@@ -14,6 +14,18 @@ import { HealthModule } from './health/health.module';
 import { QueueModule } from './queue/queue.module';
 import { RedisModule } from './redis/redis.module';
 
+// pino-pretty e devDependency: a imagem de runtime instala com --omit=dev e nao
+// o tem. Fora de producao usamos o log formatado quando o pacote existe e
+// caimos em JSON puro quando nao existe, em vez de derrubar o boot.
+function prettyTransport() {
+  try {
+    require.resolve('pino-pretty');
+    return { target: 'pino-pretty', options: { singleLine: true } };
+  } catch {
+    return undefined;
+  }
+}
+
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -36,7 +48,7 @@ import { RedisModule } from './redis/redis.module';
           transport:
             config.getOrThrow<string>('app.environment') === 'production'
               ? undefined
-              : { target: 'pino-pretty', options: { singleLine: true } },
+              : prettyTransport(),
           redact: [
             'req.headers.authorization',
             'req.headers.cookie',

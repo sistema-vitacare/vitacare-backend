@@ -8,3 +8,7 @@ coverage/
 .DS_Store
 .idea/
 .vscode/
+
+# Overrides locais do compose (desenvolvimento)
+compose.override.yaml
+compose.override.yml
