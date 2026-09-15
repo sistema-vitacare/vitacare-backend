@@ -10,6 +10,7 @@ um unico container e consome instancias **externas** de PostgreSQL e Redis.
 - [Executar com Docker](#executar-com-docker)
 - [Desenvolvimento local](#desenvolvimento-local)
 - [Rotas](#rotas)
+- [Manual de integracao da API](#manual-de-integracao-da-api)
 - [Estrutura do projeto](#estrutura-do-projeto)
 - [Banco de dados e migrations](#banco-de-dados-e-migrations)
 - [Cache e filas](#cache-e-filas)
@@ -108,6 +109,16 @@ Todo erro sai no mesmo formato:
 
 Excecoes nao tratadas viram `500` generico: a causa vai para o log com stack
 trace, nunca para a resposta HTTP.
+
+## Manual de integracao da API
+
+O [manual Markdown](docs/api/README.md) lista as rotas realmente disponiveis,
+com request, propriedades de resposta, erros e exemplos. Cada novo endpoint
+deve ter uma nota propria em `docs/api/endpoints/` conforme o
+[padrao de documentacao](docs/api/padrao-endpoint.md), alem do contrato Swagger.
+Alteracoes de regra, fluxo, dados ou contrato devem ser registradas no vault
+VitaCare e refletidas no manual na mesma tarefa, como definido em `AGENTS.md`
+e `CLAUDE.md`.
 
 ## Estrutura do projeto
 
