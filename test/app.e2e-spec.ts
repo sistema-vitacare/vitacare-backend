@@ -22,13 +22,24 @@ class CreatePacienteDto {
 }
 
 interface ErrorBody {
-  statusCode: number;
-  error: unknown;
-  message: unknown;
-  path: string;
-  method: string;
-  timestamp: string;
-  requestId?: string;
+  error: {
+    code: string;
+    message: string;
+    detail: string | null;
+    fields: { field: string; code: string; message?: string }[] | null;
+  };
+  meta: {
+    requestId: string;
+    timestamp: string;
+    path: string;
+    method: string;
+    status: number;
+  };
+}
+
+interface EnvelopeBody<T> {
+  data: T;
+  meta: { requestId: string; timestamp: string };
 }
 
 interface HealthBody {
@@ -104,14 +115,21 @@ describe('Pipeline HTTP (e2e)', () => {
   });
 
   describe('roteamento', () => {
-    it('serve a raiz sob o prefixo e a versao', async () => {
+    it('serve a raiz sob o prefixo e a versao, dentro do envelope', async () => {
       const response = await request(server()).get('/api/v1');
 
+      const body = response.body as EnvelopeBody<{
+        name: string;
+        status: string;
+      }>;
+
       expect(response.status).toBe(200);
-      expect(response.body).toEqual({
+      expect(body.data).toEqual({
         name: 'vitacare-backend',
         status: 'running',
       });
+      expect(body.meta.requestId).toEqual(expect.any(String));
+      expect(body.meta.timestamp).toEqual(expect.any(String));
     });
 
     it('nao expoe a raiz sem a versao', async () => {
@@ -155,34 +173,49 @@ describe('Pipeline HTTP (e2e)', () => {
       });
       expect(body.path).toBe('/health/ready');
     });
+
+    it('nao envelopa nenhuma rota de health', async () => {
+      const live = await request(server()).get('/health/live');
+      const ready = await request(server()).get('/health/ready');
+
+      expect(live.body).not.toHaveProperty('data');
+      expect(ready.body).not.toHaveProperty('data');
+    });
   });
 
   describe('validacao', () => {
-    it('aceita e converte um payload valido', async () => {
+    it('aceita e converte um payload valido, dentro do envelope', async () => {
       const response = await request(server())
         .post('/api/v1/pacientes')
         .send({ nome: 'Ana', idade: '42' });
 
+      const body = response.body as EnvelopeBody<{
+        nome: string;
+        idade: number;
+      }>;
+
       expect(response.status).toBe(201);
-      expect(response.body).toEqual({ nome: 'Ana', idade: 42 });
+      expect(body.data).toEqual({ nome: 'Ana', idade: 42 });
+      expect(body.meta.requestId).toEqual(expect.any(String));
     });
 
-    it('rejeita payload invalido no formato de erro normalizado', async () => {
+    it('rejeita payload invalido com 422 e erro por campo', async () => {
       const response = await request(server())
         .post('/api/v1/pacientes')
         .send({ idade: -1 });
 
       const body = response.body as ErrorBody;
 
-      expect(response.status).toBe(400);
-      expect(body).toMatchObject({
-        statusCode: 400,
-        error: 'Bad Request',
+      expect(response.status).toBe(422);
+      expect(body.error.code).toBe('VALIDATION_FAILED');
+      expect(body.error.fields?.map((field) => field.field)).toEqual(
+        expect.arrayContaining(['nome', 'idade']),
+      );
+      expect(body.meta).toMatchObject({
         path: '/api/v1/pacientes',
         method: 'POST',
+        status: 422,
       });
-      expect(Array.isArray(body.message)).toBe(true);
-      expect(body.timestamp).toEqual(expect.any(String));
     });
 
     it('rejeita propriedades nao declaradas no DTO', async () => {
@@ -192,8 +225,10 @@ describe('Pipeline HTTP (e2e)', () => {
 
       const body = response.body as ErrorBody;
 
-      expect(response.status).toBe(400);
-      expect(String(body.message)).toContain('isAdmin');
+      expect(response.status).toBe(422);
+      expect(
+        body.error.fields?.some((field) => field.field === 'isAdmin'),
+      ).toBe(true);
     });
   });
 
@@ -201,12 +236,15 @@ describe('Pipeline HTTP (e2e)', () => {
     it('converte excecao nao tratada em 500 sem vazar detalhes', async () => {
       const response = await request(server()).get('/api/v1/pacientes/boom');
 
+      const body = response.body as ErrorBody;
+
       expect(response.status).toBe(500);
-      expect(response.body).toMatchObject({
-        statusCode: 500,
-        error: 'Internal Server Error',
-        message: 'Unexpected internal error',
+      expect(body.error).toMatchObject({
+        code: 'INTERNAL_ERROR',
+        detail: null,
+        fields: null,
       });
+      expect(body.meta.requestId).toEqual(expect.any(String));
       expect(JSON.stringify(response.body)).not.toContain('hunter2');
     });
   });
@@ -248,6 +286,28 @@ describe('Pipeline HTTP (e2e)', () => {
       expect(response.status).toBe(200);
       expect(body.info.title).toBe('VitaCare API');
       expect(Object.keys(body.paths)).toContain('/api/v1');
+
+      const root = body.paths['/api/v1'] as {
+        get: {
+          responses: Record<
+            string,
+            { content: Record<string, { schema: { properties: object } }> }
+          >;
+        };
+      };
+
+      const schema =
+        root.get.responses['200'].content['application/json'].schema;
+
+      expect(Object.keys(schema.properties)).toEqual(
+        expect.arrayContaining(['data', 'meta']),
+      );
+    });
+
+    it('nao envelopa o proprio documento OpenAPI', async () => {
+      const response = await request(server()).get('/api/docs-json');
+
+      expect(response.body).not.toHaveProperty('data');
     });
   });
 });
