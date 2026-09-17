@@ -1,7 +1,7 @@
 ---
 title: Readiness de PostgreSQL e Redis
 status: atual
-updated: 2026-09-15
+updated: 2026-09-17
 method: GET
 path: /health/ready
 source: src/health/health.controller.ts
@@ -83,6 +83,11 @@ Em `503 Service Unavailable`, o Terminus retorna `status: "error"`, reparte os i
 
 `/health/live` pode continuar `200` durante este `503`. Não use readiness para consultar dados clínicos ou estado de uma organização.
 
+
+### Envelope
+
+Esta rota **não usa** o envelope `{ data, meta }`. O corpo acima é o formato do indicador de saúde e é o contrato de monitoramento: sondas de container e balanceador dependem dele. Alterá-lo quebraria integrações externas, então `/health/*` está na lista de exclusão do interceptor e do filtro global. Ver [manual](../README.md), seção "Rotas fora do envelope".
+
 ## Origem e validação
 
-Implementação: `src/health/health.controller.ts`, `src/health/indicators/redis.health.ts`; Swagger: `@HealthCheck`; teste HTTP com dependências mockadas em `test/app.e2e-spec.ts` (200 e 503). Conferido em 2026-09-15. Sem RF/UC de domínio; rota operacional.
+Implementação: `src/health/health.controller.ts`, `src/health/indicators/redis.health.ts`; Swagger: `@HealthCheck`; teste HTTP com dependências mockadas em `test/app.e2e-spec.ts` (200 e 503). Conferido em 2026-09-17. Sem RF/UC de domínio; rota operacional.

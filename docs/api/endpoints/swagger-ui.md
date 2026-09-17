@@ -1,7 +1,7 @@
 ---
 title: Interface Swagger da API
 status: atual
-updated: 2026-09-15
+updated: 2026-09-17
 method: GET
 path: /api/docs
 source: src/app.setup.ts
@@ -26,6 +26,11 @@ curl -i 'https://api.example.com/api/docs'
 Quando habilitada, a rota entrega **HTML** da Swagger UI (`Content-Type: text/html`) e seus recursos estáticos. Não há corpo JSON nem propriedades JSON a descrever. O navegador consome o documento de `GET /api/docs-json` para mostrar operações e schemas.
 
 Quando `SWAGGER_ENABLED=false`, a UI não é registrada e o caminho retorna `404` conforme o roteamento da aplicação. Um erro interno, caso ocorra durante a resposta, segue o envelope global do [manual](../README.md). A disponibilidade desta UI não comprova que banco, Redis ou módulos de negócio estejam operacionais.
+
+
+### Envelope
+
+Esta rota **não usa** o envelope `{ data, meta }`. O formato é fixado pela especificação OpenAPI e pela interface Swagger; envelopá-lo quebraria qualquer cliente que consome o contrato. A rota está na lista de exclusão do interceptor e do filtro global. Ver [manual](../README.md), seção "Rotas fora do envelope".
 
 ## Origem e validação
 

@@ -9,7 +9,9 @@ import type { NestExpressApplication } from '@nestjs/platform-express';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import type { NextFunction, Request, Response } from 'express';
 import helmet from 'helmet';
-import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
+import { AllExceptionsFilter } from './common/filters/allExceptions.filter';
+import { ResponseEnvelopeInterceptor } from './common/http/responseEnvelope.interceptor';
+import { validationExceptionFactory } from './common/http/validationException.factory';
 
 export interface AppSetupOptions {
   apiPrefix: string;
@@ -83,14 +85,20 @@ export const setupApp = (
     defaultVersion: options.apiVersion,
   });
 
+  // Health mantem o relatorio do Terminus e a documentacao mantem HTML/OpenAPI
+  // puros: as duas ficam fora do envelope e do novo formato de erro.
+  const excludedPaths = ['/health', docsPath];
+
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
       forbidNonWhitelisted: true,
       transform: true,
+      exceptionFactory: validationExceptionFactory,
     }),
   );
-  app.useGlobalFilters(new AllExceptionsFilter());
+  app.useGlobalInterceptors(new ResponseEnvelopeInterceptor(excludedPaths));
+  app.useGlobalFilters(new AllExceptionsFilter(excludedPaths));
   app.enableShutdownHooks();
 
   if (options.swaggerEnabled) {

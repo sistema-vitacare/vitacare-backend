@@ -1,7 +1,7 @@
 ---
 title: Liveness do processo
 status: atual
-updated: 2026-09-15
+updated: 2026-09-17
 method: GET
 path: /health/live
 source: src/health/health.controller.ts
@@ -35,6 +35,11 @@ curl -i -H 'Accept: application/json' 'https://api.example.com/health/live'
 
 Falha de conexão com o processo não produz JSON desta rota; o cliente/proxy verá seu próprio erro. Um `500` inesperado, se a aplicação ainda conseguir responder, usa o envelope global do [manual](../README.md). Liveness `200` não garante dependências disponíveis.
 
+
+### Envelope
+
+Esta rota **não usa** o envelope `{ data, meta }`. O corpo acima é o formato do indicador de saúde e é o contrato de monitoramento: sondas de container e balanceador dependem dele. Alterá-lo quebraria integrações externas, então `/health/*` está na lista de exclusão do interceptor e do filtro global. Ver [manual](../README.md), seção "Rotas fora do envelope".
+
 ## Origem e validação
 
-Implementação: `src/health/health.controller.ts`; teste HTTP: `test/app.e2e-spec.ts`. Conferido em 2026-09-15. Sem RF/UC de domínio; rota operacional.
+Implementação: `src/health/health.controller.ts`; teste HTTP: `test/app.e2e-spec.ts`. Conferido em 2026-09-17. Sem RF/UC de domínio; rota operacional.

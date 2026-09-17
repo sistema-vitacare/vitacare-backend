@@ -1,5 +1,6 @@
 import { join } from 'node:path';
 import type { DataSourceOptions } from 'typeorm';
+import { SnakeNamingStrategy } from './snakeNaming.strategy';
 
 export interface DatabaseSettings {
   host: string;
@@ -33,6 +34,8 @@ export const buildDataSourceOptions = (
   ssl: settings.ssl
     ? { rejectUnauthorized: settings.sslRejectUnauthorized }
     : false,
+  // Codigo em camelCase, banco em snake_case, sem `name:` em cada @Column.
+  namingStrategy: new SnakeNamingStrategy(),
   // O banco e externo: nada de alteracao automatica de schema.
   synchronize: false,
   migrationsRun: false,

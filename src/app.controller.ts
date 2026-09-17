@@ -1,10 +1,6 @@
 import { Controller, Get } from '@nestjs/common';
-import {
-  ApiOkResponse,
-  ApiOperation,
-  ApiProperty,
-  ApiTags,
-} from '@nestjs/swagger';
+import { ApiOperation, ApiProperty, ApiTags } from '@nestjs/swagger';
+import { ApiEnvelope } from './common/http/apiEnvelope.decorator';
 
 export class ServiceIdentityDto {
   @ApiProperty({ example: 'vitacare-backend' })
@@ -19,7 +15,7 @@ export class ServiceIdentityDto {
 export class AppController {
   @Get()
   @ApiOperation({ summary: 'Identificacao do servico' })
-  @ApiOkResponse({ type: ServiceIdentityDto })
+  @ApiEnvelope(ServiceIdentityDto)
   index(): ServiceIdentityDto {
     return { name: 'vitacare-backend', status: 'running' };
   }

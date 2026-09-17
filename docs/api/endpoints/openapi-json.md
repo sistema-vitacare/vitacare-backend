@@ -1,7 +1,7 @@
 ---
 title: Contrato OpenAPI gerado
 status: atual
-updated: 2026-09-15
+updated: 2026-09-17
 method: GET
 path: /api/docs-json
 source: src/app.setup.ts
@@ -100,6 +100,11 @@ curl -i -H 'Accept: application/json' 'https://api.example.com/api/docs-json'
 | `components.securitySchemes.bearer` | objeto | Esquema HTTP `bearer` com formato anunciado `JWT`; ainda não há login. |
 
 Com `SWAGGER_ENABLED=false`, a rota não existe (`404`). Um `500` inesperado usa o envelope global do [manual](../README.md). Para consumir **todas as propriedades efetivas** do OpenAPI, obtenha o JSON da execução alvo; o exemplo acima é apenas orientação de leitura e pode diferir à medida que a API cresce.
+
+
+### Envelope
+
+Esta rota **não usa** o envelope `{ data, meta }`. O formato é fixado pela especificação OpenAPI e pela interface Swagger; envelopá-lo quebraria qualquer cliente que consome o contrato. A rota está na lista de exclusão do interceptor e do filtro global. Ver [manual](../README.md), seção "Rotas fora do envelope".
 
 ## Origem e validação
 
