@@ -1,7 +1,7 @@
 ---
 title: Manual de integração da API VitaCare
 status: atual
-updated: 2026-09-15
+updated: 2026-09-17
 ---
 
 # Manual de integração da API VitaCare
@@ -24,33 +24,135 @@ O corpo das rotas de negócio é JSON quando aplicável. Ainda não existem endp
 
 Os caminhos de Swagger usam `SWAGGER_PATH=docs` e só existem com `SWAGGER_ENABLED=true`. O documento OpenAPI é gerado em runtime; consulte a rota JSON do ambiente para conferir a versão publicada. `/health/live` é excluída do OpenAPI de propósito, mas permanece documentada aqui.
 
-## Erros e paginação para próximos módulos
+## Contrato transversal
 
-O filtro global normaliza erros HTTP. `requestId` só aparece quando há ID de requisição; `message` pode ser texto ou lista de mensagens de validação. Em erros específicos como falha de readiness, o payload original da biblioteca pode trazer `status`, `info`, `error` e `details`, acrescidos dos metadados abaixo. Exemplo genérico, **ilustrativo**:
+Toda rota sob `/api` compartilha o mesmo envelope de sucesso e o mesmo formato de erro. As exceções estão listadas adiante.
+
+### Envelope de sucesso
 
 ```json
 {
-  "statusCode": 400,
-  "error": "Bad Request",
-  "message": ["page must not be less than 1"],
-  "path": "/api/v1/recurso?page=0",
-  "method": "GET",
-  "timestamp": "2026-09-15T12:00:00.000Z",
-  "requestId": "5"
+  "data": { "id": "7f3a", "fullName": "Ana Souza" },
+  "meta": { "requestId": "01J8X", "timestamp": "2026-09-17T12:00:00.000Z" }
+}
+```
+
+Listagem paginada acrescenta `meta.pagination`:
+
+```json
+{
+  "data": [{ "id": "7f3a" }, { "id": "91bd" }],
+  "meta": {
+    "requestId": "01J8Y",
+    "timestamp": "2026-09-17T12:00:01.000Z",
+    "pagination": { "page": 2, "limit": 20, "total": 143, "totalPages": 8 }
+  }
+}
+```
+
+Escrita pode acrescentar `meta.message`:
+
+```json
+{
+  "data": { "id": "c40e" },
+  "meta": {
+    "requestId": "01J8Z",
+    "timestamp": "2026-09-17T12:00:02.000Z",
+    "message": "Paciente cadastrado com sucesso."
+  }
 }
 ```
 
 | Propriedade | Tipo | Significado |
 | --- | --- | --- |
-| `statusCode` | inteiro | Código HTTP retornado. |
-| `error` | texto | Nome curto do erro, quando o payload for erro HTTP padrão. |
-| `message` | texto ou lista de textos | Explicação/validação; não aparece em todo erro de dependência. |
-| `path` | texto | URL requisitada, incluindo query string. |
-| `method` | texto | Método HTTP da requisição. |
-| `timestamp` | texto ISO 8601 | Momento em que o filtro construiu a resposta. |
-| `requestId` | texto, opcional | Identificador para correlação de logs. |
+| `data` | objeto, lista ou `null` | Conteúdo da operação. Operação sem conteúdo devolve `200` com `data: null`, não `204`. |
+| `meta.requestId` | texto | Identificador de correlação com o log. Sempre presente. |
+| `meta.timestamp` | texto ISO 8601 | Momento em que a resposta foi construída. Sempre presente. |
+| `meta.message` | texto, opcional | Confirmação amigável definida pelo caso de uso. |
+| `meta.pagination` | objeto, opcional | `page`, `limit`, `total` e `totalPages`. Só em resultado paginado. |
 
-O projeto já contém `PaginationQueryDto` para rotas futuras: `page` inteiro mínimo 1, padrão 1; `limit` inteiro de 1 a 100, padrão 20. O envelope de paginação previsto tem `items` (lista) e `meta` com `page`, `limit`, `total` e `totalPages`. **Nenhuma rota atual recebe esses parâmetros**. Cada rota futura deverá documentar seus próprios filtros, ordenação, limites e formato de item antes de ser publicada.
+### Rotas fora do envelope
+
+| Rota | Motivo |
+| --- | --- |
+| `GET /health/live` | Mantém o formato do indicador de saúde. |
+| `GET /health/ready` | Mantém o relatório de dependências, com `status`, `info`, `error` e `details`. |
+| `GET /api/docs` | HTML da interface Swagger. |
+| `GET /api/docs-json` | Documento OpenAPI, formato fixado pela especificação. |
+
+### Formato de erro
+
+```json
+{
+  "error": {
+    "code": "VALIDATION_FAILED",
+    "message": "Alguns campos precisam ser corrigidos.",
+    "detail": "2 campos invalidos na requisicao.",
+    "fields": [
+      { "field": "email", "code": "IS_EMAIL", "message": "Informe um e-mail valido." },
+      { "field": "idade", "code": "MIN", "message": "idade must not be less than 0" }
+    ]
+  },
+  "meta": {
+    "requestId": "01J8Y",
+    "timestamp": "2026-09-17T12:00:01.000Z",
+    "path": "/api/v1/pacientes",
+    "method": "POST",
+    "status": 422
+  }
+}
+```
+
+Erro inesperado suprime o `detail` e não expõe a causa:
+
+```json
+{
+  "error": {
+    "code": "INTERNAL_ERROR",
+    "message": "Nao foi possivel concluir a operacao. Tente novamente.",
+    "detail": null,
+    "fields": null
+  },
+  "meta": {
+    "requestId": "01J8Z",
+    "timestamp": "2026-09-17T12:00:02.000Z",
+    "path": "/api/v1/pacientes",
+    "method": "GET",
+    "status": 500
+  }
+}
+```
+
+| Propriedade | Tipo | Significado |
+| --- | --- | --- |
+| `error.code` | texto | Código estável no formato `DOMINIO_MOTIVO`, em SCREAMING_SNAKE. É contrato com o frontend: trate por `code`, nunca comparando `message`. |
+| `error.message` | texto | Mensagem amigável, em português, exibível ao usuário final. |
+| `error.detail` | texto ou `null` | Frase técnica escrita pela aplicação. Nunca stack, nunca mensagem crua de driver, nunca valor de campo clínico ou de identidade. `null` em erro inesperado. |
+| `error.fields` | lista ou `null` | Um item por restrição violada, com `field`, `code` e `message` opcional. Campo aninhado aparece como `pai.filho`. |
+| `meta.requestId` | texto | Correlação com o log do servidor. Cite-o ao reportar um erro. |
+| `meta.timestamp` | texto ISO 8601 | Momento em que o filtro construiu a resposta. |
+| `meta.path` | texto | URL requisitada, incluindo query string. |
+| `meta.method` | texto | Método HTTP da requisição. |
+| `meta.status` | inteiro | Código HTTP retornado, repetido no corpo. |
+
+### Códigos HTTP
+
+| Status | Uso |
+| --- | --- |
+| `400` | Corpo malformado, JSON inválido, parâmetro de rota com tipo errado. |
+| `401` | Não autenticado: token ausente, expirado ou revogado. |
+| `403` | Autenticado sem permissão de perfil ou sem vínculo com o paciente. |
+| `404` | Recurso inexistente **ou** pertencente a outra organização. A API não distingue os dois casos de propósito. |
+| `409` | Conflito de estado: duplicidade, transição inválida, limite de plano atingido. |
+| `422` | Validação de campo. O JSON está correto; os valores não. |
+| `429` | Limite de requisições excedido. |
+| `500` | Erro inesperado. `detail` é `null`. |
+
+Códigos transversais de `error.code`: `BAD_REQUEST`, `VALIDATION_FAILED`, `UNAUTHENTICATED`, `FORBIDDEN`, `NOT_FOUND`, `CONFLICT`, `RATE_LIMITED`, `INTERNAL_ERROR`, `SERVICE_UNAVAILABLE`. Cada módulo declara os seus em `<modulo>.errors.ts` e a nota do endpoint lista os possíveis por status.
+
+### Paginação
+
+`PaginationQueryDto` vale para toda rota de listagem: `page` inteiro mínimo 1, padrão 1; `limit` inteiro de 1 a 100, padrão 20. O resultado alimenta `meta.pagination`. **Nenhuma rota atual recebe esses parâmetros.** Cada rota futura documenta seus próprios filtros, ordenação e limites antes de ser publicada.
 
 ## Manutenção do manual
 

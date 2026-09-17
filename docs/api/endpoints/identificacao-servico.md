@@ -1,7 +1,7 @@
 ---
 title: Identificação do serviço
 status: atual
-updated: 2026-09-15
+updated: 2026-09-17
 method: GET
 path: /api/v1
 source: src/app.controller.ts
@@ -27,18 +27,36 @@ curl -i -H 'Accept: application/json' 'https://api.example.com/api/v1'
 
 ```json
 {
-  "name": "vitacare-backend",
-  "status": "running"
+  "data": {
+    "name": "vitacare-backend",
+    "status": "running"
+  },
+  "meta": {
+    "requestId": "01J8X",
+    "timestamp": "2026-09-17T12:00:00.000Z"
+  }
 }
 ```
 
+Esta rota **usa o envelope** `{ data, meta }` descrito no [manual](../README.md).
+
 | Propriedade JSON | Tipo | Obrigatória | Significado |
 | --- | --- | --- | --- |
-| `name` | texto | sim | Identificador fixo do serviço neste checkout: `vitacare-backend`. |
-| `status` | texto | sim | Estado do processo HTTP: `running`. Não representa readiness. |
+| `data.name` | texto | sim | Identificador fixo do serviço neste checkout: `vitacare-backend`. |
+| `data.status` | texto | sim | Estado do processo HTTP: `running`. Não representa readiness. |
+| `meta.requestId` | texto | sim | Identificador de correlação com o log do servidor. |
+| `meta.timestamp` | texto ISO 8601 | sim | Momento em que a resposta foi construída. |
 
-Caminho inexistente ou versão incorreta retorna `404` no envelope global descrito no [manual](../README.md). Erro interno não tratado retorna `500` genérico. Esses códigos não fazem parte do sucesso desta operação.
+### Erros
+
+| Status | `error.code` | Condição |
+| --- | --- | --- |
+| `404` | `NOT_FOUND` | Caminho inexistente ou versão incorreta. |
+| `429` | `RATE_LIMITED` | Limite de requisições excedido. |
+| `500` | `INTERNAL_ERROR` | Falha inesperada. `detail` vem `null`. |
+
+Todos seguem o formato `{ error, meta }` do manual. Esses códigos não fazem parte do sucesso desta operação.
 
 ## Origem e validação
 
-Implementação: `src/app.controller.ts`; Swagger: `ServiceIdentityDto`; teste HTTP: `test/app.e2e-spec.ts` (roteamento e resposta). Conferido em 2026-09-15. Sem RF/UC de domínio; é rota transversal de infraestrutura.
+Implementação: `src/app.controller.ts`; Swagger: `ServiceIdentityDto`; teste HTTP: `test/app.e2e-spec.ts` (roteamento e resposta). Conferido em 2026-09-17. Sem RF/UC de domínio; é rota transversal de infraestrutura.
