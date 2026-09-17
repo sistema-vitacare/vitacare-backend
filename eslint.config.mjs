@@ -32,6 +32,26 @@ export default tseslint.config(
     },
   },
   {
+    // O isolamento por organizacao depende de todo acesso a dados passar pelo
+    // TenantScopedRepository. Repositorio cru so dentro de `repositories/`.
+    files: ['src/**/*.ts'],
+    ignores: [
+      'src/**/repositories/**',
+      'src/common/database/**',
+      'src/**/*.spec.ts',
+    ],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector: "Decorator[expression.callee.name='InjectRepository']",
+          message:
+            'Use TenantScopedRepository. @InjectRepository so e permitido em repositories/.',
+        },
+      ],
+    },
+  },
+  {
     // Os stubs gerados por `typeorm migration:create` trazem queryRunner
     // sem uso ate que o corpo da migration seja escrito.
     files: ['src/database/migrations/**/*.ts'],
