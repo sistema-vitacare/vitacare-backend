@@ -1,5 +1,9 @@
 # VitaCare Backend — Base, convenções transversais e contratos de resposta
 
+> Atualização de 2026-09-18: a convenção de `deactivated_at` deste desenho
+> histórico foi substituída por `deleted_at timestamptz` anulável em toda
+> tabela. Consulte `AGENTS.md` e `src/database/README.md` para a regra vigente.
+
 - **Data:** 2026-09-17
 - **Tarefa:** Backlog do backend, tarefa 1, checkpoints 1 e 3 (`vitacare-backlog-backend-base-e-acompanhamento`)
 - **RF/UC/RNF:** RNF004, RNF005, RNF007, RNF009 (base transversal). Sem RF/UC direto — habilita todos.

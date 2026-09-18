@@ -1,5 +1,9 @@
 # Base transversal do VitaCare Backend — Implementation Plan
 
+> Atualização de 2026-09-18: a referência histórica a `deactivated_at`
+> foi substituída por `deleted_at timestamptz` anulável em toda tabela.
+> A regra vigente está em `AGENTS.md` e `src/database/README.md`.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Entregar a camada transversal que todo módulo de negócio do VitaCare vai herdar: contexto de requisição, isolamento por organização, envelope de resposta, contrato de erro e convenções de migration.

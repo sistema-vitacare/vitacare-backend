@@ -129,6 +129,9 @@ comportamento real.
 
 - Toda alteracao de schema entra como migration em `src/database/migrations`.
   Ver `src/database/README.md`. Nunca use `synchronize`.
+- Toda entidade/tabela inclui `deletedAt`/`deleted_at timestamptz` anulavel;
+  nao usar `deactivatedAt`/`deactivated_at`. A coluna nao aplica filtro
+  automatico: o caso de uso e o repositorio definem leitura e revogacao.
 - Filas: importe `BullModule.registerQueue({ name: '...' })` no modulo e declare
   o processor com `@Processor('...')`.
 - Importe utilitarios compartilhados por alias: `import { PaginationQueryDto } from '@/common'`.
