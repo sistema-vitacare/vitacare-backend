@@ -11,6 +11,11 @@ import redisConfig from './config/redis.config';
 import securityConfig from './config/security.config';
 import { DatabaseModule } from './database/database.module';
 import { HealthModule } from './health/health.module';
+import { AccessModule } from './modules/Access/access.module';
+import { AuditModule } from './modules/Audit/audit.module';
+import { OrganizationModule } from './modules/Organization/organization.module';
+import { PlanModule } from './modules/Plan/plan.module';
+import { UserModule } from './modules/User/user.module';
 import { QueueModule } from './queue/queue.module';
 import { RedisModule } from './redis/redis.module';
 
@@ -73,6 +78,11 @@ function prettyTransport() {
       }),
     }),
     DatabaseModule,
+    OrganizationModule,
+    PlanModule,
+    AccessModule,
+    UserModule,
+    AuditModule,
     RedisModule,
     QueueModule,
     HealthModule,
