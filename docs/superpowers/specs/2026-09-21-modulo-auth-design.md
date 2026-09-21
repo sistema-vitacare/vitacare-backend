@@ -2,7 +2,7 @@
 
 **Data:** 2026-09-21  
 **Escopo:** RF001, RF002, UC01 e UC02  
-**Estado:** aprovado em conversa, aguardando revisão do documento
+**Estado:** aprovado por Mateus em 2026-09-21
 
 ## Objetivo
 
@@ -276,9 +276,11 @@ tabela de auditoria.
 ## Configuração
 
 Configuração tipada e validada incluirá segredos e prazos de autenticação,
-parâmetros Argon2id, habilitação SMTP, host, porta, TLS, usuário, senha,
-remetente e URL de recuperação do frontend. Variáveis SMTP obrigatórias serão
-validadas condicionalmente apenas quando SMTP estiver habilitado.
+habilitação SMTP, host, porta, TLS, usuário, senha, remetente e URL de
+recuperação do frontend. Argon2id usará os parâmetros seguros padrão da versão
+fixada de `node-argon2`; eles não serão enfraquecidos por variáveis de ambiente.
+Variáveis SMTP obrigatórias serão validadas condicionalmente apenas quando SMTP
+estiver habilitado.
 
 `.env.example` terá valores ilustrativos sem credenciais. Logs continuarão
 redigindo `authorization` e passarão a redigir campos sensíveis dos DTOs quando
