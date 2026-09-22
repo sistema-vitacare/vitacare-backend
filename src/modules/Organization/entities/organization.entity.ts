@@ -23,6 +23,9 @@ export class Organization {
   @PrimaryColumn('uuid', { default: () => 'gen_random_uuid()' })
   id!: string;
 
+  @Column({ type: 'varchar', length: 50, unique: true })
+  code!: string;
+
   @Column('uuid')
   usagePlanId!: string;
 
