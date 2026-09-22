@@ -108,4 +108,4 @@ Esta rota **não usa** o envelope `{ data, meta }`. O formato é fixado pela esp
 
 ## Origem e validação
 
-Geração: `src/app.setup.ts`, `src/config/app.config.ts`; teste HTTP: `test/app.e2e-spec.ts` confirma status, título e `/api/v1`. A estrutura de topo foi conferida com `SwaggerModule.createDocument` local em 2026-09-15. Sem RF/UC de domínio; rota de documentação.
+Geração: `src/app.setup.ts`, `src/config/app.config.ts`; teste HTTP: `tests/app/app.e2e-spec.ts` confirma status, título e `/api/v1`. A estrutura de topo foi conferida com `SwaggerModule.createDocument` local em 2026-09-15. Sem RF/UC de domínio; rota de documentação.

@@ -82,4 +82,4 @@ Efeito: a sessão recebe `revoked_at` e `revoked_reason = 'logout'`. A linha con
 
 ## Origem e validação
 
-Controller `src/modules/Auth/auth.controller.ts`; caso de uso `src/modules/Auth/Logout/logout.useCase.ts`; repositório `src/modules/Auth/repositories/authSession.repository.ts`. Testes: `logout.useCase.spec.ts`, `test/auth.e2e-spec.ts` (200 com `data: null` e 401 sem Bearer) e `test/authSchema.e2e-spec.ts` (dois dispositivos, só um encerrado). Conferido contra o OpenAPI gerado em 2026-09-22. Vault: [[2026-09-21-autenticacao-sessoes-recuperacao]].
+Controller `src/modules/Auth/auth.controller.ts`; caso de uso `src/modules/Auth/Logout/logout.useCase.ts`; repositório `src/modules/Auth/repositories/authSession.repository.ts`. Testes: `tests/modules/Auth/logout.useCase.spec.ts`, `tests/modules/Auth/auth.e2e-spec.ts` (200 com `data: null` e 401 sem Bearer) e `tests/modules/Auth/authSchema.e2e-spec.ts` (dois dispositivos, só um encerrado). Conferido contra o OpenAPI gerado em 2026-09-22. Vault: [[2026-09-21-autenticacao-sessoes-recuperacao]].

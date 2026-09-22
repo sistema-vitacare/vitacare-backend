@@ -59,4 +59,4 @@ Todos seguem o formato `{ error, meta }` do manual. Esses códigos não fazem pa
 
 ## Origem e validação
 
-Implementação: `src/app.controller.ts`; Swagger: `ServiceIdentityDto`; teste HTTP: `test/app.e2e-spec.ts` (roteamento e resposta). Conferido em 2026-09-17. Sem RF/UC de domínio; é rota transversal de infraestrutura.
+Implementação: `src/app.controller.ts`; Swagger: `ServiceIdentityDto`; teste HTTP: `tests/app/app.e2e-spec.ts` (roteamento e resposta). Conferido em 2026-09-17. Sem RF/UC de domínio; é rota transversal de infraestrutura.

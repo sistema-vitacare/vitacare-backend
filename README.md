@@ -166,9 +166,22 @@ src/
 ├── modules/                 # modulos de dominio (ver modules/README.md)
 ├── queue/                   # BullMQ compartilhado
 ├── redis/                   # cliente ioredis + RedisService (cache)
+├── cli/                     # entrypoints de operacao (bootstrap)
 ├── app.setup.ts             # pipeline HTTP, reusado pelos testes e2e
 └── main.ts                  # bootstrap
+
+tests/                       # todo teste do repositorio, por area de src/
+├── jest-e2e.json            # config da camada e2e
+├── app/                     # pipeline HTTP transversal
+├── common/                  # envelope, erros, contexto, validacao
+├── database/                # nomes de colunas e schema em PostgreSQL
+├── health/ e redis/         # infraestrutura
+└── modules/Auth/            # unitarios e e2e do dominio
 ```
+
+Nenhum `*.spec.ts` fica dentro de `src/`: os testes espelham as areas de `src/`
+em `tests/`, com arquivos planos dentro de cada pasta. O sufixo separa as
+camadas — `*.e2e-spec.ts` roda por `npm run test:e2e`, o resto por `npm test`.
 
 Imports entre pastas usam o alias `@/`, resolvido em build e em testes:
 
@@ -246,12 +259,12 @@ de health nao poluem o log.
 
 ## Testes
 
-- `npm test` — unitarios, colocados ao lado do codigo (`*.spec.ts`).
+- `npm test` — unitarios de `tests/`, exceto `*.e2e-spec.ts`.
 - `npm run test:e2e` — sobe o pipeline HTTP real (helmet, CORS, versionamento,
   validacao, filtro de erros, Swagger) com PostgreSQL e Redis mockados. Roda em
   CI sem nenhum servico externo.
-- Os specs de schema (`test/initialSchema.e2e-spec.ts` e
-  `test/authSchema.e2e-spec.ts`) **pulam** por padrao. Para exercita-los, aponte
+- Os specs de schema (`tests/database/initialSchema.e2e-spec.ts` e
+  `tests/modules/Auth/authSchema.e2e-spec.ts`) **pulam** por padrao. Para exercita-los, aponte
   `VITACARE_TEST_DATABASE_URL` para um PostgreSQL **descartavel e vazio**
   chamado `vitacare_schema_test` em `localhost`; eles rodam as migrations,
   validam constraints, isolamento entre organizacoes e revogacao de sessao, e

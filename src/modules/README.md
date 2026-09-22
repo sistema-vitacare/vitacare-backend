@@ -25,8 +25,7 @@ src/modules/
     │   ├── createPatient.dto.ts
     │   ├── createPatient.parser.ts
     │   ├── createPatient.type.ts
-    │   ├── createPatient.query.ts
-    │   └── createPatient.useCase.spec.ts
+    │   └── createPatient.query.ts
     │
     ├── ListPatients/
     ├── UpdatePatient/
@@ -45,6 +44,8 @@ src/modules/
 | `*.errors.ts` | Catalogo congelado de codigos do modulo. | Consumido pelo Swagger e por `docs/api/`. |
 | `*.service.ts` | Opcional: orquestracao ou integracao reutilizavel. | So quando for camada util de verdade. |
 
+Nenhum `*.spec.ts` mora em `src/`. Ver "Testes" abaixo.
+
 ## Regras
 
 1. **Arquivo vira pasta quando passa de um.** `createPatient.parser.ts` ->
@@ -57,6 +58,38 @@ src/modules/
    as demais no singular do recurso (`CreatePatient`, `DeactivatePatient`).
 5. **Nada compartilhado entre casos de uso fica dentro da pasta de um deles.**
    Sobe para `entities/`, `enums/`, `repositories/`, `parsers/` ou `types/`.
+
+## Testes
+
+**Convencao alterada em 2026-09-22:** teste nao fica ao lado do codigo. Todo
+arquivo de teste vive em `tests/`, na raiz do repositorio, em uma pasta por area
+de `src/`. Dentro da pasta os arquivos sao planos — a pasta por caso de uso
+existe em `src/`, nao em `tests/`.
+
+```
+tests/
+├── jest-e2e.json                       # config da camada e2e
+├── app/app.e2e-spec.ts                 # pipeline HTTP transversal
+├── common/*.spec.ts                    # envelope, erros, contexto, validacao
+├── database/                           # estrategia de nomes e schema
+│   ├── snakeNaming.strategy.spec.ts
+│   └── initialSchema.e2e-spec.ts
+├── health/ e redis/                    # infraestrutura
+└── modules/
+    └── Patient/
+        ├── createPatient.useCase.spec.ts
+        ├── patient.repository.spec.ts
+        └── patient.e2e-spec.ts
+```
+
+- O nome do arquivo repete o do alvo mais `.spec.ts`; o sufixo de
+  responsabilidade (`.useCase`, `.repository`, `.guard`) ja desambigua.
+- `*.e2e-spec.ts` roda por `npm run test:e2e`; os demais por `npm test`. A
+  separacao e por sufixo, nao por pasta.
+- Teste importa producao **sempre pelo alias `@/`**; caminho relativo para
+  `src/` quebra assim que o arquivo muda de pasta.
+- Teste que exige PostgreSQL descartavel fica atras de
+  `VITACARE_TEST_DATABASE_URL` e **pula** quando a variavel nao existe.
 
 ## Isolamento por organizacao
 

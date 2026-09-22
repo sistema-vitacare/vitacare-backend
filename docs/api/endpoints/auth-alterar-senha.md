@@ -98,4 +98,4 @@ Efeitos, na mesma transação: novo hash, `password_changed_at`, revogação de 
 
 ## Origem e validação
 
-Controller `src/modules/Auth/auth.controller.ts`; DTO `src/modules/Auth/ChangePassword/changePassword.dto.ts`; caso de uso `changePassword.useCase.ts`; transação `src/modules/Auth/repositories/authTransaction.repository.ts`. Testes: `changePassword.useCase.spec.ts`, `test/auth.e2e-spec.ts` (200 com `data: null`) e `test/authSchema.e2e-spec.ts` (dois dispositivos derrubados e login novo exigido). Conferido contra o OpenAPI gerado em 2026-09-22. Vault: [[2026-09-21-autenticacao-sessoes-recuperacao]].
+Controller `src/modules/Auth/auth.controller.ts`; DTO `src/modules/Auth/ChangePassword/changePassword.dto.ts`; caso de uso `changePassword.useCase.ts`; transação `src/modules/Auth/repositories/authTransaction.repository.ts`. Testes: `tests/modules/Auth/changePassword.useCase.spec.ts`, `tests/modules/Auth/auth.e2e-spec.ts` (200 com `data: null`) e `tests/modules/Auth/authSchema.e2e-spec.ts` (dois dispositivos derrubados e login novo exigido). Conferido contra o OpenAPI gerado em 2026-09-22. Vault: [[2026-09-21-autenticacao-sessoes-recuperacao]].

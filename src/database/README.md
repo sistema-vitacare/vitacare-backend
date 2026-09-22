@@ -92,7 +92,7 @@ nem dados iniciais de planos, perfis ou permissoes nesta fatia.
 As FKs compostas de usuario/perfil, perfil/permissao e auditoria/ator impedem
 referencias a outra organizacao no PostgreSQL. `permissions` e catalogo global;
 as concessoes pertencem ao perfil de uma organizacao. Os testes em
-`test/initialSchema.e2e-spec.ts` usam PostgreSQL **descartavel** e exigem
+`tests/database/initialSchema.e2e-spec.ts` usam PostgreSQL **descartavel** e exigem
 `VITACARE_TEST_DATABASE_URL` apontando para `vitacare_schema_test` em
 `localhost`/`127.0.0.1`, sem tabela `organizations` preexistente.
 
@@ -109,13 +109,13 @@ organizacao. Mapeamento em `src/modules/Auth/entities/`.
 
 Validacao executada em PostgreSQL descartavel: `migration:show`,
 `migration:run`, `migration:revert` e `migration:run` novamente, mais
-`test/authSchema.e2e-spec.ts`, que roda as duas migrations, exercita
+`tests/modules/Auth/authSchema.e2e-spec.ts`, que roda as duas migrations, exercita
 isolamento entre organizacoes, inatividade e revogacao de sessao e reverte
 tudo no final. **Nenhuma migration foi aplicada em banco externo ou real.**
 
 ```bash
 VITACARE_TEST_DATABASE_URL="postgresql://<usuario>:<senha>@127.0.0.1:<porta>/vitacare_schema_test" \
-  npm run test:e2e -- --runInBand test/authSchema.e2e-spec.ts
+  npm run test:e2e -- --runInBand tests/modules/Auth/authSchema.e2e-spec.ts
 ```
 
 `organizations.usage_plan_id` e obrigatorio e referencia `usage_plans.id` com

@@ -90,4 +90,4 @@ Esta rota **não usa** o envelope `{ data, meta }`. O corpo acima é o formato d
 
 ## Origem e validação
 
-Implementação: `src/health/health.controller.ts`, `src/health/indicators/redis.health.ts`; Swagger: `@HealthCheck`; teste HTTP com dependências mockadas em `test/app.e2e-spec.ts` (200 e 503). Conferido em 2026-09-17. Sem RF/UC de domínio; rota operacional.
+Implementação: `src/health/health.controller.ts`, `src/health/indicators/redis.health.ts`; Swagger: `@HealthCheck`; teste HTTP com dependências mockadas em `tests/app/app.e2e-spec.ts` (200 e 503). Conferido em 2026-09-17. Sem RF/UC de domínio; rota operacional.

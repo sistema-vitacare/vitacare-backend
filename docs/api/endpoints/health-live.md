@@ -42,4 +42,4 @@ Esta rota **não usa** o envelope `{ data, meta }`. O corpo acima é o formato d
 
 ## Origem e validação
 
-Implementação: `src/health/health.controller.ts`; teste HTTP: `test/app.e2e-spec.ts`. Conferido em 2026-09-17. Sem RF/UC de domínio; rota operacional.
+Implementação: `src/health/health.controller.ts`; teste HTTP: `tests/app/app.e2e-spec.ts`. Conferido em 2026-09-17. Sem RF/UC de domínio; rota operacional.

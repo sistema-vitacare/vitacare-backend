@@ -35,11 +35,7 @@ export default tseslint.config(
     // O isolamento por organizacao depende de todo acesso a dados passar pelo
     // TenantScopedRepository. Repositorio cru so dentro de `repositories/`.
     files: ['src/**/*.ts'],
-    ignores: [
-      'src/**/repositories/**',
-      'src/common/database/**',
-      'src/**/*.spec.ts',
-    ],
+    ignores: ['src/**/repositories/**', 'src/common/database/**'],
     rules: {
       'no-restricted-syntax': [
         'error',
