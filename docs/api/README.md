@@ -48,8 +48,6 @@ Cada requisição recompõe o contexto no banco, então revogação, expiração
 
 Cada requisição aceita renova a janela de inatividade da sessão normal; o prazo absoluto não é renovado. A organização efetiva **sempre** vem da sessão: nenhuma rota aceita `organizationId` do cliente como prova de autorização. Autorização por permissão nomeada usa o formato `recurso:acao`; falta de permissão responde `403 AUTH_FORBIDDEN`.
 
-Não existe SMTP configurado em nenhum ambiente (decisão de 2026-09-22), então a recuperação por link aceita a solicitação mas não envia mensagem nem cria token; a via disponível para quem perdeu a senha é a redefinição administrativa.
-
 Rotas públicas de autenticação: login, solicitação de recuperação e redefinição por token. Todo o resto exige Bearer, e o OpenAPI marca isso no esquema `bearer`.
 
 > **Não existe SMTP configurado em nenhum ambiente** (decisão de 2026-09-22). A solicitação de recuperação responde `202`, mas não cria token nem envia mensagem; quem perdeu a senha depende da [redefinição administrativa](endpoints/auth-redefinir-senha-usuario.md). O contrato da rota descreve o comportamento que passa a valer quando houver servidor de e-mail.
