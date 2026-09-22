@@ -88,6 +88,8 @@ npm run test:e2e  # pipeline HTTP, sem dependencias externas
 | `GET /api/docs-json` | Contrato OpenAPI para o frontend. |
 | `GET /health/live` | Liveness: o processo responde. Nao toca em dependencias. |
 | `GET /health/ready` | Readiness: PostgreSQL e Redis respondem. `503` se algum falhar. |
+| `POST /api/v1/auth/login` | Login por código da organização, e-mail e senha. |
+| `POST /api/v1/auth/password-recovery/request` | Solicitação genérica de recuperação por e-mail. |
 
 O prefixo (`API_PREFIX`) e a versao (`API_VERSION`) sao configuraveis. As rotas
 de health ficam fora do prefixo e do versionamento, de proposito: sao consumidas
@@ -97,18 +99,17 @@ Todo erro sai no mesmo formato:
 
 ```json
 {
-  "statusCode": 404,
-  "error": "Not Found",
-  "message": "Paciente nao encontrado",
-  "path": "/api/v1/pacientes/1",
-  "method": "GET",
-  "timestamp": "2026-09-14T13:05:07.047Z",
-  "requestId": "5"
+  "error": { "code": "AUTH_UNAUTHENTICATED", "message": "Autenticação necessária.", "detail": null, "fields": null },
+  "meta": { "requestId": "exemplo", "timestamp": "2026-09-22T13:05:07.047Z", "path": "/api/v1/auth/logout", "method": "POST", "status": 401 }
 }
 ```
 
 Excecoes nao tratadas viram `500` generico: a causa vai para o log com stack
 trace, nunca para a resposta HTTP.
+
+## Autenticação e SMTP
+
+O login recebe `organizationCode`, `email` e `password`; a sessão Bearer é opaca e stateful. Senhas temporárias exigem troca no primeiro acesso. `SMTP_ENABLED=false` permite iniciar a API sem SMTP e solicitações de recuperação continuam genéricas, sem criar token entregável. Com SMTP habilitado, configure `SMTP_HOST`, `SMTP_FROM` e `PASSWORD_RESET_URL`; os demais valores SMTP são opcionais conforme o provedor. Veja o manual de autenticação em `docs/api/`.
 
 ## Manual de integracao da API
 

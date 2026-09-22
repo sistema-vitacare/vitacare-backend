@@ -12,7 +12,7 @@ Este diretório descreve **as rotas que existem no backend**, em Markdown legív
 
 Nos exemplos, `https://api.example.com` representa a origem do ambiente onde a API for publicada; não é um servidor VitaCare configurado. O prefixo (`API_PREFIX`, padrão `api`) e a versão URI (`API_VERSION`, padrão `1`) são configuráveis. Assim, as rotas de negócio atuais usam `/api/v1`; as rotas `/health/*` ficam fora do prefixo e da versão. O servidor usa HTTPS na arquitetura prevista, mas o ambiente local pode usar HTTP.
 
-O corpo das rotas de negócio é JSON quando aplicável. Ainda não existem endpoints de autenticação nem módulos de domínio neste checkout. As rotas atuais abaixo são públicas e não recebem token. Quando auth for implementada, cada nota deverá indicar seu esquema, permissões e vínculo com organização/paciente. Não envie dados pessoais reais em exemplos de documentação.
+O corpo das rotas de negócio é JSON quando aplicável. Autenticação usa Bearer opaco e stateful: o token bruto só sai no login e seu hash é persistido; sessão revogada, expirada, inativa ou com senha alterada não continua válida. Não envie dados pessoais reais em exemplos de documentação.
 
 | Método e caminho padrão | Finalidade | Nota |
 | --- | --- | --- |
@@ -21,6 +21,13 @@ O corpo das rotas de negócio é JSON quando aplicável. Ainda não existem endp
 | `GET /health/ready` | PostgreSQL e Redis disponíveis | [health-ready.md](endpoints/health-ready.md) |
 | `GET /api/docs` | Interface Swagger, se habilitada | [swagger-ui.md](endpoints/swagger-ui.md) |
 | `GET /api/docs-json` | Documento OpenAPI, se habilitado | [openapi-json.md](endpoints/openapi-json.md) |
+| `POST /api/v1/auth/login` | Inicia sessão | [auth-login.md](endpoints/auth-login.md) |
+| `POST /api/v1/auth/password/first-access` | Conclui troca obrigatória | [auth-primeiro-acesso.md](endpoints/auth-primeiro-acesso.md) |
+| `POST /api/v1/auth/logout` | Revoga a sessão atual | [auth-logout.md](endpoints/auth-logout.md) |
+| `PUT /api/v1/auth/password` | Troca a própria senha | [auth-alterar-senha.md](endpoints/auth-alterar-senha.md) |
+| `POST /api/v1/auth/password-recovery/request` | Solicita recuperação | [auth-solicitar-recuperacao.md](endpoints/auth-solicitar-recuperacao.md) |
+| `POST /api/v1/auth/password-recovery/reset` | Redefine com token | [auth-redefinir-senha.md](endpoints/auth-redefinir-senha.md) |
+| `POST /api/v1/auth/users/:userId/temporary-password` | Redefinição administrativa | [auth-redefinir-senha-usuario.md](endpoints/auth-redefinir-senha-usuario.md) |
 
 Os caminhos de Swagger usam `SWAGGER_PATH=docs` e só existem com `SWAGGER_ENABLED=true`. O documento OpenAPI é gerado em runtime; consulte a rota JSON do ambiente para conferir a versão publicada. `/health/live` é excluída do OpenAPI de propósito, mas permanece documentada aqui.
 

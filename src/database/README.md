@@ -83,6 +83,10 @@ filhas e o custo aceito por essa garantia.
 
 ## Primeira migration de identidade e auditoria
 
+## Migration de autenticação
+
+`migrations/1790000000000-CreateAuthSchema.ts` adiciona `organizations.code`, estado de troca de senha em `users`, sessões opacas e tokens de recuperação. Ela ainda não foi aplicada por esta tarefa em banco externo. Valide somente em PostgreSQL descartável com `migration:show`, `migration:run`, `migration:revert` e `migration:run` novamente.
+
 `migrations/1789674300000-CreateInitialIdentitySchema.ts` cria `usage_plans`,
 `organizations`, `access_profiles`, `permissions`, `profile_permissions`,
 `users` e `audit_events`. O mapeamento TypeORM fica em
