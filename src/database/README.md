@@ -96,6 +96,20 @@ as concessoes pertencem ao perfil de uma organizacao. Os testes em
 `VITACARE_TEST_DATABASE_URL` apontando para `vitacare_schema_test` em
 `localhost`/`127.0.0.1`, sem tabela `organizations` preexistente.
 
+## Seed de desenvolvimento
+
+`seeds/devSeed.ts` cria planos, organizacoes, perfis e usuarios de
+desenvolvimento, e roda por `npm run seed:dev`. E idempotente: consulta pela
+chave natural antes de inserir, porque `usage_plans` nao tem restricao de
+unicidade que sirva de chave — um `ON CONFLICT` la nunca conflitaria e o seed
+duplicaria os planos. Evidencia em `tests/database/devSeed.e2e-spec.ts`, que
+roda o seed duas vezes em PostgreSQL descartavel e confere contagens, login de
+cada conta e isolamento entre as duas organizacoes.
+
+Seed nao e migration: ele **nao** altera schema e nao entra no historico de
+migrations. Nenhum dado de desenvolvimento deve chegar a homologacao ou
+producao.
+
 ## Migration de autenticacao
 
 `migrations/1790000000000-CreateAuthSchema.ts` acrescenta `organizations.code`

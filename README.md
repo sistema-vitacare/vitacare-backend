@@ -142,6 +142,27 @@ vinculo e usuario sao criados em uma unica transacao; identificador ja usado
 falha em conflito, sem criacao parcial. Em imagem compilada use
 `npm run auth:bootstrap:prod`.
 
+## Seed de desenvolvimento
+
+Com as migrations aplicadas, `npm run seed:dev` cria uma base minima para
+exercitar a API: dois planos, **duas organizacoes** (`clinica-vida` e
+`casa-bem-estar`), os quatro perfis em cada uma e tres usuarios ativos. Duas
+organizacoes de proposito: e assim que se testa isolamento entre tenants.
+
+```bash
+npm run seed:dev
+```
+
+O comando e **idempotente** — rodar de novo nao duplica nada — e recusa
+qualquer `NODE_ENV` diferente de `development`/`test`, porque grava contas com
+senha conhecida. Os usuarios nascem `active` e sem troca obrigatoria, entao o
+login ja devolve sessao normal.
+
+> As contas do seed usam e-mails reais do time e a senha `12345678`. E dado de
+> desenvolvimento local: nao replicar em homologacao nem em producao, e nao
+> tratar os planos como catalogo comercial (P05/P06) nem a permissao concedida
+> ao perfil `admin` como matriz de acesso aprovada (RF005/RF016).
+
 ## Manual de integracao da API
 
 O [manual Markdown](docs/api/README.md) lista as rotas realmente disponiveis,
