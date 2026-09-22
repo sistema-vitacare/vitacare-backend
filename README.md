@@ -79,6 +79,10 @@ npm test          # unitarios
 npm run test:e2e  # pipeline HTTP, sem dependencias externas
 ```
 
+> Use Node.js 22, como declarado em `engines` e no `.nvmrc`. Em Node 20 o
+> binario nativo do `argon2` derruba o processo de teste com *segmentation
+> fault*, sem mensagem de erro util.
+
 ## Rotas
 
 | Rota | Descricao |
@@ -110,6 +114,29 @@ trace, nunca para a resposta HTTP.
 ## Autenticação e SMTP
 
 O login recebe `organizationCode`, `email` e `password`; a sessão Bearer é opaca e stateful. Senhas temporárias exigem troca no primeiro acesso. `SMTP_ENABLED=false` permite iniciar a API sem SMTP e solicitações de recuperação continuam genéricas, sem criar token entregável. Com SMTP habilitado, configure `SMTP_HOST`, `SMTP_FROM` e `PASSWORD_RESET_URL`; os demais valores SMTP são opcionais conforme o provedor. Veja o manual de autenticação em `docs/api/`.
+
+## Bootstrap da primeira organizacao
+
+O banco nao nasce com organizacao nem administrador. Com as migrations ja
+aplicadas e um plano de uso cadastrado, crie os dois com:
+
+```bash
+npm run auth:bootstrap -- \
+  --organization-code clinica-exemplo \
+  --usage-plan-id <uuid do plano> \
+  --trade-name "Clinica Exemplo" \
+  --admin-name "Nome do administrador" \
+  --admin-email admin@example.test \
+  --admin-cpf 00000000000
+```
+
+O comando **nao aceita senha por argumento**: a senha provisoria e sorteada,
+gravada apenas como hash e exibida uma unica vez no terminal, para nao ficar no
+historico do shell. O administrador entra com ela e e obrigado a trocar no
+primeiro acesso. Organizacao, perfil `admin`, permissao `users:reset_password`,
+vinculo e usuario sao criados em uma unica transacao; identificador ja usado
+falha em conflito, sem criacao parcial. Em imagem compilada use
+`npm run auth:bootstrap:prod`.
 
 ## Manual de integracao da API
 
@@ -223,3 +250,9 @@ de health nao poluem o log.
 - `npm run test:e2e` — sobe o pipeline HTTP real (helmet, CORS, versionamento,
   validacao, filtro de erros, Swagger) com PostgreSQL e Redis mockados. Roda em
   CI sem nenhum servico externo.
+- Os specs de schema (`test/initialSchema.e2e-spec.ts` e
+  `test/authSchema.e2e-spec.ts`) **pulam** por padrao. Para exercita-los, aponte
+  `VITACARE_TEST_DATABASE_URL` para um PostgreSQL **descartavel e vazio**
+  chamado `vitacare_schema_test` em `localhost`; eles rodam as migrations,
+  validam constraints, isolamento entre organizacoes e revogacao de sessao, e
+  revertem tudo ao final. Nunca aponte para banco com dado real.

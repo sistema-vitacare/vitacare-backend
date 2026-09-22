@@ -1,7 +1,7 @@
 ---
 title: Manual de integração da API VitaCare
 status: atual
-updated: 2026-09-17
+updated: 2026-09-22
 ---
 
 # Manual de integração da API VitaCare
@@ -30,6 +30,27 @@ O corpo das rotas de negócio é JSON quando aplicável. Autenticação usa Bear
 | `POST /api/v1/auth/users/:userId/temporary-password` | Redefinição administrativa | [auth-redefinir-senha-usuario.md](endpoints/auth-redefinir-senha-usuario.md) |
 
 Os caminhos de Swagger usam `SWAGGER_PATH=docs` e só existem com `SWAGGER_ENABLED=true`. O documento OpenAPI é gerado em runtime; consulte a rota JSON do ambiente para conferir a versão publicada. `/health/live` é excluída do OpenAPI de propósito, mas permanece documentada aqui.
+
+## Autenticação
+
+Sessão stateful com token **opaco**: o login devolve o valor bruto uma única vez e o banco guarda apenas o SHA-256 dele. Não há JWT, não há nada legível dentro do token e o cliente não deve tentar interpretá-lo.
+
+```http
+Authorization: Bearer <token devolvido em data.accessToken>
+```
+
+Cada requisição recompõe o contexto no banco, então revogação, expiração, inativação do usuário e inativação da organização valem **na chamada seguinte**, sem esperar o token expirar.
+
+| Tipo de sessão | Origem | Validade | Alcance |
+| --- | --- | --- | --- |
+| `normal` | Login de conta sem troca pendente | 12 horas absolutas e 30 minutos sem atividade | Todas as rotas autenticadas |
+| `password_change` | Login de conta com troca obrigatória | 10 minutos absolutos | Apenas [primeiro acesso](endpoints/auth-primeiro-acesso.md) e [logout](endpoints/auth-logout.md) |
+
+Cada requisição aceita renova a janela de inatividade da sessão normal; o prazo absoluto não é renovado. A organização efetiva **sempre** vem da sessão: nenhuma rota aceita `organizationId` do cliente como prova de autorização. Autorização por permissão nomeada usa o formato `recurso:acao`; falta de permissão responde `403 AUTH_FORBIDDEN`.
+
+Rotas públicas de autenticação: login, solicitação de recuperação e redefinição por token. Todo o resto exige Bearer, e o OpenAPI marca isso no esquema `bearer`.
+
+A senha tem de 8 a 128 **caracteres**, aceita espaços e Unicode e não tem regra de composição. O armazenamento usa Argon2id.
 
 ## Contrato transversal
 
@@ -146,14 +167,16 @@ Erro inesperado suprime o `detail` e não expõe a causa:
 
 | Status | Uso |
 | --- | --- |
-| `400` | Corpo malformado, JSON inválido, parâmetro de rota com tipo errado. |
-| `401` | Não autenticado: token ausente, expirado ou revogado. |
+| `202` | Pedido aceito sem afirmar o efeito, como a solicitação de recuperação de senha. |
+| `400` | Corpo malformado ou JSON inválido. Parâmetro de rota fora do formato responde `422`. |
+| `401` | Não autenticado: token ausente, expirado, revogado ou de tipo incompatível com a rota. |
 | `403` | Autenticado sem permissão de perfil ou sem vínculo com o paciente. |
 | `404` | Recurso inexistente **ou** pertencente a outra organização. A API não distingue os dois casos de propósito. |
 | `409` | Conflito de estado: duplicidade, transição inválida, limite de plano atingido. |
 | `422` | Validação de campo. O JSON está correto; os valores não. |
 | `429` | Limite de requisições excedido. |
 | `500` | Erro inesperado. `detail` é `null`. |
+| `503` | Dependência indisponível, como Redis fora do ar na proteção contra abuso. |
 
 Códigos transversais de `error.code`: `BAD_REQUEST`, `VALIDATION_FAILED`, `UNAUTHENTICATED`, `FORBIDDEN`, `NOT_FOUND`, `CONFLICT`, `RATE_LIMITED`, `INTERNAL_ERROR`, `SERVICE_UNAVAILABLE`. Cada módulo declara os seus em `<modulo>.errors.ts` e a nota do endpoint lista os possíveis por status.
 

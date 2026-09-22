@@ -83,10 +83,6 @@ filhas e o custo aceito por essa garantia.
 
 ## Primeira migration de identidade e auditoria
 
-## Migration de autenticação
-
-`migrations/1790000000000-CreateAuthSchema.ts` adiciona `organizations.code`, estado de troca de senha em `users`, sessões opacas e tokens de recuperação. Ela ainda não foi aplicada por esta tarefa em banco externo. Valide somente em PostgreSQL descartável com `migration:show`, `migration:run`, `migration:revert` e `migration:run` novamente.
-
 `migrations/1789674300000-CreateInitialIdentitySchema.ts` cria `usage_plans`,
 `organizations`, `access_profiles`, `permissions`, `profile_permissions`,
 `users` e `audit_events`. O mapeamento TypeORM fica em
@@ -99,6 +95,28 @@ as concessoes pertencem ao perfil de uma organizacao. Os testes em
 `test/initialSchema.e2e-spec.ts` usam PostgreSQL **descartavel** e exigem
 `VITACARE_TEST_DATABASE_URL` apontando para `vitacare_schema_test` em
 `localhost`/`127.0.0.1`, sem tabela `organizations` preexistente.
+
+## Migration de autenticacao
+
+`migrations/1790000000000-CreateAuthSchema.ts` acrescenta `organizations.code`
+(unico, com CHECK de formato), `users.must_change_password` e
+`users.password_changed_at`, e cria `auth_sessions` e `password_reset_tokens`.
+As duas tabelas novas guardam apenas o SHA-256 do token, em coluna `char(64)`
+unica e marcada `select: false` na entidade, e seguem a convencao de
+`deleted_at timestamptz` anulavel. As FKs compostas `(user_id,
+organization_id)` impedem sessao ou token apontando para usuario de outra
+organizacao. Mapeamento em `src/modules/Auth/entities/`.
+
+Validacao executada em PostgreSQL descartavel: `migration:show`,
+`migration:run`, `migration:revert` e `migration:run` novamente, mais
+`test/authSchema.e2e-spec.ts`, que roda as duas migrations, exercita
+isolamento entre organizacoes, inatividade e revogacao de sessao e reverte
+tudo no final. **Nenhuma migration foi aplicada em banco externo ou real.**
+
+```bash
+VITACARE_TEST_DATABASE_URL="postgresql://<usuario>:<senha>@127.0.0.1:<porta>/vitacare_schema_test" \
+  npm run test:e2e -- --runInBand test/authSchema.e2e-spec.ts
+```
 
 `organizations.usage_plan_id` e obrigatorio e referencia `usage_plans.id` com
 `ON DELETE RESTRICT`. A tabela de planos oferece somente a estrutura fisica do
