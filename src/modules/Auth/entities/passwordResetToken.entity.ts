@@ -27,6 +27,12 @@ export class PasswordResetToken implements TenantOwned {
   @Column('timestamptz', { nullable: true })
   revokedAt!: Date | null;
 
+  @Column({ type: 'timestamptz', default: () => 'now()' })
+  createdAt!: Date;
+
+  @Column({ type: 'timestamptz', default: () => 'now()' })
+  updatedAt!: Date;
+
   @Column('timestamptz', { nullable: true })
   deletedAt!: Date | null;
 }

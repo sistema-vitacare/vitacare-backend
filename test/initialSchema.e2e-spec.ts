@@ -1,7 +1,24 @@
-import { join } from 'node:path';
 import { DataSource } from 'typeorm';
 import { CreateInitialIdentitySchema1789674300000 } from '../src/database/migrations/1789674300000-CreateInitialIdentitySchema';
 import { SnakeNamingStrategy } from '../src/database/snakeNaming.strategy';
+import { AccessProfile } from '../src/modules/Access/entities/accessProfile.entity';
+import { Permission } from '../src/modules/Access/entities/permission.entity';
+import { ProfilePermission } from '../src/modules/Access/entities/profilePermission.entity';
+import { AuditEvent } from '../src/modules/Audit/entities/auditEvent.entity';
+import { Organization } from '../src/modules/Organization/entities/organization.entity';
+import { UsagePlan } from '../src/modules/Plan/entities/usagePlan.entity';
+import { User } from '../src/modules/User/entities/user.entity';
+
+/** Tabelas criadas pela primeira migration, na ordem alfabetica das tabelas. */
+const INITIAL_SCHEMA_ENTITIES = [
+  AccessProfile,
+  AuditEvent,
+  Organization,
+  Permission,
+  ProfilePermission,
+  UsagePlan,
+  User,
+];
 
 const databaseUrl = process.env.VITACARE_TEST_DATABASE_URL;
 const describeWithDatabase = databaseUrl ? describe : describe.skip;
@@ -33,7 +50,9 @@ describeWithDatabase('schema inicial em PostgreSQL descartavel', () => {
     dataSource = new DataSource({
       type: 'postgres',
       url: databaseUrl,
-      entities: [join(__dirname, '../src/modules/**/*.entity.{ts,js}')],
+      // Apenas as entidades cobertas por esta migration: as tabelas de
+      // autenticacao chegam na migration seguinte e tem spec propria.
+      entities: INITIAL_SCHEMA_ENTITIES,
       migrations: [CreateInitialIdentitySchema1789674300000],
       namingStrategy: new SnakeNamingStrategy(),
       synchronize: false,

@@ -40,6 +40,12 @@ export class AuthSession implements TenantOwned {
   @Column({ type: 'varchar', length: 40, nullable: true })
   revokedReason!: string | null;
 
+  @Column({ type: 'timestamptz', default: () => 'now()' })
+  createdAt!: Date;
+
+  @Column({ type: 'timestamptz', default: () => 'now()' })
+  updatedAt!: Date;
+
   @Column('timestamptz', { nullable: true })
   deletedAt!: Date | null;
 }

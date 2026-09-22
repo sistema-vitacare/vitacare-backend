@@ -213,6 +213,31 @@ describe('Auth HTTP (e2e)', () => {
       expect(body.error.code).toBe('AUTH_INVALID_CREDENTIALS');
       expect(body.error.fields).toBeNull();
     });
+
+    it('ignora X-Forwarded-For forjado ao identificar o cliente', async () => {
+      login.execute.mockResolvedValue({
+        state: 'authenticated',
+        accessToken: 'token-opaco',
+        tokenType: 'Bearer',
+        expiresAt: new Date('2026-09-22T12:00:00.000Z'),
+        idleTimeoutSeconds: 1800,
+      });
+
+      await request(server())
+        .post('/api/v1/auth/login')
+        .set('X-Forwarded-For', '203.0.113.9')
+        .send({
+          organizationCode: 'clinica-a',
+          email: 'user@example.test',
+          password: 'senha válida',
+        });
+
+      const [, meta] = login.execute.mock.calls[0] as [unknown, { ip: string }];
+
+      // Sem `trust proxy`, o IP vem do socket; o header nao pode furar limite.
+      expect(meta.ip).not.toBe('203.0.113.9');
+      expect(meta.ip).toMatch(/127\.0\.0\.1|::1|::ffff:127\.0\.0\.1/);
+    });
   });
 
   describe('rotas de sessão', () => {
