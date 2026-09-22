@@ -46,6 +46,21 @@ export const AuthErrors = {
     status: HttpStatus.TOO_MANY_REQUESTS,
     message: 'Muitas tentativas. Aguarde antes de tentar novamente.',
   },
+  BOOTSTRAP_INVALID_INPUT: {
+    code: 'AUTH_BOOTSTRAP_INVALID_INPUT',
+    status: HttpStatus.UNPROCESSABLE_ENTITY,
+    message: 'Dados do bootstrap inválidos.',
+  },
+  BOOTSTRAP_PLAN_NOT_FOUND: {
+    code: 'AUTH_BOOTSTRAP_PLAN_NOT_FOUND',
+    status: HttpStatus.NOT_FOUND,
+    message: 'Plano de uso não encontrado.',
+  },
+  BOOTSTRAP_CONFLICT: {
+    code: 'AUTH_BOOTSTRAP_CONFLICT',
+    status: HttpStatus.CONFLICT,
+    message: 'Já existe registro com estes identificadores.',
+  },
   DEPENDENCY_UNAVAILABLE: {
     code: 'AUTH_DEPENDENCY_UNAVAILABLE',
     status: HttpStatus.SERVICE_UNAVAILABLE,
