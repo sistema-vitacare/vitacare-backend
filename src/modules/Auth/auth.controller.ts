@@ -16,6 +16,7 @@ import { CurrentContext } from '@/common/context/currentContext.decorator';
 import type { RequestContext } from '@/common/context/requestContext.type';
 import { ApiEnvelope } from '@/common/http/apiEnvelope.decorator';
 import { ApiErrors } from '@/common/http/apiErrors.decorator';
+import { resolveRequestId } from '@/common/http/requestId';
 import { BEARER_SECURITY_SCHEME } from '@/common/http/bearerAuth';
 import { UuidParam } from '@/common/http/uuidParam.pipe';
 
@@ -40,8 +41,8 @@ import { ResetUserPasswordAsAdminUseCase } from './ResetUserPasswordAsAdmin/rese
 const clientIp = (request: Request): string =>
   request.ip ?? request.socket.remoteAddress ?? 'unknown';
 
-const requestIdOf = (request: Request): string =>
-  String(request.headers['x-request-id'] ?? '');
+/** Mesmo id do envelope e do log, para a sessao criada ficar rastreavel. */
+const requestIdOf = (request: Request): string => resolveRequestId(request);
 
 @ApiTags('auth')
 @Controller('auth')

@@ -3,6 +3,7 @@ import { Reflector } from '@nestjs/core';
 import { createHash } from 'node:crypto';
 
 import { DomainException } from '@/common/errors/domain.exception';
+import { resolveRequestId } from '@/common/http/requestId';
 
 import { AuthErrors } from '../auth.errors';
 import { AuthSessionRepository } from '../repositories/authSession.repository';
@@ -52,7 +53,9 @@ export class AuthGuard implements CanActivate {
 
     request.authSessionId = principal.sessionId;
     request.context = {
-      requestId: String(request.headers['x-request-id'] ?? ''),
+      // Mesmo id que sai em `meta.requestId` e no log, para a auditoria
+      // gravada pelo caso de uso correlacionar com a requisicao.
+      requestId: resolveRequestId(request),
       userId: principal.userId,
       organizationId: principal.organizationId,
       profile: principal.profile,

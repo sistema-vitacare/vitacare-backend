@@ -55,10 +55,13 @@ export class LoginUseCase {
       email,
     );
 
-    if (
-      !identity ||
-      !(await this.hasValidCredentials(identity, input.password))
-    ) {
+    // A verificacao roda antes do desvio para nao encurtar o caminho da falha.
+    const credentialsValid = await this.hasValidCredentials(
+      identity,
+      input.password,
+    );
+
+    if (!identity || !credentialsValid) {
       await this.rateLimiter.recordLoginFailure(
         organizationCode,
         email,
@@ -111,19 +114,23 @@ export class LoginUseCase {
    * vazar na resposta nem no tempo gasto ate a falha.
    */
   private async hasValidCredentials(
-    identity: LoginIdentity,
+    identity: LoginIdentity | null,
     password: string,
   ): Promise<boolean> {
-    if (
-      identity.status !== 'active' ||
-      identity.deletedAt !== null ||
-      identity.organizationStatus !== 'active' ||
-      identity.organizationDeletedAt !== null ||
-      !identity.passwordHash
-    ) {
-      return false;
+    const usableHash =
+      identity &&
+      identity.status === 'active' &&
+      identity.deletedAt === null &&
+      identity.organizationStatus === 'active' &&
+      identity.organizationDeletedAt === null
+        ? identity.passwordHash
+        : null;
+
+    // Sem hash utilizavel ainda se gasta o tempo de uma verificacao real.
+    if (!usableHash) {
+      return this.passwords.verifyDummy(password);
     }
 
-    return this.passwords.verify(identity.passwordHash, password);
+    return this.passwords.verify(usableHash, password);
   }
 }

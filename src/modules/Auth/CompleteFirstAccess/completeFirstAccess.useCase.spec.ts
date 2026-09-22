@@ -34,7 +34,7 @@ const build = (options: {
 
   const useCase = new CompleteFirstAccessUseCase(
     identities as never,
-    passwords,
+    passwords as never,
     transactions as never,
   );
 

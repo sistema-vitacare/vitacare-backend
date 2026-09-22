@@ -141,7 +141,7 @@ describe('AuthGuard', () => {
 
     expect(request.authSessionId).toBe('sessao-1');
     expect(request.context).toEqual({
-      requestId: 'req-9',
+      requestId: expect.any(String) as string,
       userId: 'user-1',
       organizationId: 'org-1',
       profile: 'admin',

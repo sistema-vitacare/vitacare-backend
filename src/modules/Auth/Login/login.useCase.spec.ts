@@ -58,6 +58,7 @@ const build = (doubles: Doubles = {}) => {
 
   const passwords = {
     verify: jest.fn().mockResolvedValue(doubles.passwordMatches ?? true),
+    verifyDummy: jest.fn().mockResolvedValue(false),
   };
 
   const tokens = {
@@ -202,6 +203,19 @@ describe('LoginUseCase', () => {
     ['senha errada', { passwordMatches: false }],
   ])('esconde %s sob o mesmo erro de credenciais', async (_case, doubles) => {
     await expectInvalidCredentials(doubles);
+  });
+
+  it('gasta uma verificacao mesmo sem hash real, para a falha nao ser mais rapida', async () => {
+    const { useCase, passwords } = build({ identity: null });
+
+    await expect(
+      useCase.execute(credentials, { ip: '127.0.0.1' }),
+    ).rejects.toMatchObject<Partial<DomainException>>({
+      code: 'AUTH_INVALID_CREDENTIALS',
+    });
+
+    expect(passwords.verifyDummy).toHaveBeenCalledWith('senha válida');
+    expect(passwords.verify).not.toHaveBeenCalled();
   });
 
   it('nao consulta identidade quando o limite de tentativas ja bloqueou', async () => {

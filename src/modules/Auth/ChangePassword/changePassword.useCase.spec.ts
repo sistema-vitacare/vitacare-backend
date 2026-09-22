@@ -41,7 +41,7 @@ const build = (options: {
 
   const useCase = new ChangePasswordUseCase(
     identities as never,
-    passwords,
+    passwords as never,
     transactions as never,
   );
 
