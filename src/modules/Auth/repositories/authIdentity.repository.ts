@@ -39,4 +39,18 @@ export class AuthIdentityRepository {
       ? { ...row, profile: row.profile, permissions: new Set() }
       : null;
   }
+
+  async findPasswordHash(
+    userId: string,
+    organizationId: string,
+  ): Promise<string | null> {
+    const rows = await this.dataSource.query<
+      Array<{ passwordHash: string | null }>
+    >(
+      `SELECT password_hash AS "passwordHash" FROM users
+       WHERE id=$1 AND organization_id=$2 AND status='active' AND deleted_at IS NULL`,
+      [userId, organizationId],
+    );
+    return rows[0]?.passwordHash ?? null;
+  }
 }

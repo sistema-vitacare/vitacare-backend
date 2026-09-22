@@ -24,16 +24,42 @@ export const environmentValidationSchema = Joi.object({
   THROTTLE_TTL_MS: Joi.number().integer().min(1000).default(60000),
   THROTTLE_LIMIT: Joi.number().integer().min(1).default(120),
   SMTP_ENABLED: bool.default(false),
-  SMTP_HOST: Joi.when('SMTP_ENABLED', { is: true, then: Joi.string().hostname().required(), otherwise: Joi.string().allow('').optional() }),
+  SMTP_HOST: Joi.when('SMTP_ENABLED', {
+    is: true,
+    then: Joi.string().hostname().required(),
+    otherwise: Joi.string().allow('').optional(),
+  }),
   SMTP_PORT: Joi.number().port().default(587),
   SMTP_SECURE: bool.default(false),
   SMTP_USER: Joi.string().allow('').optional(),
   SMTP_PASSWORD: Joi.string().allow('').optional(),
-  SMTP_FROM: Joi.when('SMTP_ENABLED', { is: true, then: Joi.string().email().required(), otherwise: Joi.string().allow('').optional() }),
-  PASSWORD_RESET_URL: Joi.when('SMTP_ENABLED', { is: true, then: Joi.string().uri({ scheme: ['http', 'https'] }).required(), otherwise: Joi.string().allow('').optional() }),
-  SMTP_CONNECTION_TIMEOUT_MS: Joi.number().integer().min(1000).max(60000).default(10000),
-  SMTP_GREETING_TIMEOUT_MS: Joi.number().integer().min(1000).max(60000).default(10000),
-  SMTP_SOCKET_TIMEOUT_MS: Joi.number().integer().min(1000).max(60000).default(10000),
+  SMTP_FROM: Joi.when('SMTP_ENABLED', {
+    is: true,
+    then: Joi.string().email().required(),
+    otherwise: Joi.string().allow('').optional(),
+  }),
+  PASSWORD_RESET_URL: Joi.when('SMTP_ENABLED', {
+    is: true,
+    then: Joi.string()
+      .uri({ scheme: ['http', 'https'] })
+      .required(),
+    otherwise: Joi.string().allow('').optional(),
+  }),
+  SMTP_CONNECTION_TIMEOUT_MS: Joi.number()
+    .integer()
+    .min(1000)
+    .max(60000)
+    .default(10000),
+  SMTP_GREETING_TIMEOUT_MS: Joi.number()
+    .integer()
+    .min(1000)
+    .max(60000)
+    .default(10000),
+  SMTP_SOCKET_TIMEOUT_MS: Joi.number()
+    .integer()
+    .min(1000)
+    .max(60000)
+    .default(10000),
 
   // PostgreSQL externo
   DB_HOST: host.required(),

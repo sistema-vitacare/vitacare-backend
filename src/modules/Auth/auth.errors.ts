@@ -16,6 +16,36 @@ export const AuthErrors = {
     status: HttpStatus.FORBIDDEN,
     message: 'Você não tem permissão para esta operação.',
   },
+  USER_NOT_FOUND: {
+    code: 'AUTH_USER_NOT_FOUND',
+    status: HttpStatus.NOT_FOUND,
+    message: 'Usuário não encontrado.',
+  },
+  RESET_TOKEN_INVALID_OR_EXPIRED: {
+    code: 'AUTH_RESET_TOKEN_INVALID_OR_EXPIRED',
+    status: HttpStatus.UNPROCESSABLE_ENTITY,
+    message: 'Token de redefinição inválido ou expirado.',
+  },
+  CURRENT_PASSWORD_INVALID: {
+    code: 'AUTH_CURRENT_PASSWORD_INVALID',
+    status: HttpStatus.UNPROCESSABLE_ENTITY,
+    message: 'Senha atual inválida.',
+  },
+  PASSWORD_REUSE: {
+    code: 'AUTH_PASSWORD_REUSE',
+    status: HttpStatus.UNPROCESSABLE_ENTITY,
+    message: 'A nova senha não pode ser igual à atual.',
+  },
+  INVALID_STATE: {
+    code: 'AUTH_INVALID_STATE',
+    status: HttpStatus.CONFLICT,
+    message: 'A operação não é permitida no estado atual.',
+  },
+  TEMPORARILY_BLOCKED: {
+    code: 'AUTH_TEMPORARILY_BLOCKED',
+    status: HttpStatus.TOO_MANY_REQUESTS,
+    message: 'Muitas tentativas. Aguarde antes de tentar novamente.',
+  },
   DEPENDENCY_UNAVAILABLE: {
     code: 'AUTH_DEPENDENCY_UNAVAILABLE',
     status: HttpStatus.SERVICE_UNAVAILABLE,
