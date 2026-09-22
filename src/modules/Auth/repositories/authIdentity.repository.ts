@@ -1,13 +1,19 @@
 import { Injectable } from '@nestjs/common';
 import { DataSource } from 'typeorm';
+
 import type { LoginIdentity } from '../types/auth.types';
 
+/**
+ * Leitura de identidade para autenticacao. E o unico ponto que consulta um
+ * usuario sem organizacao no contexto: no login a organizacao ainda esta sendo
+ * descoberta pelo codigo enviado, e o par organizacao/e-mail e sempre exigido.
+ */
 @Injectable()
 export class AuthIdentityRepository {
   constructor(private readonly dataSource: DataSource) {}
 
   async findForLogin(
-    code: string,
+    organizationCode: string,
     email: string,
   ): Promise<LoginIdentity | null> {
     const row = await this.dataSource
@@ -32,12 +38,17 @@ export class AuthIdentityRepository {
         'profile',
         'profile.id = user.profile_id AND profile.organization_id = user.organization_id',
       )
-      .where('organization.code = :code', { code })
+      .where('organization.code = :organizationCode', { organizationCode })
       .andWhere('user.email = :email', { email })
       .getRawOne<Omit<LoginIdentity, 'permissions'>>();
-    return row
-      ? { ...row, profile: row.profile, permissions: new Set() }
-      : null;
+
+    if (!row) {
+      return null;
+    }
+
+    // Permissoes so sao necessarias na sessao ja estabelecida; o login decide
+    // apenas se a credencial vale.
+    return { ...row, permissions: new Set() };
   }
 
   async findPasswordHash(
@@ -47,10 +58,15 @@ export class AuthIdentityRepository {
     const rows = await this.dataSource.query<
       Array<{ passwordHash: string | null }>
     >(
-      `SELECT password_hash AS "passwordHash" FROM users
-       WHERE id=$1 AND organization_id=$2 AND status='active' AND deleted_at IS NULL`,
+      `SELECT password_hash AS "passwordHash"
+         FROM users
+        WHERE id = $1
+          AND organization_id = $2
+          AND status = 'active'
+          AND deleted_at IS NULL`,
       [userId, organizationId],
     );
+
     return rows[0]?.passwordHash ?? null;
   }
 }

@@ -10,6 +10,7 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import type { NextFunction, Request, Response } from 'express';
 import helmet from 'helmet';
 import { AllExceptionsFilter } from './common/filters/allExceptions.filter';
+import { BEARER_SECURITY_SCHEME } from './common/http/bearerAuth';
 import { ResponseEnvelopeInterceptor } from './common/http/responseEnvelope.interceptor';
 import { validationExceptionFactory } from './common/http/validationException.factory';
 
@@ -108,7 +109,15 @@ export const setupApp = (
         .setTitle('VitaCare API')
         .setDescription('Backend HTTP do VitaCare.')
         .setVersion(options.apiVersion)
-        .addBearerAuth()
+        .addBearerAuth(
+          {
+            type: 'http',
+            scheme: 'bearer',
+            description:
+              'Token opaco de sessao emitido por POST /auth/login. Enviar como `Authorization: Bearer <token>`.',
+          },
+          BEARER_SECURITY_SCHEME,
+        )
         .build(),
     );
 

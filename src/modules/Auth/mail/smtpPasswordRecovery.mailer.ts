@@ -1,17 +1,25 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import nodemailer, { type Transporter } from 'nodemailer';
-import type { PasswordRecoveryMailer } from './passwordRecoveryMailer';
+
+import type {
+  PasswordRecoveryMailer,
+  PasswordRecoveryMessage,
+} from './passwordRecoveryMailer';
 
 @Injectable()
 export class SmtpPasswordRecoveryMailer implements PasswordRecoveryMailer {
   readonly enabled = true;
+
   private readonly transport: Transporter;
   private readonly from: string;
+
   constructor(config: ConfigService) {
     const user = config.get<string>('mail.user');
     const password = config.get<string>('mail.password');
+
     this.from = config.getOrThrow<string>('mail.from');
+
     this.transport = nodemailer.createTransport({
       host: config.getOrThrow<string>('mail.host'),
       port: config.getOrThrow<number>('mail.port'),
@@ -26,16 +34,14 @@ export class SmtpPasswordRecoveryMailer implements PasswordRecoveryMailer {
       debug: false,
     });
   }
-  async send(input: {
-    to: string;
-    resetUrl: string;
-    expiresInMinutes: number;
-  }): Promise<void> {
+
+  /** A mensagem nao diz quem e o usuario nem qual organizacao. */
+  async send(message: PasswordRecoveryMessage): Promise<void> {
     await this.transport.sendMail({
       from: this.from,
-      to: input.to,
+      to: message.to,
       subject: 'Redefinição de senha VitaCare',
-      text: `Use o link para redefinir a senha. Ele expira em ${input.expiresInMinutes} minutos: ${input.resetUrl}`,
+      text: `Use o link para redefinir a senha. Ele expira em ${message.expiresInMinutes} minutos: ${message.resetUrl}`,
     });
   }
 }

@@ -12,17 +12,37 @@ export interface ApiEnvelopeOptions {
   description?: string;
 }
 
+/** Rota que responde apenas efeito, sem corpo de dados: `data` sai como `null`. */
+const NULL_DATA_SCHEMA = {
+  nullable: true,
+  description: 'Operacao sem corpo de dados: `data` e sempre `null`.',
+  example: null,
+};
+
 /**
  * Documenta a resposta de sucesso ja envelopada em `{ data, meta }`. Usar em
  * toda rota: sem isto o OpenAPI mostra o DTO nu e diverge do comportamento
  * real da API.
+ *
+ * Passar `null` como modelo documenta a rota que responde `data: null`, em vez
+ * de reaproveitar um DTO de entrada como se fosse resposta.
  */
 export const ApiEnvelope = <TModel extends Type<unknown>>(
-  model: TModel,
+  model: TModel | null,
   options: ApiEnvelopeOptions = {},
-) =>
-  applyDecorators(
-    ApiExtraModels(model, ResponseMetaDto, PaginationMetaDto, ErrorResponseDto),
+) => {
+  const dataSchema = model
+    ? options.isArray
+      ? { type: 'array' as const, items: { $ref: getSchemaPath(model) } }
+      : { $ref: getSchemaPath(model) }
+    : NULL_DATA_SCHEMA;
+
+  const models = model
+    ? [model, ResponseMetaDto, PaginationMetaDto, ErrorResponseDto]
+    : [ResponseMetaDto, PaginationMetaDto, ErrorResponseDto];
+
+  return applyDecorators(
+    ApiExtraModels(...models),
     ApiResponse({
       status: options.status ?? HttpStatus.OK,
       description: options.description,
@@ -30,11 +50,10 @@ export const ApiEnvelope = <TModel extends Type<unknown>>(
         type: 'object',
         required: ['data', 'meta'],
         properties: {
-          data: options.isArray
-            ? { type: 'array', items: { $ref: getSchemaPath(model) } }
-            : { $ref: getSchemaPath(model) },
+          data: dataSchema,
           meta: { $ref: getSchemaPath(ResponseMetaDto) },
         },
       },
     }),
   );
+};
