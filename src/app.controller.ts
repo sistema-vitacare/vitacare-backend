@@ -1,6 +1,7 @@
 import { Controller, Get } from '@nestjs/common';
 import { ApiOperation, ApiProperty, ApiTags } from '@nestjs/swagger';
 import { ApiEnvelope } from './common/http/apiEnvelope.decorator';
+import { Public } from './modules/Auth/guards/public.decorator';
 
 export class ServiceIdentityDto {
   @ApiProperty({ example: 'vitacare-backend' })
@@ -13,6 +14,7 @@ export class ServiceIdentityDto {
 @ApiTags('app')
 @Controller()
 export class AppController {
+  @Public()
   @Get()
   @ApiOperation({ summary: 'Identificacao do servico' })
   @ApiEnvelope(ServiceIdentityDto)
