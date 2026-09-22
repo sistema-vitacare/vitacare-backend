@@ -37,7 +37,7 @@ export class RequestPasswordRecoveryUseCase {
 
     await this.limiter.assertRecoveryAllowed(organizationCode, email, meta.ip);
 
-    const identity = await this.identities.findForLogin(
+    const { identity } = await this.identities.findForAuthentication(
       organizationCode,
       email,
     );

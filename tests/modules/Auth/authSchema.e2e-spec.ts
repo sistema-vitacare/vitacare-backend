@@ -152,6 +152,25 @@ describeWithDatabase('autenticacao em PostgreSQL descartavel', () => {
     return Number(rows[0].total);
   };
 
+  const auditOf = async (
+    organizationId: string,
+  ): Promise<Array<{ action: string; actorType: string }>> =>
+    dataSource.query(
+      `SELECT action, actor_type AS "actorType"
+         FROM audit_events
+        WHERE organization_id = $1
+        ORDER BY occurred_at, action`,
+      [organizationId],
+    );
+
+  const auditTotal = async (): Promise<number> => {
+    const rows: Array<{ total: string }> = await dataSource.query(
+      'SELECT count(*)::text AS total FROM audit_events',
+    );
+
+    return Number(rows[0].total);
+  };
+
   const contextOf = (tenant: Tenant) =>
     ({
       requestId: 'req-integration',
@@ -217,7 +236,7 @@ describeWithDatabase('autenticacao em PostgreSQL descartavel', () => {
       tokens,
       config,
     );
-    logout = new LogoutUseCase(sessions);
+    logout = new LogoutUseCase(transactions);
     changePassword = new ChangePasswordUseCase(
       identities,
       passwords,
@@ -547,7 +566,7 @@ describeWithDatabase('autenticacao em PostgreSQL descartavel', () => {
       const celularHash = tokens.hash(celular.accessToken);
       const principal = await sessions.resolve(celularHash, new Date());
 
-      await logout.execute(principal!.sessionId);
+      await logout.execute(principal!.sessionId, contextOf(tenant));
 
       expect(await sessions.resolve(celularHash, new Date())).toBeNull();
       expect(
@@ -871,6 +890,143 @@ describeWithDatabase('autenticacao em PostgreSQL descartavel', () => {
         'auth.login_succeeded',
         'auth.password_changed',
       ]);
+    }, 60000);
+
+    it('registra o logout na sessao encerrada e ignora a repeticao', async () => {
+      const tenant = await seedTenant(
+        'auditoria-logout',
+        'saida@example.test',
+        'senha bem valida',
+      );
+
+      const session = await login.execute(
+        {
+          organizationCode: 'auditoria-logout',
+          email: 'saida@example.test',
+          password: 'senha bem valida',
+        },
+        { ip: '127.0.0.1', requestId: 'req-saida' },
+      );
+
+      const principal = await sessions.resolve(
+        tokens.hash(session.accessToken),
+        new Date(),
+      );
+
+      await logout.execute(principal!.sessionId, contextOf(tenant));
+      // Segunda chamada com a mesma sessao ja revogada: sem evento novo.
+      await logout.execute(principal!.sessionId, contextOf(tenant));
+
+      expect(await auditOf(tenant.organizationId)).toEqual([
+        { action: 'auth.login_succeeded', actorType: 'user' },
+        { action: 'auth.logout', actorType: 'user' },
+      ]);
+    }, 60000);
+
+    it('registra a tentativa falha com autor quando a conta existe', async () => {
+      const tenant = await seedTenant(
+        'auditoria-falha',
+        'falha@example.test',
+        'senha bem valida',
+      );
+
+      await expect(
+        login.execute(
+          {
+            organizationCode: 'auditoria-falha',
+            email: 'falha@example.test',
+            password: 'senha errada aqui',
+          },
+          { ip: '127.0.0.1', requestId: 'req-falha' },
+        ),
+      ).rejects.toMatchObject({ code: 'AUTH_INVALID_CREDENTIALS' });
+
+      const events: Array<{
+        action: string;
+        actorType: string;
+        actorUserId: string | null;
+        entityId: string | null;
+        requestId: string | null;
+      }> = await dataSource.query(
+        `SELECT action,
+                actor_type AS "actorType",
+                actor_user_id AS "actorUserId",
+                entity_id AS "entityId",
+                request_id AS "requestId"
+           FROM audit_events
+          WHERE organization_id = $1`,
+        [tenant.organizationId],
+      );
+
+      expect(events).toEqual([
+        {
+          action: 'auth.login_failed',
+          actorType: 'user',
+          actorUserId: tenant.userId,
+          entityId: tenant.userId,
+          requestId: 'req-falha',
+        },
+      ]);
+    }, 60000);
+
+    it('registra a tentativa falha como evento de sistema quando a conta nao existe', async () => {
+      const tenant = await seedTenant(
+        'auditoria-sem-conta',
+        'existe@example.test',
+        'senha bem valida',
+      );
+
+      await expect(
+        login.execute(
+          {
+            organizationCode: 'auditoria-sem-conta',
+            email: 'ninguem@example.test',
+            password: 'senha bem valida',
+          },
+          { ip: '127.0.0.1', requestId: 'req-sem-conta' },
+        ),
+      ).rejects.toMatchObject({ code: 'AUTH_INVALID_CREDENTIALS' });
+
+      const events: Array<{
+        action: string;
+        actorType: string;
+        actorUserId: string | null;
+        entityId: string | null;
+      }> = await dataSource.query(
+        `SELECT action,
+                actor_type AS "actorType",
+                actor_user_id AS "actorUserId",
+                entity_id AS "entityId"
+           FROM audit_events
+          WHERE organization_id = $1`,
+        [tenant.organizationId],
+      );
+
+      expect(events).toEqual([
+        {
+          action: 'auth.login_failed',
+          actorType: 'system',
+          actorUserId: null,
+          entityId: null,
+        },
+      ]);
+    }, 60000);
+
+    it('nao grava nada quando nem a organizacao do codigo existe', async () => {
+      const before = await auditTotal();
+
+      await expect(
+        login.execute(
+          {
+            organizationCode: 'organizacao-que-nao-existe',
+            email: 'alguem@example.test',
+            password: 'senha bem valida',
+          },
+          { ip: '127.0.0.1' },
+        ),
+      ).rejects.toMatchObject({ code: 'AUTH_INVALID_CREDENTIALS' });
+
+      expect(await auditTotal()).toBe(before);
     }, 60000);
   });
 });

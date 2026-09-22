@@ -50,10 +50,8 @@ export class LoginUseCase {
 
     await this.rateLimiter.assertLoginAllowed(organizationCode, email, meta.ip);
 
-    const identity = await this.identities.findForLogin(
-      organizationCode,
-      email,
-    );
+    const { organizationId, identity } =
+      await this.identities.findForAuthentication(organizationCode, email);
 
     // A verificacao roda antes do desvio para nao encurtar o caminho da falha.
     const credentialsValid = await this.hasValidCredentials(
@@ -67,6 +65,14 @@ export class LoginUseCase {
         email,
         meta.ip,
       );
+
+      if (organizationId) {
+        await this.transactions.recordLoginFailure({
+          organizationId,
+          userId: identity?.userId ?? null,
+          requestId: meta.requestId ?? null,
+        });
+      }
 
       throw new DomainException({
         ...AuthErrors.INVALID_CREDENTIALS,

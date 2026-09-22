@@ -115,8 +115,11 @@ export class AuthController {
   @ApiOperation({ summary: 'Revoga apenas a sessao apresentada.' })
   @ApiEnvelope(null)
   @ApiErrors({ status: 401, codes: ['AUTH_UNAUTHENTICATED'] })
-  async logout(@CurrentSessionId() sessionId: string): Promise<null> {
-    return this.logoutUseCase.execute(sessionId);
+  async logout(
+    @CurrentSessionId() sessionId: string,
+    @CurrentContext() context: RequestContext,
+  ): Promise<null> {
+    return this.logoutUseCase.execute(sessionId, context);
   }
 
   @Put('password')

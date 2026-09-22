@@ -269,7 +269,16 @@ describe('Auth HTTP (e2e)', () => {
 
       expect(response.status).toBe(200);
       expect(body.data).toBeNull();
-      expect(logout.execute).toHaveBeenCalledWith('sessao-1');
+      // O contexto vai junto: a revogacao e a auditoria do logout saem na
+      // organizacao e no usuario do proprio token.
+      expect(logout.execute).toHaveBeenCalledWith(
+        'sessao-1',
+        expect.objectContaining({
+          userId: '11111111-1111-4111-8111-111111111111',
+          organizationId: '22222222-2222-4222-8222-222222222222',
+          requestId: 'req-1',
+        }),
+      );
     });
 
     it('troca a própria senha com 200 e corpo nulo', async () => {

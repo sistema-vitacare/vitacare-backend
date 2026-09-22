@@ -32,12 +32,14 @@ const build = (options: {
       options.assertRecoveryAllowed ?? jest.fn().mockResolvedValue(undefined),
   };
 
+  const identity =
+    options.identity === undefined ? activeIdentity : options.identity;
+
   const identities = {
-    findForLogin: jest
-      .fn()
-      .mockResolvedValue(
-        options.identity === undefined ? activeIdentity : options.identity,
-      ),
+    findForAuthentication: jest.fn().mockResolvedValue({
+      organizationId: identity?.organizationId ?? 'org-1',
+      identity,
+    }),
   };
 
   const mailer = {
@@ -165,6 +167,6 @@ describe('RequestPasswordRecoveryUseCase', () => {
       code: 'AUTH_TEMPORARILY_BLOCKED',
     });
 
-    expect(identities.findForLogin).not.toHaveBeenCalled();
+    expect(identities.findForAuthentication).not.toHaveBeenCalled();
   });
 });

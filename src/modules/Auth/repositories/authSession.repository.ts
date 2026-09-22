@@ -13,11 +13,12 @@ interface PermissionRow {
 }
 
 /**
- * Leitura e revogacao de sessao. Toda validade fica em SQL, em uma unica
- * sentenca: a sessao so e aceita quando o token bate, nao foi revogada, esta
- * dentro do prazo absoluto e da janela de inatividade, e tanto o usuario
- * quanto a organizacao continuam ativos. A mesma sentenca renova
- * `last_activity_at`, entao nao existe janela entre validar e renovar.
+ * Leitura de sessao. A revogacao vive em `AuthTransactionRepository`, junto do
+ * evento de auditoria que precisa sair na mesma transacao. Toda validade fica
+ * em SQL, em uma unica sentenca: a sessao so e aceita quando o token bate, nao
+ * foi revogada, esta dentro do prazo absoluto e da janela de inatividade, e
+ * tanto o usuario quanto a organizacao continuam ativos. A mesma sentenca
+ * renova `last_activity_at`, entao nao existe janela entre validar e renovar.
  */
 @Injectable()
 export class AuthSessionRepository {
@@ -92,15 +93,5 @@ export class AuthSessionRepository {
       ...principal,
       permissions: new Set(permissions.map((item) => item.code)),
     };
-  }
-
-  async revoke(sessionId: string, reason: string): Promise<void> {
-    await this.dataSource.query(
-      `UPDATE auth_sessions
-          SET revoked_at = now(), revoked_reason = $2, updated_at = now()
-        WHERE id = $1
-          AND revoked_at IS NULL`,
-      [sessionId, reason],
-    );
   }
 }

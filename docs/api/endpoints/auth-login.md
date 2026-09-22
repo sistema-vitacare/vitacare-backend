@@ -79,6 +79,8 @@ curl -i -X POST 'https://api.example.com/api/v1/auth/login' \
 
 Efeitos da chamada bem-sucedida: cria a sessão, atualiza `users.last_access_at` e grava auditoria (`auth.login_succeeded` ou `auth.first_access_started`) na organização do usuário. Nada disso vaza na resposta.
 
+A tentativa **recusada** também é auditada, como `auth.login_failed`, desde que o código informado corresponda a uma organização existente. Quando o e-mail pertence a uma conta daquela organização, o evento sai com autor (`actor_type = 'user'`); quando não pertence, sai como evento de sistema, sem autor e sem entidade. Código de organização inexistente não gera evento, porque `audit_events.organization_id` é obrigatório e referencia a tabela. Nenhum dado digitado na tentativa — e-mail, senha ou IP — é copiado para a auditoria; o `request_id` liga o evento ao log da requisição. Nada disso muda a resposta, que continua idêntica em todos os casos.
+
 ## Erros
 
 | Status | `error.code` | Quando |
@@ -137,4 +139,4 @@ Efeitos da chamada bem-sucedida: cria a sessão, atualiza `users.last_access_at`
 
 ## Origem e validação
 
-Controller `src/modules/Auth/auth.controller.ts`; DTO `src/modules/Auth/Login/login.dto.ts`; caso de uso `src/modules/Auth/Login/login.useCase.ts`; catálogo `src/modules/Auth/auth.errors.ts`; prazos em `src/config/auth.config.ts`; migration `src/database/migrations/1790000000000-CreateAuthSchema.ts`. Testes: `tests/modules/Auth/login.useCase.spec.ts`, `tests/modules/Auth/auth.e2e-spec.ts` (envelope, `no-store`, 401 uniforme, 422, `X-Forwarded-For`) e `tests/modules/Auth/authSchema.e2e-spec.ts` (duas organizações com o mesmo e-mail, em PostgreSQL real). Conferido contra o OpenAPI gerado em 2026-09-22. Vault: [[2026-09-21-autenticacao-sessoes-recuperacao]].
+Controller `src/modules/Auth/auth.controller.ts`; DTO `src/modules/Auth/Login/login.dto.ts`; caso de uso `src/modules/Auth/Login/login.useCase.ts`; catálogo `src/modules/Auth/auth.errors.ts`; prazos em `src/config/auth.config.ts`; migration `src/database/migrations/1790000000000-CreateAuthSchema.ts`. Testes: `tests/modules/Auth/login.useCase.spec.ts`, `tests/modules/Auth/auth.e2e-spec.ts` (envelope, `no-store`, 401 uniforme, 422, `X-Forwarded-For`) e `tests/modules/Auth/authSchema.e2e-spec.ts` (duas organizações com o mesmo e-mail e os três desfechos de auditoria da tentativa falha, em PostgreSQL real). Conferido contra o OpenAPI gerado em 2026-09-22. Vault: [[2026-09-21-autenticacao-sessoes-recuperacao]], [[2026-09-22-auditoria-de-acesso]].

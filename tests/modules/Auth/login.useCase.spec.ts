@@ -30,23 +30,31 @@ const durations: Record<string, number> = {
 
 interface Doubles {
   identity?: LoginIdentity | null;
+  organizationId?: string | null;
   passwordMatches?: boolean;
   createLoginSession?: jest.Mock;
   assertLoginAllowed?: jest.Mock;
 }
 
 const build = (doubles: Doubles = {}) => {
+  const identity =
+    doubles.identity === undefined ? activeIdentity : doubles.identity;
+
+  const organizationId =
+    doubles.organizationId === undefined
+      ? (identity?.organizationId ?? 'org-1')
+      : doubles.organizationId;
+
   const identities = {
-    findForLogin: jest
+    findForAuthentication: jest
       .fn()
-      .mockResolvedValue(
-        doubles.identity === undefined ? activeIdentity : doubles.identity,
-      ),
+      .mockResolvedValue({ organizationId, identity }),
   };
 
   const transactions = {
     createLoginSession:
       doubles.createLoginSession ?? jest.fn().mockResolvedValue(undefined),
+    recordLoginFailure: jest.fn().mockResolvedValue(undefined),
   };
 
   const limiter = {
@@ -131,6 +139,7 @@ describe('LoginUseCase', () => {
       'clinica-a',
       'user@example.test',
     );
+    expect(transactions.recordLoginFailure).not.toHaveBeenCalled();
   });
 
   it('emite sessao restrita de dez minutos quando a troca e obrigatoria', async () => {
@@ -162,7 +171,7 @@ describe('LoginUseCase', () => {
       { ip: '127.0.0.1' },
     );
 
-    expect(identities.findForLogin).toHaveBeenCalledWith(
+    expect(identities.findForAuthentication).toHaveBeenCalledWith(
       'clinica-a',
       'user@example.test',
     );
@@ -170,7 +179,11 @@ describe('LoginUseCase', () => {
   });
 
   it.each([
-    ['organizacao ou conta inexistente', { identity: null }],
+    [
+      'organizacao inexistente',
+      { identity: null, organizationId: null as string | null },
+    ],
+    ['conta inexistente', { identity: null }],
     [
       'organizacao inativa',
       {
@@ -205,6 +218,53 @@ describe('LoginUseCase', () => {
     await expectInvalidCredentials(doubles);
   });
 
+  it('audita a tentativa falha na conta quando a conta existe', async () => {
+    const { useCase, transactions } = build({ passwordMatches: false });
+
+    await expect(
+      useCase.execute(credentials, { ip: '127.0.0.1', requestId: 'req-2' }),
+    ).rejects.toMatchObject<Partial<DomainException>>({
+      code: 'AUTH_INVALID_CREDENTIALS',
+    });
+
+    expect(transactions.recordLoginFailure).toHaveBeenCalledWith({
+      organizationId: 'org-1',
+      userId: 'user-1',
+      requestId: 'req-2',
+    });
+  });
+
+  it('audita a tentativa falha sem autor quando so a organizacao existe', async () => {
+    const { useCase, transactions } = build({ identity: null });
+
+    await expect(
+      useCase.execute(credentials, { ip: '127.0.0.1' }),
+    ).rejects.toMatchObject<Partial<DomainException>>({
+      code: 'AUTH_INVALID_CREDENTIALS',
+    });
+
+    expect(transactions.recordLoginFailure).toHaveBeenCalledWith({
+      organizationId: 'org-1',
+      userId: null,
+      requestId: null,
+    });
+  });
+
+  it('nao audita quando nem a organizacao do codigo existe', async () => {
+    const { useCase, transactions } = build({
+      identity: null,
+      organizationId: null,
+    });
+
+    await expect(
+      useCase.execute(credentials, { ip: '127.0.0.1' }),
+    ).rejects.toMatchObject<Partial<DomainException>>({
+      code: 'AUTH_INVALID_CREDENTIALS',
+    });
+
+    expect(transactions.recordLoginFailure).not.toHaveBeenCalled();
+  });
+
   it('gasta uma verificacao mesmo sem hash real, para a falha nao ser mais rapida', async () => {
     const { useCase, passwords } = build({ identity: null });
 
@@ -228,7 +288,9 @@ describe('LoginUseCase', () => {
       }),
     );
 
-    const { useCase, identities } = build({ assertLoginAllowed: blocked });
+    const { useCase, identities, transactions } = build({
+      assertLoginAllowed: blocked,
+    });
 
     await expect(
       useCase.execute(credentials, { ip: '127.0.0.1' }),
@@ -236,7 +298,8 @@ describe('LoginUseCase', () => {
       code: 'AUTH_TEMPORARILY_BLOCKED',
     });
 
-    expect(identities.findForLogin).not.toHaveBeenCalled();
+    expect(identities.findForAuthentication).not.toHaveBeenCalled();
+    expect(transactions.recordLoginFailure).not.toHaveBeenCalled();
   });
 
   it('propaga indisponibilidade do Redis sem emitir sessao', async () => {

@@ -1,7 +1,12 @@
 import { Injectable } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 
-import type { LoginIdentity } from '../types/auth.types';
+import type { AuthLookup, LoginIdentity } from '../types/auth.types';
+
+/** Linha crua da busca: a organizacao sempre vem, a conta pode faltar. */
+interface LookupRow extends Omit<LoginIdentity, 'permissions' | 'userId'> {
+  userId: string | null;
+}
 
 /**
  * Leitura de identidade para autenticacao. E o unico ponto que consulta um
@@ -12,43 +17,56 @@ import type { LoginIdentity } from '../types/auth.types';
 export class AuthIdentityRepository {
   constructor(private readonly dataSource: DataSource) {}
 
-  async findForLogin(
+  /**
+   * Parte da organizacao e chega na conta por juncao a esquerda, em uma unica
+   * consulta. Assim o chamador sabe a organizacao mesmo quando o e-mail nao
+   * existe — a tentativa falha precisa disso para ser auditada — sem que o
+   * caminho da conta inexistente gaste uma consulta a mais que o da existente.
+   */
+  async findForAuthentication(
     organizationCode: string,
     email: string,
-  ): Promise<LoginIdentity | null> {
+  ): Promise<AuthLookup> {
     const row = await this.dataSource
       .createQueryBuilder()
-      .select('user.id', 'userId')
-      .addSelect('user.organization_id', 'organizationId')
+      .select('organization.id', 'organizationId')
+      .addSelect('organization.status', 'organizationStatus')
+      .addSelect('organization.deleted_at', 'organizationDeletedAt')
+      .addSelect('user.id', 'userId')
       .addSelect('user.password_hash', 'passwordHash')
       .addSelect('user.must_change_password', 'mustChangePassword')
       .addSelect('user.status', 'status')
       .addSelect('user.deleted_at', 'deletedAt')
-      .addSelect('organization.status', 'organizationStatus')
-      .addSelect('organization.deleted_at', 'organizationDeletedAt')
       .addSelect('profile.code', 'profile')
-      .from('users', 'user')
-      .innerJoin(
-        'organizations',
-        'organization',
-        'organization.id = user.organization_id',
+      .from('organizations', 'organization')
+      .leftJoin(
+        'users',
+        'user',
+        'user.organization_id = organization.id AND user.email = :email',
+        { email },
       )
-      .innerJoin(
+      .leftJoin(
         'access_profiles',
         'profile',
         'profile.id = user.profile_id AND profile.organization_id = user.organization_id',
       )
       .where('organization.code = :organizationCode', { organizationCode })
-      .andWhere('user.email = :email', { email })
-      .getRawOne<Omit<LoginIdentity, 'permissions'>>();
+      .getRawOne<LookupRow>();
 
     if (!row) {
-      return null;
+      return { organizationId: null, identity: null };
+    }
+
+    if (row.userId === null) {
+      return { organizationId: row.organizationId, identity: null };
     }
 
     // Permissoes so sao necessarias na sessao ja estabelecida; o login decide
     // apenas se a credencial vale.
-    return { ...row, permissions: new Set() };
+    return {
+      organizationId: row.organizationId,
+      identity: { ...row, userId: row.userId, permissions: new Set() },
+    };
   }
 
   async findPasswordHash(

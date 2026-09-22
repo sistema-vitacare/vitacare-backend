@@ -33,6 +33,20 @@ export interface ChangePasswordInput {
   action: string;
 }
 
+export interface RecordLoginFailureInput {
+  organizationId: string;
+  /** `null` quando o e-mail nao pertence a nenhuma conta da organizacao. */
+  userId: string | null;
+  requestId: string | null;
+}
+
+export interface RecordLogoutInput {
+  sessionId: string;
+  userId: string;
+  organizationId: string;
+  requestId: string;
+}
+
 export interface ResetUserPasswordAsAdminInput {
   targetUserId: string;
   organizationId: string;
@@ -85,6 +99,59 @@ export class AuthTransactionRepository {
             : 'auth.first_access_started',
         requestId: input.requestId ?? null,
       });
+    });
+  }
+
+  /**
+   * A tentativa recusada fica registrada na organizacao que o codigo apontou,
+   * com autor quando a conta existe e como evento de sistema quando nao
+   * existe. Sem organizacao conhecida nao ha linha possivel: `organization_id`
+   * e obrigatorio e referencia a tabela, entao o chamador nem chega aqui.
+   */
+  async recordLoginFailure(input: RecordLoginFailureInput): Promise<void> {
+    await this.writeAudit(this.dataSource.manager, {
+      organizationId: input.organizationId,
+      actorUserId: input.userId,
+      entityId: input.userId,
+      action: 'auth.login_failed',
+      requestId: input.requestId,
+    });
+  }
+
+  /**
+   * Revogacao e auditoria do logout na mesma transacao, sempre pela sessao da
+   * propria organizacao e do proprio usuario. Sessao ja revogada nao gera
+   * evento novo: a resposta segue igual, mas a auditoria nao ganha linha que
+   * nao corresponde a nada.
+   */
+  async recordLogout(input: RecordLogoutInput): Promise<boolean> {
+    return this.dataSource.transaction(async (manager) => {
+      const revoked = await manager.query<WriteResult>(
+        `UPDATE auth_sessions
+            SET revoked_at = now(),
+                revoked_reason = 'logout',
+                updated_at = now()
+          WHERE id = $1
+            AND user_id = $2
+            AND organization_id = $3
+            AND revoked_at IS NULL
+            AND deleted_at IS NULL`,
+        [input.sessionId, input.userId, input.organizationId],
+      );
+
+      if (affectedRows(revoked) !== 1) {
+        return false;
+      }
+
+      await this.writeAudit(manager, {
+        organizationId: input.organizationId,
+        actorUserId: input.userId,
+        entityId: input.userId,
+        action: 'auth.logout',
+        requestId: input.requestId,
+      });
+
+      return true;
     });
   }
 
@@ -233,12 +300,17 @@ export class AuthTransactionRepository {
     );
   }
 
+  /**
+   * Sem autor conhecido o evento e de sistema, como exige
+   * `audit_events_actor_check`. Nenhum dado digitado na tentativa entra aqui:
+   * o `request_id` liga a linha ao log da requisicao e basta para investigar.
+   */
   private async writeAudit(
     manager: EntityManager,
     event: {
       organizationId: string;
-      actorUserId: string;
-      entityId: string;
+      actorUserId: string | null;
+      entityId: string | null;
       action: string;
       requestId: string | null;
     },
@@ -246,9 +318,10 @@ export class AuthTransactionRepository {
     await manager.query<WriteResult>(
       `INSERT INTO audit_events
          (organization_id, actor_type, actor_user_id, action, entity_type, entity_id, request_id)
-       VALUES ($1, 'user', $2, $3, 'user', $4, $5)`,
+       VALUES ($1, $2, $3, $4, 'user', $5, $6)`,
       [
         event.organizationId,
+        event.actorUserId === null ? 'system' : 'user',
         event.actorUserId,
         event.action,
         event.entityId,

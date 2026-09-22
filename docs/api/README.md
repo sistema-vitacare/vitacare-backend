@@ -54,6 +54,24 @@ Rotas públicas de autenticação: login, solicitação de recuperação e redef
 
 A senha tem de 8 a 128 **caracteres**, aceita espaços e Unicode e não tem regra de composição. O armazenamento usa Argon2id.
 
+### Auditoria de acesso
+
+Todo evento de acesso é gravado em `audit_events`, sempre dentro de uma organização e na mesma transação da escrita que o originou. A consulta e a exportação desses registros são objeto da tarefa 14 (RF017, UC06); hoje eles apenas são gravados e **nenhuma rota os devolve**.
+
+| `action` | Origem |
+| --- | --- |
+| `auth.login_succeeded` | Login aceito em conta sem troca pendente. |
+| `auth.login_failed` | Login recusado, quando o código corresponde a uma organização existente. Com autor se o e-mail é de uma conta dela; como evento de sistema se não é. |
+| `auth.first_access_started` | Login aceito em conta com troca obrigatória. |
+| `auth.first_access_completed` | Senha definitiva gravada pela sessão restrita. |
+| `auth.logout` | Sessão encerrada pelo próprio usuário. |
+| `auth.password_changed` | Troca da própria senha. |
+| `auth.password_recovered` | Senha redefinida por token de recuperação. |
+| `auth.admin_password_reset` | Senha temporária emitida por administrador. |
+| `auth.bootstrap_completed` | Primeira organização e primeiro administrador criados por `npm run auth:bootstrap`. |
+
+O evento guarda organização, autor, ação, entidade, `request_id` e o momento. **Nada digitado na requisição entra ali**: nem e-mail, nem senha, nem IP. Para investigar uma tentativa, correlacione o `request_id` do evento com o log estruturado da mesma requisição.
+
 ## Contrato transversal
 
 Toda rota sob `/api` compartilha o mesmo envelope de sucesso e o mesmo formato de erro. As exceções estão listadas adiante.

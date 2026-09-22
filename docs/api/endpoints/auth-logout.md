@@ -49,7 +49,7 @@ curl -i -X POST 'https://api.example.com/api/v1/auth/logout' \
 | `meta.requestId` | texto | sim | Correlação. |
 | `meta.timestamp` | texto ISO 8601 | sim | Momento da resposta. |
 
-Efeito: a sessão recebe `revoked_at` e `revoked_reason = 'logout'`. A linha continua no banco para histórico; ela apenas deixa de autenticar.
+Efeitos: a sessão recebe `revoked_at` e `revoked_reason = 'logout'` e a auditoria ganha um evento `auth.logout` na organização e no usuário do próprio token, na **mesma transação** — ou as duas gravações acontecem, ou nenhuma. A linha da sessão continua no banco para histórico; ela apenas deixa de autenticar. Sessão já revogada não produz evento novo.
 
 ## Erros
 
@@ -82,4 +82,4 @@ Efeito: a sessão recebe `revoked_at` e `revoked_reason = 'logout'`. A linha con
 
 ## Origem e validação
 
-Controller `src/modules/Auth/auth.controller.ts`; caso de uso `src/modules/Auth/Logout/logout.useCase.ts`; repositório `src/modules/Auth/repositories/authSession.repository.ts`. Testes: `tests/modules/Auth/logout.useCase.spec.ts`, `tests/modules/Auth/auth.e2e-spec.ts` (200 com `data: null` e 401 sem Bearer) e `tests/modules/Auth/authSchema.e2e-spec.ts` (dois dispositivos, só um encerrado). Conferido contra o OpenAPI gerado em 2026-09-22. Vault: [[2026-09-21-autenticacao-sessoes-recuperacao]].
+Controller `src/modules/Auth/auth.controller.ts`; caso de uso `src/modules/Auth/Logout/logout.useCase.ts`; repositório `src/modules/Auth/repositories/authTransaction.repository.ts`. Testes: `tests/modules/Auth/logout.useCase.spec.ts`, `tests/modules/Auth/auth.e2e-spec.ts` (200 com `data: null` e 401 sem Bearer) e `tests/modules/Auth/authSchema.e2e-spec.ts` (dois dispositivos, só um encerrado; evento de auditoria uma única vez). Conferido contra o OpenAPI gerado em 2026-09-22. Vault: [[2026-09-21-autenticacao-sessoes-recuperacao]], [[2026-09-22-auditoria-de-acesso]].
