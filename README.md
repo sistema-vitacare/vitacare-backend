@@ -113,7 +113,11 @@ trace, nunca para a resposta HTTP.
 
 ## Autenticação e SMTP
 
-O login recebe `organizationCode`, `email` e `password`; a sessão Bearer é opaca e stateful. Senhas temporárias exigem troca no primeiro acesso. `SMTP_ENABLED=false` permite iniciar a API sem SMTP e solicitações de recuperação continuam genéricas, sem criar token entregável. Com SMTP habilitado, configure `SMTP_HOST`, `SMTP_FROM` e `PASSWORD_RESET_URL`; os demais valores SMTP são opcionais conforme o provedor. Veja o manual de autenticação em `docs/api/`.
+O login recebe `organizationCode`, `email` e `password`; a sessão Bearer é opaca e stateful. Senhas temporárias exigem troca no primeiro acesso.
+
+> **Decisão de 2026-09-22: não existe SMTP no projeto.** Nenhum ambiente tem servidor de e-mail configurado, e `SMTP_ENABLED` fica `false`. Consequência prática: a recuperação de senha por link **não entrega nada** — a rota responde `202` e, sem SMTP, sequer cria token. Quem perdeu a senha depende da [redefinição administrativa](docs/api/endpoints/auth-redefinir-senha-usuario.md). O código do envio já existe e passa a valer no dia em que um SMTP for configurado.
+
+`SMTP_ENABLED=false` permite iniciar a API sem SMTP e solicitações de recuperação continuam genéricas, sem criar token entregável. Com SMTP habilitado, configure `SMTP_HOST`, `SMTP_FROM` e `PASSWORD_RESET_URL`; os demais valores SMTP são opcionais conforme o provedor. Veja o manual de autenticação em `docs/api/`.
 
 ## Bootstrap da primeira organizacao
 
@@ -263,6 +267,11 @@ de health nao poluem o log.
 - `npm run test:e2e` — sobe o pipeline HTTP real (helmet, CORS, versionamento,
   validacao, filtro de erros, Swagger) com PostgreSQL e Redis mockados. Roda em
   CI sem nenhum servico externo.
+- `tests/modules/Auth/authRateLimiter.integration.e2e-spec.ts` exercita o
+  limite de abuso contra um Redis **real** e pula sem
+  `VITACARE_TEST_REDIS_URL`. Aponte para um banco logico descartavel, por
+  exemplo `redis://default:<senha>@127.0.0.1:6379/15`: o teste apaga as chaves
+  `vitacare-test:auth:*` que cria.
 - Os specs de schema (`tests/database/initialSchema.e2e-spec.ts` e
   `tests/modules/Auth/authSchema.e2e-spec.ts`) **pulam** por padrao. Para exercita-los, aponte
   `VITACARE_TEST_DATABASE_URL` para um PostgreSQL **descartavel e vazio**

@@ -62,6 +62,8 @@ O que acontece por trás, quando a conta existe, está ativa, a organização es
 
 Com `SMTP_ENABLED=false` **nenhum token é criado**. A resposta continua `202`, e a recuperação por link fica indisponível na prática; nesse cenário use a [redefinição administrativa](auth-redefinir-senha-usuario.md).
 
+> **Estado real em 2026-09-22:** por decisão de Mateus, **não existe SMTP em nenhum ambiente** do projeto. Portanto esta rota hoje aceita a solicitação, não cria token e não envia mensagem — em todos os casos. O contrato acima descreve o comportamento que passa a valer quando um servidor for configurado; não trate o envio como funcionalidade disponível.
+
 ## Erros
 
 | Status | `error.code` | Quando |

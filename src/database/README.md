@@ -111,7 +111,12 @@ Validacao executada em PostgreSQL descartavel: `migration:show`,
 `migration:run`, `migration:revert` e `migration:run` novamente, mais
 `tests/modules/Auth/authSchema.e2e-spec.ts`, que roda as duas migrations, exercita
 isolamento entre organizacoes, inatividade e revogacao de sessao e reverte
-tudo no final. **Nenhuma migration foi aplicada em banco externo ou real.**
+tudo no final. Em 2026-09-22 o banco configurado em `.env` (PostgreSQL local em
+`127.0.0.1:5432`, base `vitacare`) foi conferido: as duas migrations constam
+como aplicadas (a inicial em 2026-09-17, a de autenticacao em 2026-09-21) e o
+comparador de schema do TypeORM nao aponta nenhuma divergencia estrutural
+frente as nove entidades. **Nenhuma migration foi aplicada em ambiente de
+producao ou em base com dado real.**
 
 ```bash
 VITACARE_TEST_DATABASE_URL="postgresql://<usuario>:<senha>@127.0.0.1:<porta>/vitacare_schema_test" \

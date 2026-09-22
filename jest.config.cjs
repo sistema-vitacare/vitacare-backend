@@ -20,4 +20,10 @@ module.exports = {
   ],
   coverageDirectory: 'coverage',
   testEnvironment: 'node',
+  // Falha legivel em Node incompativel, em vez de SIGSEGV nos workers.
+  globalSetup: '<rootDir>/tests/ensureNodeVersion.cjs',
+  // Cada worker compila TypeScript; metade das CPUs mantem a suite rapida
+  // sem estourar a memoria de uma VM apertada (foi o que travava o WSL).
+  maxWorkers: '50%',
+  workerIdleMemoryLimit: '512MB',
 };
