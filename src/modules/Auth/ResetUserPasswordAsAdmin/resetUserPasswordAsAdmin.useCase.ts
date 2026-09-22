@@ -17,7 +17,6 @@ export class ResetUserPasswordAsAdminUseCase {
   constructor(
     private readonly passwords: PasswordHasher,
     private readonly transactions: AuthTransactionRepository,
-    private readonly generatePassword: () => string = generateTemporaryPassword,
   ) {}
   async execute(
     input: { userId: string },
@@ -29,7 +28,7 @@ export class ResetUserPasswordAsAdminUseCase {
         detail:
           'A redefinição administrativa não pode atingir a própria conta.',
       });
-    const temporaryPassword = this.generatePassword();
+    const temporaryPassword = generateTemporaryPassword();
     const result = await this.transactions.resetUserPasswordAsAdmin({
       targetUserId: input.userId,
       organizationId: ctx.organizationId,

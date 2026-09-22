@@ -8,14 +8,12 @@ describe('ResetUserPasswordAsAdminUseCase', () => {
     const useCase = new ResetUserPasswordAsAdminUseCase(
       { hash: jest.fn().mockResolvedValue('hash-temporario') } as never,
       transactions as never,
-      () => 'ABCDEFGHJKLMNPQRSTUV',
     );
-    await expect(
-      useCase.execute({ userId: 'u2' }, {
-        userId: 'u1',
-        organizationId: 'o1',
-        requestId: 'r1',
-      } as never),
-    ).resolves.toEqual({ temporaryPassword: 'ABCDEFGHJKLMNPQRSTUV' });
+    const result = await useCase.execute({ userId: 'u2' }, {
+      userId: 'u1',
+      organizationId: 'o1',
+      requestId: 'r1',
+    } as never);
+    expect(result.temporaryPassword).toHaveLength(20);
   });
 });
