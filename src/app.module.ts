@@ -5,14 +5,17 @@ import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { LoggerModule } from 'nestjs-pino';
 import { AppController } from './app.controller';
 import appConfig from './config/app.config';
+import authConfig from './config/auth.config';
 import databaseConfig from './config/database.config';
 import { environmentValidationSchema } from './config/env.validation';
 import redisConfig from './config/redis.config';
+import mailConfig from './config/mail.config';
 import securityConfig from './config/security.config';
 import { DatabaseModule } from './database/database.module';
 import { HealthModule } from './health/health.module';
 import { AccessModule } from './modules/Access/access.module';
 import { AuditModule } from './modules/Audit/audit.module';
+import { AuthModule } from './modules/Auth/auth.module';
 import { OrganizationModule } from './modules/Organization/organization.module';
 import { PlanModule } from './modules/Plan/plan.module';
 import { UserModule } from './modules/User/user.module';
@@ -37,7 +40,14 @@ function prettyTransport() {
       isGlobal: true,
       cache: true,
       expandVariables: true,
-      load: [appConfig, databaseConfig, redisConfig, securityConfig],
+      load: [
+        appConfig,
+        authConfig,
+        databaseConfig,
+        redisConfig,
+        securityConfig,
+        mailConfig,
+      ],
       validationSchema: environmentValidationSchema,
       validationOptions: {
         abortEarly: false,
@@ -83,6 +93,7 @@ function prettyTransport() {
     AccessModule,
     UserModule,
     AuditModule,
+    AuthModule,
     RedisModule,
     QueueModule,
     HealthModule,

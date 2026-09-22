@@ -54,6 +54,12 @@ export class User {
   @Column({ type: 'varchar', length: 255, nullable: true, select: false })
   passwordHash!: string | null;
 
+  @Column({ type: 'boolean', default: true })
+  mustChangePassword!: boolean;
+
+  @Column({ type: 'timestamptz', nullable: true })
+  passwordChangedAt!: Date | null;
+
   @Column({ type: 'varchar', length: 32, nullable: true })
   phone!: string | null;
 

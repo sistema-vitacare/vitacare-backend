@@ -8,6 +8,7 @@ import {
 } from '@nestjs/terminus';
 import { SkipThrottle } from '@nestjs/throttler';
 import { RedisHealthIndicator } from './indicators/redis.health';
+import { Public } from '../modules/Auth/guards/public.decorator';
 
 @ApiTags('health')
 @Controller({ path: 'health', version: VERSION_NEUTRAL })
@@ -22,6 +23,7 @@ export class HealthController {
 
   /** Liveness: o processo HTTP responde. Nao toca em dependencias. */
   @Get('live')
+  @Public()
   @ApiExcludeEndpoint()
   liveness(): { status: string } {
     return { status: 'ok' };
@@ -29,6 +31,7 @@ export class HealthController {
 
   /** Readiness: PostgreSQL e Redis respondem. Retorna 503 se algum falhar. */
   @Get('ready')
+  @Public()
   @HealthCheck()
   @ApiOperation({ summary: 'Verifica PostgreSQL e Redis' })
   readiness(): Promise<HealthCheckResult> {
