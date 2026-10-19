@@ -20,6 +20,15 @@ import { buildDataSourceOptions } from './typeorm.options';
             'database.sslRejectUnauthorized',
           ),
           poolSize: config.getOrThrow<number>('database.poolSize'),
+          poolIdleTimeoutMs: config.getOrThrow<number>(
+            'database.poolIdleTimeoutMs',
+          ),
+          statementTimeoutMs: config.getOrThrow<number>(
+            'database.statementTimeoutMs',
+          ),
+          applicationName: config.getOrThrow<string>(
+            'database.applicationName',
+          ),
           connectTimeoutMs: config.getOrThrow<number>(
             'database.connectTimeoutMs',
           ),

@@ -5,7 +5,10 @@ import {
   withMeta,
 } from '@/common/http/envelope';
 import { isExcludedPath } from '@/common/http/excludedPaths';
-import { resolveRequestId } from '@/common/http/requestId';
+import {
+  requestIdFromHeaders,
+  resolveRequestId,
+} from '@/common/http/requestId';
 
 describe('resolveRequestId', () => {
   it('usa o id que o pino anexou a requisicao', () => {
@@ -98,4 +101,23 @@ describe('paginate', () => {
     );
     expect(envelope.meta.pagination?.totalPages).toBe(0);
   });
+});
+
+describe('requestIdFromHeaders', () => {
+  it('adota o id do gateway', () => {
+    const id = '0123456789abcdef0123456789abcdef';
+
+    expect(requestIdFromHeaders({ headers: { 'x-request-id': id } })).toBe(id);
+  });
+
+  it.each([undefined, 'curto', 'id com espaco e\nquebra de linha', ['a', 'b']])(
+    'gera um UUID novo para %p',
+    (incoming) => {
+      const id = requestIdFromHeaders({
+        headers: { 'x-request-id': incoming },
+      });
+
+      expect(id).toMatch(/^[0-9a-f-]{36}$/);
+    },
+  );
 });

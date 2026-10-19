@@ -114,7 +114,7 @@ Escrita pode acrescentar `meta.message`:
 | Propriedade | Tipo | Significado |
 | --- | --- | --- |
 | `data` | objeto, lista ou `null` | Conteúdo da operação. Operação sem conteúdo devolve `200` com `data: null`, não `204`. |
-| `meta.requestId` | texto | Identificador de correlação com o log. Sempre presente. |
+| `meta.requestId` | texto | Identificador de correlação com o log. Sempre presente. Atrás do gateway de produção é o `X-Request-Id` gerado pelo nginx (32 caracteres hexadecimais), o mesmo da linha de acesso do gateway; header ausente ou fora do formato `[A-Za-z0-9-]{16,64}` gera um UUID. |
 | `meta.timestamp` | texto ISO 8601 | Momento em que a resposta foi construída. Sempre presente. |
 | `meta.message` | texto, opcional | Confirmação amigável definida pelo caso de uso. |
 | `meta.pagination` | objeto, opcional | `page`, `limit`, `total` e `totalPages`. Só em resultado paginado. |

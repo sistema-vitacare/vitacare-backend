@@ -1,0 +1,194 @@
+# CI e deploy de produção.
+#
+#   push/PR em develop ou PR para main → só `testes`
+#   push na main (o merge de develop) → testes → imagens no GHCR → deploy
+#
+#   1. testes: lint, build, unitários e e2e contra PostgreSQL e Redis REAIS de
+#      serviço (as suítes atrás de VITACARE_TEST_* deixam de ser puladas)
+#   2. imagem: build e push de duas imagens do mesmo Dockerfile
+#        ghcr.io/sistema-vitacare/vitacare-backend          (API, réplicas)
+#        ghcr.io/sistema-vitacare/vitacare-backend-gateway  (nginx de borda)
+#   3. deploy: POST no webhook da stack; o Portainer baixa as imagens, roda o
+#      migrate e recria as réplicas, e o job espera GET /api/v1 mostrar este
+#      commit em data.version.
+# Qualquer etapa que falha interrompe as seguintes: nada quebrado chega à VPS.
+#
+# Configuração no GitHub (Settings → Secrets and variables → Actions):
+#   Secret   PORTAINER_WEBHOOK_URL   URL do webhook da stack (obrigatório)
+#   Variable APP_URL                 http://<IP>:1040 ou https://api.dominio,
+#                                    sem / no fim (opcional; sem ela o job não
+#                                    confere se a versão nova entrou no ar)
+name: CI e deploy
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+  # Manual: no Portainer CE o webhook só redeploya se a main tiver commit novo.
+  # Sem commit novo, use "Pull and redeploy" na stack.
+  workflow_dispatch:
+
+# Dois merges seguidos não fazem dois deploys simultâneos; o segundo espera.
+# Fora da main, um push novo cancela a verificação do anterior.
+concurrency:
+  group: ${{ github.ref == 'refs/heads/main' && 'deploy-producao' || format('ci-{0}', github.ref) }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+permissions:
+  contents: read
+
+jobs:
+  testes:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    services:
+      postgres:
+        image: postgres:17-alpine       # mesma versão principal da VPS
+        env:
+          POSTGRES_USER: vitacare
+          POSTGRES_PASSWORD: secret
+          POSTGRES_DB: vitacare_schema_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U vitacare -d vitacare_schema_test"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+      redis:
+        image: redis:8-alpine
+        ports: ["6379:6379"]
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      # `${A:-${B:?msg}}`: o docker compose aceita, o Portainer CE recusa a
+      # stack (avalia o `:?` de dentro mesmo com A definida).
+      - name: Compose de produção sem interpolação aninhada com :?
+        run: |
+          if grep -nE '\$\{[A-Za-z_]+:-\$\{[A-Za-z_]+:\?' docker-compose.prod.yml; then
+            echo "::error::Interpolação aninhada com :? — o Portainer recusa a stack."; exit 1
+          fi
+
+      - name: Compose de produção válido
+        run: docker compose -f docker-compose.prod.yml config --quiet
+        env:
+          DB_PASSWORD: ci
+          REDIS_PASSWORD: ci
+
+      - run: npm ci
+
+      - run: npm run lint
+
+      - run: npm run build
+
+      - run: npm test -- --runInBand
+
+      # Com as duas URLs, as suítes de schema, seed e rate limit rodam contra o
+      # banco e o Redis de serviço, descartáveis por definição. O nome do banco
+      # e o host local são exigidos pela trava dos próprios testes.
+      - run: npm run test:e2e -- --runInBand
+        env:
+          VITACARE_TEST_DATABASE_URL: postgresql://vitacare:secret@127.0.0.1:5432/vitacare_schema_test
+          VITACARE_TEST_REDIS_URL: redis://127.0.0.1:6379/15
+
+  imagem:
+    needs: testes
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: write   # push no GHCR com o GITHUB_TOKEN, sem token extra
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # O GHCR exige minúsculo.
+      - run: echo "IMAGE=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_ENV"
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # :latest é o que a stack usa; :sha-<commit> fica para rollback
+      # (APP_IMAGE=...:sha-<commit> na stack).
+      - name: API
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          target: runtime
+          push: true
+          build-args: GIT_SHA=${{ github.sha }}
+          tags: |
+            ${{ env.IMAGE }}:latest
+            ${{ env.IMAGE }}:sha-${{ github.sha }}
+          labels: |
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+          cache-from: type=gha,scope=api
+          cache-to: type=gha,mode=max,scope=api
+
+      - name: Gateway
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          target: gateway
+          push: true
+          tags: |
+            ${{ env.IMAGE }}-gateway:latest
+            ${{ env.IMAGE }}-gateway:sha-${{ github.sha }}
+          labels: |
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+          cache-from: type=gha,scope=gateway
+          cache-to: type=gha,mode=max,scope=gateway
+
+  deploy:
+    needs: imagem
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: production
+
+    steps:
+      # -k: o Portainer responde em https://IP:9443 com certificado autoassinado.
+      - name: Dispara o webhook da stack no Portainer
+        env:
+          PORTAINER_WEBHOOK_URL: ${{ secrets.PORTAINER_WEBHOOK_URL }}
+        run: |
+          if [ -z "$PORTAINER_WEBHOOK_URL" ]; then
+            echo "::error::Secret PORTAINER_WEBHOOK_URL não configurado"
+            exit 1
+          fi
+          curl -fsS -k -X POST --max-time 300 "$PORTAINER_WEBHOOK_URL"
+
+      # /health/live responderia 200 também com a versão antiga; data.version
+      # só mostra este commit quando as réplicas NOVAS estão servindo. Depois,
+      # /health/ready prova que elas alcançam PostgreSQL e Redis.
+      - name: Espera a versão nova entrar no ar
+        if: ${{ vars.APP_URL != '' }}
+        env:
+          APP_URL: ${{ vars.APP_URL }}
+        run: |
+          for i in $(seq 1 36); do
+            no_ar=$(curl -fsS --max-time 10 "$APP_URL/api/v1" 2>/dev/null | jq -r '.data.version // empty' 2>/dev/null || true)
+            if [ "$no_ar" = "$GITHUB_SHA" ] && curl -fsS -o /dev/null --max-time 10 "$APP_URL/health/ready"; then
+              echo "Versão $GITHUB_SHA no ar em $APP_URL"
+              exit 0
+            fi
+            echo "Tentativa $i: no ar '${no_ar:-sem resposta}', aguardando 10s..."
+            sleep 10
+          done
+          echo "::error::A versão $GITHUB_SHA não entrou no ar em 6 minutos. Ver os logs: Grafana {stack=\"vitacare\"} ou o serviço migrate no Portainer."
+          exit 1

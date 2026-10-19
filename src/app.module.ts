@@ -2,8 +2,10 @@ import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { APP_GUARD } from '@nestjs/core';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
+import type Redis from 'ioredis';
 import { LoggerModule } from 'nestjs-pino';
 import { AppController } from './app.controller';
+import { requestIdFromHeaders } from './common/http/requestId';
 import appConfig from './config/app.config';
 import authConfig from './config/auth.config';
 import databaseConfig from './config/database.config';
@@ -12,6 +14,8 @@ import redisConfig from './config/redis.config';
 import mailConfig from './config/mail.config';
 import securityConfig from './config/security.config';
 import { DatabaseModule } from './database/database.module';
+import { REDIS_CLIENT } from './redis/redis.constants';
+import { RedisThrottlerStorage } from './redis/redisThrottler.storage';
 import { HealthModule } from './health/health.module';
 import { AccessModule } from './modules/Access/access.module';
 import { AuditModule } from './modules/Audit/audit.module';
@@ -64,6 +68,7 @@ function prettyTransport() {
             config.getOrThrow<string>('app.environment') === 'production'
               ? undefined
               : prettyTransport(),
+          genReqId: requestIdFromHeaders,
           redact: [
             'req.headers.authorization',
             'req.headers.cookie',
@@ -77,8 +82,10 @@ function prettyTransport() {
       }),
     }),
     ThrottlerModule.forRootAsync({
-      inject: [ConfigService],
-      useFactory: (config: ConfigService) => ({
+      inject: [ConfigService, REDIS_CLIENT],
+      useFactory: (config: ConfigService, redis: Redis) => ({
+        // Contagem no Redis: o limite vale para a stack, nao por replica.
+        storage: new RedisThrottlerStorage(redis),
         throttlers: [
           {
             ttl: config.getOrThrow<number>('security.throttleTtlMs'),
