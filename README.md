@@ -1,15 +1,19 @@
 # VitaCare Backend
 
-Backend HTTP 100% API construido com Node.js 22, TypeScript e NestJS 11. Roda em
-um unico container e consome instancias **externas** de PostgreSQL e Redis.
+Backend HTTP 100% API construido com Node.js 22, TypeScript e NestJS 11. Consome
+instancias **externas** de PostgreSQL e Redis. Em desenvolvimento roda em um
+unico container (`compose.yaml`); em producao, em replicas atras de um gateway
+nginx, com deploy automatico pela `main` ([deploy na VPS](docs/deploy-vps.md)).
 
 ## Sumario
 
 - [Requisitos](#requisitos)
 - [Configuracao](#configuracao)
 - [Executar com Docker](#executar-com-docker)
+- [Deploy de producao](#deploy-de-producao)
 - [Desenvolvimento local](#desenvolvimento-local)
 - [Rotas](#rotas)
+- [Manual de integracao da API](#manual-de-integracao-da-api)
 - [Estrutura do projeto](#estrutura-do-projeto)
 - [Banco de dados e migrations](#banco-de-dados-e-migrations)
 - [Cache e filas](#cache-e-filas)
@@ -61,6 +65,23 @@ A porta interna do container e fixa em `3000`; publique outra no host com
 VITACARE_ENV_FILE=.env.production HOST_PORT=8080 docker compose up -d
 ```
 
+## Deploy de producao
+
+Merge na `main` → GitHub Actions (lint, build, unitarios e e2e contra PostgreSQL
+e Redis reais) → imagens `vitacare-backend` e `vitacare-backend-gateway` no GHCR
+→ webhook do Portainer → stack `vitacare` com tres servicos:
+
+| Servico | Papel |
+| --- | --- |
+| `migrate` | aplica as migrations pendentes uma vez por deploy e sai |
+| `api` | a API, em `API_REPLICAS` replicas (padrao 2), sem porta publicada |
+| `gateway` | `app-vitacare`, nginx na porta `1040`; distribui entre as replicas |
+
+PostgreSQL e Redis sao os das stacks `infra` da VPS, alcancados pela rede
+docker. Passo a passo, dimensionamento do pool e da memoria, timeouts, escala e
+rollback: [docs/deploy-vps.md](docs/deploy-vps.md). Variaveis da stack:
+`.env.production.example`.
+
 ## Desenvolvimento local
 
 ```bash
@@ -78,6 +99,10 @@ npm test          # unitarios
 npm run test:e2e  # pipeline HTTP, sem dependencias externas
 ```
 
+> Use Node.js 22, como declarado em `engines` e no `.nvmrc`. Em Node 20 o
+> binario nativo do `argon2` derruba o processo de teste com *segmentation
+> fault*, sem mensagem de erro util.
+
 ## Rotas
 
 | Rota | Descricao |
@@ -87,6 +112,8 @@ npm run test:e2e  # pipeline HTTP, sem dependencias externas
 | `GET /api/docs-json` | Contrato OpenAPI para o frontend. |
 | `GET /health/live` | Liveness: o processo responde. Nao toca em dependencias. |
 | `GET /health/ready` | Readiness: PostgreSQL e Redis respondem. `503` se algum falhar. |
+| `POST /api/v1/auth/login` | Login por código da organização, e-mail e senha. |
+| `POST /api/v1/auth/password-recovery/request` | Solicitação genérica de recuperação por e-mail. |
 
 O prefixo (`API_PREFIX`) e a versao (`API_VERSION`) sao configuraveis. As rotas
 de health ficam fora do prefixo e do versionamento, de proposito: sao consumidas
@@ -96,18 +123,75 @@ Todo erro sai no mesmo formato:
 
 ```json
 {
-  "statusCode": 404,
-  "error": "Not Found",
-  "message": "Paciente nao encontrado",
-  "path": "/api/v1/pacientes/1",
-  "method": "GET",
-  "timestamp": "2026-09-14T13:05:07.047Z",
-  "requestId": "5"
+  "error": { "code": "AUTH_UNAUTHENTICATED", "message": "Autenticação necessária.", "detail": null, "fields": null },
+  "meta": { "requestId": "exemplo", "timestamp": "2026-09-22T13:05:07.047Z", "path": "/api/v1/auth/logout", "method": "POST", "status": 401 }
 }
 ```
 
 Excecoes nao tratadas viram `500` generico: a causa vai para o log com stack
 trace, nunca para a resposta HTTP.
+
+## Autenticação e SMTP
+
+O login recebe `organizationCode`, `email` e `password`; a sessão Bearer é opaca e stateful. Senhas temporárias exigem troca no primeiro acesso.
+
+> **Decisão de 2026-09-22: não existe SMTP no projeto.** Nenhum ambiente tem servidor de e-mail configurado, e `SMTP_ENABLED` fica `false`. Consequência prática: a recuperação de senha por link **não entrega nada** — a rota responde `202` e, sem SMTP, sequer cria token. Quem perdeu a senha depende da [redefinição administrativa](docs/api/endpoints/auth-redefinir-senha-usuario.md). O código do envio já existe e passa a valer no dia em que um SMTP for configurado.
+
+`SMTP_ENABLED=false` permite iniciar a API sem SMTP e solicitações de recuperação continuam genéricas, sem criar token entregável. Com SMTP habilitado, configure `SMTP_HOST`, `SMTP_FROM` e `PASSWORD_RESET_URL`; os demais valores SMTP são opcionais conforme o provedor. Veja o manual de autenticação em `docs/api/`.
+
+## Bootstrap da primeira organizacao
+
+O banco nao nasce com organizacao nem administrador. Com as migrations ja
+aplicadas e um plano de uso cadastrado, crie os dois com:
+
+```bash
+npm run auth:bootstrap -- \
+  --organization-code clinica-exemplo \
+  --usage-plan-id <uuid do plano> \
+  --trade-name "Clinica Exemplo" \
+  --admin-name "Nome do administrador" \
+  --admin-email admin@example.test \
+  --admin-cpf 00000000000
+```
+
+O comando **nao aceita senha por argumento**: a senha provisoria e sorteada,
+gravada apenas como hash e exibida uma unica vez no terminal, para nao ficar no
+historico do shell. O administrador entra com ela e e obrigado a trocar no
+primeiro acesso. Organizacao, perfil `admin`, permissao `users:reset_password`,
+vinculo e usuario sao criados em uma unica transacao; identificador ja usado
+falha em conflito, sem criacao parcial. Em imagem compilada use
+`npm run auth:bootstrap:prod`.
+
+## Seed de desenvolvimento
+
+Com as migrations aplicadas, `npm run seed:dev` cria uma base minima para
+exercitar a API: dois planos, **duas organizacoes** (`clinica-vida` e
+`casa-bem-estar`), os quatro perfis em cada uma e tres usuarios ativos. Duas
+organizacoes de proposito: e assim que se testa isolamento entre tenants.
+
+```bash
+npm run seed:dev
+```
+
+O comando e **idempotente** — rodar de novo nao duplica nada — e recusa
+qualquer `NODE_ENV` diferente de `development`/`test`, porque grava contas com
+senha conhecida. Os usuarios nascem `active` e sem troca obrigatoria, entao o
+login ja devolve sessao normal.
+
+> As contas do seed usam e-mails reais do time e a senha `12345678`. E dado de
+> desenvolvimento local: nao replicar em homologacao nem em producao, e nao
+> tratar os planos como catalogo comercial (P05/P06) nem a permissao concedida
+> ao perfil `admin` como matriz de acesso aprovada (RF005/RF016).
+
+## Manual de integracao da API
+
+O [manual Markdown](docs/api/README.md) lista as rotas realmente disponiveis,
+com request, propriedades de resposta, erros e exemplos. Cada novo endpoint
+deve ter uma nota propria em `docs/api/endpoints/` conforme o
+[padrao de documentacao](docs/api/padrao-endpoint.md), alem do contrato Swagger.
+Alteracoes de regra, fluxo, dados ou contrato devem ser registradas no vault
+VitaCare e refletidas no manual na mesma tarefa, como definido em `AGENTS.md`
+e `CLAUDE.md`.
 
 ## Estrutura do projeto
 
@@ -127,9 +211,22 @@ src/
 ├── modules/                 # modulos de dominio (ver modules/README.md)
 ├── queue/                   # BullMQ compartilhado
 ├── redis/                   # cliente ioredis + RedisService (cache)
+├── cli/                     # entrypoints de operacao (bootstrap)
 ├── app.setup.ts             # pipeline HTTP, reusado pelos testes e2e
 └── main.ts                  # bootstrap
+
+tests/                       # todo teste do repositorio, por area de src/
+├── jest-e2e.json            # config da camada e2e
+├── app/                     # pipeline HTTP transversal
+├── common/                  # envelope, erros, contexto, validacao
+├── database/                # nomes de colunas e schema em PostgreSQL
+├── health/ e redis/         # infraestrutura
+└── modules/Auth/            # unitarios e e2e do dominio
 ```
+
+Nenhum `*.spec.ts` fica dentro de `src/`: os testes espelham as areas de `src/`
+em `tests/`, com arquivos planos dentro de cada pasta. O sufixo separa as
+camadas — `*.e2e-spec.ts` roda por `npm run test:e2e`, o resto por `npm test`.
 
 Imports entre pastas usam o alias `@/`, resolvido em build e em testes:
 
@@ -164,11 +261,14 @@ Os comandos acima usam `ENV_FILE` (padrao `.env`) para achar o banco:
 ENV_FILE=.env.homolog npm run migration:run
 ```
 
-No deploy, rode contra o codigo ja compilado:
+Contra o codigo ja compilado (container de desenvolvimento):
 
 ```bash
 docker compose run --rm api npm run migration:run:prod
 ```
+
+Em producao, o servico `migrate` do `docker-compose.prod.yml` faz isso a cada
+deploy, antes das replicas subirem (`RUN_MIGRATIONS=false` desliga).
 
 Entidades sao descobertas pelo glob `*.entity.ts` e registradas no modulo do
 dominio com `TypeOrmModule.forFeature([...])`.
@@ -186,7 +286,8 @@ e declara seu processor com `@Processor('...')`.
 
 Logs estruturados com `nestjs-pino`. Em producao saem em JSON puro para o
 coletor; em desenvolvimento passam por `pino-pretty`. Cada requisicao recebe um
-id, ecoado no campo `requestId` das respostas de erro.
+id, ecoado em `meta.requestId`; atras do gateway e o `X-Request-Id` gerado pelo
+nginx, o mesmo da linha `gw ... req=<id>` do access log.
 
 `authorization`, `cookie` e `x-api-key` sao redigidos automaticamente. As rotas
 de health nao poluem o log.
@@ -198,8 +299,13 @@ de health nao poluem o log.
 - **CORS** restrito a `CORS_ORIGINS` (lista separada por virgula). Vazio em
   desenvolvimento libera tudo; vazio em producao **desliga** o CORS e registra
   um aviso no boot.
-- **Rate limit** global via `@nestjs/throttler` (`THROTTLE_LIMIT` requisicoes por
+- **Rate limit** global via `@nestjs/throttler`, com contagem no Redis
+  (`RedisThrottlerStorage`, compartilhada entre replicas; `THROTTLE_LIMIT` requisicoes por
   `THROTTLE_TTL_MS`).
+- **Proxy confiavel** (`TRUST_PROXY`): desligado por padrao. Atras do gateway, a
+  stack de producao usa `loopback,uniquelocal` para o Express ler o IP real do
+  cliente em `X-Forwarded-For`; sem isso todos os clientes dividiriam o balde de
+  rate limit do IP do nginx. `true` e recusado no boot (aceitaria IP forjado).
 - **ValidationPipe** global com `whitelist` e `forbidNonWhitelisted`: campos nao
   declarados no DTO fazem a requisicao falhar com `400`.
 - O container roda como usuario `node`, sem privilegios adicionais
@@ -207,7 +313,19 @@ de health nao poluem o log.
 
 ## Testes
 
-- `npm test` — unitarios, colocados ao lado do codigo (`*.spec.ts`).
+- `npm test` — unitarios de `tests/`, exceto `*.e2e-spec.ts`.
 - `npm run test:e2e` — sobe o pipeline HTTP real (helmet, CORS, versionamento,
-  validacao, filtro de erros, Swagger) com PostgreSQL e Redis mockados. Roda em
-  CI sem nenhum servico externo.
+  validacao, filtro de erros, Swagger) com PostgreSQL e Redis mockados. No CI as
+  suites de banco e Redis abaixo rodam contra servicos descartaveis do proprio
+  job (`.github/workflows/deploy.yml`).
+- `tests/modules/Auth/authRateLimiter.integration.e2e-spec.ts` exercita o
+  limite de abuso contra um Redis **real** e pula sem
+  `VITACARE_TEST_REDIS_URL`. Aponte para um banco logico descartavel, por
+  exemplo `redis://default:<senha>@127.0.0.1:6379/15`: o teste apaga as chaves
+  `vitacare-test:auth:*` que cria.
+- Os specs de schema (`tests/database/initialSchema.e2e-spec.ts` e
+  `tests/modules/Auth/authSchema.e2e-spec.ts`) **pulam** por padrao. Para exercita-los, aponte
+  `VITACARE_TEST_DATABASE_URL` para um PostgreSQL **descartavel e vazio**
+  chamado `vitacare_schema_test` em `localhost`; eles rodam as migrations,
+  validam constraints, isolamento entre organizacoes e revogacao de sessao, e
+  revertem tudo ao final. Nunca aponte para banco com dado real.

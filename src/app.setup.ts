@@ -9,7 +9,10 @@ import type { NestExpressApplication } from '@nestjs/platform-express';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import type { NextFunction, Request, Response } from 'express';
 import helmet from 'helmet';
-import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
+import { AllExceptionsFilter } from './common/filters/allExceptions.filter';
+import { BEARER_SECURITY_SCHEME } from './common/http/bearerAuth';
+import { ResponseEnvelopeInterceptor } from './common/http/responseEnvelope.interceptor';
+import { validationExceptionFactory } from './common/http/validationException.factory';
 
 export interface AppSetupOptions {
   apiPrefix: string;
@@ -19,6 +22,11 @@ export interface AppSetupOptions {
   corsCredentials: boolean;
   swaggerEnabled: boolean;
   swaggerPath: string;
+  /**
+   * `trust proxy` do Express. Atras do gateway, sem isto `req.ip` vira o IP do
+   * nginx e todos os clientes dividem o mesmo balde do rate limit.
+   */
+  trustProxy?: false | number | string;
 }
 
 /**
@@ -47,6 +55,8 @@ export const setupApp = (
 ): { docsPath: string } => {
   const logger = new Logger('AppSetup');
   const docsPath = `/${options.apiPrefix}/${options.swaggerPath}`;
+
+  app.set('trust proxy', options.trustProxy ?? false);
 
   // A UI do Swagger depende de scripts inline; o CSP e removido apenas nela.
   const secureDefault = helmet();
@@ -83,14 +93,20 @@ export const setupApp = (
     defaultVersion: options.apiVersion,
   });
 
+  // Health mantem o relatorio do Terminus e a documentacao mantem HTML/OpenAPI
+  // puros: as duas ficam fora do envelope e do novo formato de erro.
+  const excludedPaths = ['/health', docsPath];
+
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
       forbidNonWhitelisted: true,
       transform: true,
+      exceptionFactory: validationExceptionFactory,
     }),
   );
-  app.useGlobalFilters(new AllExceptionsFilter());
+  app.useGlobalInterceptors(new ResponseEnvelopeInterceptor(excludedPaths));
+  app.useGlobalFilters(new AllExceptionsFilter(excludedPaths));
   app.enableShutdownHooks();
 
   if (options.swaggerEnabled) {
@@ -100,7 +116,15 @@ export const setupApp = (
         .setTitle('VitaCare API')
         .setDescription('Backend HTTP do VitaCare.')
         .setVersion(options.apiVersion)
-        .addBearerAuth()
+        .addBearerAuth(
+          {
+            type: 'http',
+            scheme: 'bearer',
+            description:
+              'Token opaco de sessao emitido por POST /auth/login. Enviar como `Authorization: Bearer <token>`.',
+          },
+          BEARER_SECURITY_SCHEME,
+        )
         .build(),
     );
 

@@ -1,0 +1,199 @@
+# Compose de PRODUÇÃO: é este arquivo que a stack do Portainer lê
+# (Stacks → Repository → Compose path: docker-compose.prod.yml).
+# O compose.yaml continua sendo o de desenvolvimento (build local, um container).
+#
+# Fluxo do deploy (docs/deploy-vps.md):
+#   merge develop → main → GitHub Actions: testes → imagens no GHCR → webhook
+#   → Portainer baixa as imagens e recria: migrate (uma vez) → api (N réplicas)
+#   → gateway (app-vitacare:1040, o único com porta publicada).
+#
+#   internet/NPM ─► gateway :1040 ─┬─► api réplica 1 :3000 ─┐
+#                                  ├─► api réplica 2 :3000 ─┼─► postgresql / redis
+#                                  └─► api réplica N :3000 ─┘   (rede infra)
+#
+# Nenhum .env vai para a imagem (.dockerignore) nem para o repositório. Os
+# valores ficam nas "Environment variables" da stack no Portainer, e o Compose
+# os interpola abaixo. Modelo: .env.production.example.
+# Variável com `:?` é obrigatória: sem ela a stack nem sobe, com a mensagem.
+# Nunca pôr um `:?` dentro do default de outra variável: o Portainer CE recusa
+# a stack mesmo com a variável de fora definida. O CI barra esse padrão.
+
+# Banco, comum à API e ao migrate. Postgres da stack infra, usuário PRÓPRIO do
+# sistema (dono só do banco vitacare), nunca o superusuário.
+x-db-env: &db-env
+  NODE_ENV: production
+  DB_HOST: ${DB_HOST:-postgresql}
+  DB_PORT: ${DB_PORT:-5432}
+  DB_DATABASE: ${DB_DATABASE:-vitacare}
+  DB_USERNAME: ${DB_USERNAME:-vitacare}
+  DB_PASSWORD: ${DB_PASSWORD:?Defina DB_PASSWORD nas variaveis da stack}
+  DB_SCHEMA: ${DB_SCHEMA:-public}
+  # O Postgres da stack infra fala sem TLS dentro da rede docker.
+  DB_SSL: ${DB_SSL:-false}
+  DB_CONNECT_TIMEOUT_MS: ${DB_CONNECT_TIMEOUT_MS:-10000}
+
+# Teto de log: sem ele um loop de erro enche o disco da VPS. O Loki é a memória
+# longa; este arquivo é só o buffer que o Alloy lê.
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  # Aplica as migrations pendentes e sai. Roda uma vez por deploy, ANTES das
+  # réplicas: com N réplicas migrando no boot, duas disputariam o schema.
+  migrate:
+    image: ${APP_IMAGE:-ghcr.io/sistema-vitacare/vitacare-backend:latest}
+    # Todo `compose up` (o redeploy do webhook) baixa a imagem; faz o papel do
+    # "Re-pull image", pago no Portainer CE.
+    pull_policy: always
+    command: ["migrate"]
+    restart: "no"
+    environment:
+      <<: *db-env
+      # Migration longa não pode morrer no statement_timeout da API.
+      DB_STATEMENT_TIMEOUT_MS: "0"
+      DB_POOL_SIZE: "1"
+      DB_APPLICATION_NAME: vitacare-migrate
+      # "false" pula as migrations neste deploy (o serviço sai com sucesso).
+      RUN_MIGRATIONS: ${RUN_MIGRATIONS:-true}
+    labels:
+      # Vira o label `stack` no Loki; igual ao nome da stack no Portainer.
+      stack: vitacare
+    logging: *logging
+    networks:
+      - infra
+
+  # API NestJS. Sem container_name e sem porta publicada: é o que permite
+  # réplicas. O gateway as alcança pelo nome `api` (DNS do Docker).
+  api:
+    image: ${APP_IMAGE:-ghcr.io/sistema-vitacare/vitacare-backend:latest}
+    pull_policy: always
+    command: ["api"]
+    restart: unless-stopped
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    environment:
+      <<: *db-env
+      PORT: "3000"
+      API_PREFIX: ${API_PREFIX:-api}
+      API_VERSION: ${API_VERSION:-1}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      SWAGGER_ENABLED: ${SWAGGER_ENABLED:-true}
+      SWAGGER_PATH: ${SWAGGER_PATH:-docs}
+
+      # --- Atrás do gateway (e do NPM): IP real do cliente para o rate limit.
+      # Faixas privadas = as redes docker; nunca `true` (aceitaria IP forjado).
+      TRUST_PROXY: ${TRUST_PROXY:-loopback,uniquelocal}
+      # Timeouts: consulta 30s < request 60s < gateway 75s < NPM >= 90s.
+      HTTP_REQUEST_TIMEOUT_MS: ${HTTP_REQUEST_TIMEOUT_MS:-60000}
+      HTTP_KEEP_ALIVE_TIMEOUT_MS: ${HTTP_KEEP_ALIVE_TIMEOUT_MS:-65000}
+      # Heap do V8 abaixo do teto do container: o GC trabalha antes do OOM.
+      NODE_OPTIONS: --max-old-space-size=${API_HEAP_MB:-384}
+
+      # --- Pool de conexões por réplica. Total no Postgres compartilhado:
+      # API_REPLICAS × DB_POOL_SIZE (padrão 2 × 5 = 10) + 1 do migrate.
+      DB_POOL_SIZE: ${DB_POOL_SIZE:-5}
+      DB_POOL_IDLE_TIMEOUT_MS: ${DB_POOL_IDLE_TIMEOUT_MS:-30000}
+      DB_STATEMENT_TIMEOUT_MS: ${DB_STATEMENT_TIMEOUT_MS:-30000}
+      DB_APPLICATION_NAME: vitacare-api
+
+      # --- Redis compartilhado da stack infra: prefixo próprio OBRIGATÓRIO,
+      # senão um sistema lê/limpa a chave do outro. Senha = a da stack infra.
+      REDIS_HOST: ${REDIS_HOST:-redis}
+      REDIS_PORT: ${REDIS_PORT:-6379}
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?Defina REDIS_PASSWORD (a mesma da stack infra)}
+      REDIS_DB: ${REDIS_DB:-0}
+      REDIS_TLS: "false"
+      REDIS_KEY_PREFIX: ${REDIS_KEY_PREFIX:-vitacare:}
+      QUEUE_PREFIX: ${QUEUE_PREFIX:-vitacare}
+
+      # --- Frontend: origens aceitas, separadas por vírgula. Vazio = CORS
+      # desligado em produção (nenhum navegador de outra origem é aceito).
+      CORS_ORIGINS: ${CORS_ORIGINS:-}
+      CORS_CREDENTIALS: ${CORS_CREDENTIALS:-false}
+      THROTTLE_TTL_MS: ${THROTTLE_TTL_MS:-60000}
+      THROTTLE_LIMIT: ${THROTTLE_LIMIT:-120}
+
+      # --- E-mail: decisão de 2026-09-22, não existe SMTP no projeto.
+      SMTP_ENABLED: ${SMTP_ENABLED:-false}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_SECURE: ${SMTP_SECURE:-false}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_FROM: ${SMTP_FROM:-}
+      PASSWORD_RESET_URL: ${PASSWORD_RESET_URL:-}
+    deploy:
+      # Escala horizontal: muda API_REPLICAS na stack → Update the stack. O
+      # gateway descobre as réplicas novas sozinho em até 10s.
+      replicas: ${API_REPLICAS:-2}
+      resources:
+        limits:
+          # Teto por réplica: o OOM fica no cgroup da réplica, não no Postgres.
+          memory: ${API_MEM_LIMIT:-512m}
+          # 2 vCPU para todas as apps da VPS: uma réplica em loop não toma tudo.
+          cpus: "${API_CPUS:-0.5}"
+    # SIGTERM → o Nest fecha HTTP, pool e Redis (enableShutdownHooks).
+    stop_grace_period: 30s
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3000/health/live >/dev/null || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    labels:
+      stack: vitacare
+    logging: *logging
+    networks:
+      - vitacare
+      - infra                      # postgresql e redis pelo nome
+
+  # Borda da stack: único container com porta publicada e alvo do NPM.
+  gateway:
+    image: ${GATEWAY_IMAGE:-ghcr.io/sistema-vitacare/vitacare-backend-gateway:latest}
+    pull_policy: always
+    container_name: app-vitacare
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+    ports:
+      # 127.0.0.1 por padrão: o público entra pelo Nginx Proxy Manager (rede
+      # proxy, https). Sem domínio: APP_BIND=0.0.0.0 expõe http://IP:1040.
+      # Porta do host = porta interna.
+      - "${APP_BIND:-127.0.0.1}:1040:1040"
+    deploy:
+      resources:
+        limits:
+          memory: 64m
+          cpus: "0.25"
+    healthcheck:
+      # A linha de access log a cada 30s é o batimento do pipeline de log, e o
+      # caminho passa pela API: gateway sem réplica saudável fica unhealthy.
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:1040/health/live >/dev/null || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    labels:
+      stack: vitacare
+    logging: *logging
+    networks:
+      - vitacare
+      - proxy                      # Nginx Proxy Manager (fase com domínio)
+
+networks:
+  # Rede própria: só o gateway e as réplicas. O banco não está aqui.
+  vitacare:
+    driver: bridge
+  # Criada pela stack `infra`: Postgres e Redis pelo nome do container.
+  infra:
+    external: true
+    name: ${INFRA_NETWORK:-infra}
+  # Criada pela stack `proxy`. Separada da `infra`: o proxy não enxerga o banco.
+  proxy:
+    external: true
+    name: ${PROXY_NETWORK:-proxy}

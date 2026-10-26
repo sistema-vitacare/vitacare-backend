@@ -4,7 +4,12 @@ coverage/
 .env
 .env.*
 !.env.example
+!.env.production.example
 *.log
 .DS_Store
 .idea/
 .vscode/
+
+# Overrides locais do compose (desenvolvimento)
+compose.override.yaml
+compose.override.yml

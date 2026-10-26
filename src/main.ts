@@ -1,3 +1,4 @@
+import type { Server } from 'node:http';
 import { Logger as NestLogger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
@@ -30,9 +31,18 @@ async function bootstrap(): Promise<void> {
     corsCredentials: config.getOrThrow<boolean>('security.corsCredentials'),
     swaggerEnabled,
     swaggerPath: config.getOrThrow<string>('app.swaggerPath'),
+    trustProxy: config.get<false | number | string>('app.trustProxy'),
   });
 
   await app.listen(port, '0.0.0.0');
+
+  // Hierarquia de timeouts, de dentro para fora: consulta (30s) < request do
+  // Node (60s) < proxy_read_timeout do gateway (75s) < proxy publico (>= 90s).
+  const server: Server = app.getHttpServer();
+  const keepAliveTimeout = config.getOrThrow<number>('app.keepAliveTimeoutMs');
+  server.keepAliveTimeout = keepAliveTimeout;
+  server.headersTimeout = keepAliveTimeout + 1000;
+  server.requestTimeout = config.getOrThrow<number>('app.requestTimeoutMs');
 
   logger.log(`API em http://0.0.0.0:${port}/${apiPrefix}/v${apiVersion}`);
   if (swaggerEnabled) {

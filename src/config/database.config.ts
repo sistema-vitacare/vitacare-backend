@@ -14,6 +14,9 @@ export default registerAs('database', () => ({
     true,
   ),
   poolSize: Number(process.env.DB_POOL_SIZE ?? 10),
+  poolIdleTimeoutMs: Number(process.env.DB_POOL_IDLE_TIMEOUT_MS ?? 30000),
+  statementTimeoutMs: Number(process.env.DB_STATEMENT_TIMEOUT_MS ?? 30000),
+  applicationName: process.env.DB_APPLICATION_NAME ?? 'vitacare-backend',
   connectTimeoutMs: Number(process.env.DB_CONNECT_TIMEOUT_MS ?? 10000),
   migrationsTableName: process.env.DB_MIGRATIONS_TABLE ?? 'migrations',
 }));

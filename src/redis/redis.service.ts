@@ -30,6 +30,22 @@ export class RedisService implements OnApplicationShutdown {
     await this.client.del(key);
   }
 
+  async getNumber(key: string): Promise<number | null> {
+    const value = await this.client.get(key);
+    return value === null ? null : Number(value);
+  }
+
+  async incrementWithTtl(key: string, ttlSeconds: number): Promise<number> {
+    return Number(
+      await this.client.eval(
+        "local value = redis.call('INCR', KEYS[1]); if value == 1 then redis.call('EXPIRE', KEYS[1], ARGV[1]); end; return value;",
+        1,
+        key,
+        ttlSeconds,
+      ),
+    );
+  }
+
   async onApplicationShutdown(): Promise<void> {
     if (this.client.status === 'ready') {
       await this.client.quit();
