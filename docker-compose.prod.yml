@@ -5,9 +5,9 @@
 # Fluxo do deploy (docs/deploy-vps.md):
 #   merge develop → main → GitHub Actions: testes → imagens no GHCR → webhook
 #   → Portainer baixa as imagens e recria: migrate (uma vez) → api (N réplicas)
-#   → gateway (app-vitacare:1040, o único com porta publicada).
+#   → gateway (app-vitacare:1050, o único com porta publicada).
 #
-#   internet/NPM ─► gateway :1040 ─┬─► api réplica 1 :3000 ─┐
+#   internet/NPM ─► gateway :1050 ─┬─► api réplica 1 :3000 ─┐
 #                                  ├─► api réplica 2 :3000 ─┼─► postgresql / redis
 #                                  └─► api réplica N :3000 ─┘   (rede infra)
 #
@@ -162,9 +162,9 @@ services:
         condition: service_healthy
     ports:
       # 127.0.0.1 por padrão: o público entra pelo Nginx Proxy Manager (rede
-      # proxy, https). Sem domínio: APP_BIND=0.0.0.0 expõe http://IP:1040.
+      # proxy, https). Sem domínio: APP_BIND=0.0.0.0 expõe http://IP:1050.
       # Porta do host = porta interna.
-      - "${APP_BIND:-127.0.0.1}:1040:1040"
+      - "${APP_BIND:-127.0.0.1}:1050:1050"
     deploy:
       resources:
         limits:
@@ -173,7 +173,7 @@ services:
     healthcheck:
       # A linha de access log a cada 30s é o batimento do pipeline de log, e o
       # caminho passa pela API: gateway sem réplica saudável fica unhealthy.
-      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:1040/health/live >/dev/null || exit 1"]
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:1050/health/live >/dev/null || exit 1"]
       interval: 30s
       timeout: 5s
       retries: 3

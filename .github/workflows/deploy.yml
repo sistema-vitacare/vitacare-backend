@@ -15,7 +15,7 @@
 #
 # Configuração no GitHub (Settings → Secrets and variables → Actions):
 #   Secret   PORTAINER_WEBHOOK_URL   URL do webhook da stack (obrigatório)
-#   Variable APP_URL                 http://<IP>:1040 ou https://api.dominio,
+#   Variable APP_URL                 http://<IP>:1050 ou https://api.dominio,
 #                                    sem / no fim (opcional; sem ela o job não
 #                                    confere se a versão nova entrou no ar)
 name: CI e deploy

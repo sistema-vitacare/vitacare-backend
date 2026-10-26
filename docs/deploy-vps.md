@@ -9,14 +9,14 @@ tem **réplicas** da API atrás de um **gateway** nginx.
 merge na main
   └─ GitHub Actions: testes (Postgres + Redis reais) → 2 imagens no GHCR → webhook
        └─ Portainer relê o compose, baixa as imagens e recria:
-            migrate (uma vez) → api × API_REPLICAS → gateway (app-vitacare:1040)
+            migrate (uma vez) → api × API_REPLICAS → gateway (app-vitacare:1050)
                  └─ stdout JSON (pino) + access log do gateway → Alloy → Loki
 ```
 
 | Item | Valor |
 | --- | --- |
 | Stack / label `stack` | `vitacare` |
-| Porta (host = interna) | `1040` (sequência da VPS: 1000, 1010, 1020, 1030 já reservadas) |
+| Porta (host = interna) | `1050` (1000, 1010, 1020, 1030 já reservadas; `1040` é o frontend do VitaCare) |
 | Container de borda | `app-vitacare` (o gateway; alvo do Nginx Proxy Manager) |
 | Réplicas da API | `vitacare-api-1..N`, sem porta publicada |
 | Banco e usuário | `vitacare` / `vitacare`, no Postgres da stack `infra` |
@@ -124,9 +124,9 @@ o nginx ainda acha que pode reaproveitar.
    ALTER ROLE vitacare CONNECTION LIMIT -1;
    ```
 
-2. **Firewall** (hPanel → VPS → Segurança → Firewall): liberar TCP `1040` — só na
+2. **Firewall** (hPanel → VPS → Segurança → Firewall): liberar TCP `1050` — só na
    fase por IP; com domínio o acesso é pelo NPM em 443.
-3. **Uptime Kuma**: monitor HTTP em `http://<IP-da-VPS>:1040/health/ready`, 60s.
+3. **Uptime Kuma**: monitor HTTP em `http://<IP-da-VPS>:1050/health/ready`, 60s.
    Não há scheduler, então não há monitor Push (ver Pendências).
 4. **Merge na `main`**: publica as duas imagens. O job `deploy` falha por falta do
    secret — esperado no primeiro merge.
@@ -145,7 +145,7 @@ o nginx ainda acha que pode reaproveitar.
    | Environment variables | *Advanced mode* → colar o `.env.production` |
 
 7. **GitHub** → Settings → Secrets and variables → Actions: secret
-   `PORTAINER_WEBHOOK_URL`; variable `APP_URL=http://<IP-da-VPS>:1040`. Criar o
+   `PORTAINER_WEBHOOK_URL`; variable `APP_URL=http://<IP-da-VPS>:1050`. Criar o
    environment `production`. *Re-run all jobs* do workflow do passo 4.
 8. **Primeiro boot** — logs esperados: `migrate` aplica as migrations e sai com
    código 0; cada réplica loga `API em http://0.0.0.0:3000/api/v1`; o gateway
@@ -164,11 +164,11 @@ o nginx ainda acha que pode reaproveitar.
 ## Validação
 
 ```bash
-curl -s http://<IP>:1040/api/v1 | jq -r .data.version   # = git rev-parse origin/main
-curl -s http://<IP>:1040/health/ready                    # postgres e redis "up"
+curl -s http://<IP>:1050/api/v1 | jq -r .data.version   # = git rev-parse origin/main
+curl -s http://<IP>:1050/health/ready                    # postgres e redis "up"
 docker ps --filter label=com.docker.compose.project=vitacare --format '{{.Names}} {{.Status}}'
 # app-vitacare (healthy) · vitacare-api-1 (healthy) · vitacare-api-2 (healthy) · vitacare-migrate-1 Exited (0)
-for i in $(seq 1 6); do curl -s -o /dev/null http://<IP>:1040/api/v1; done
+for i in $(seq 1 6); do curl -s -o /dev/null http://<IP>:1050/api/v1; done
 docker logs app-vitacare 2>&1 | grep 'gw GET /api/v1' | tail -6   # up= alterna entre as réplicas
 ```
 
@@ -194,9 +194,9 @@ tempo). O `req=<id>` da linha do gateway é o mesmo `reqId` do log da API e o
 
 ## Com domínio (Parte B)
 
-No NPM: Proxy Host `api.<dominio>` → `app-vitacare:1040`, SSL Let's Encrypt,
+No NPM: Proxy Host `api.<dominio>` → `app-vitacare:1050`, SSL Let's Encrypt,
 timeout ≥ 90s. Depois: `APP_BIND` apagado (volta a `127.0.0.1`), `APP_URL` no
-GitHub com `https://`, `CORS_ORIGINS` com a origem do frontend, regra 1040 removida
+GitHub com `https://`, `CORS_ORIGINS` com a origem do frontend, regra 1050 removida
 do firewall. O gateway deriva scheme e porta de `X-Forwarded-Proto`, e a API lê o
 IP real do cliente por `X-Forwarded-For` (`TRUST_PROXY=loopback,uniquelocal`).
 

@@ -31,9 +31,9 @@ COPY confs/gateway/nginx.conf /etc/nginx/conf.d/vitacare.conf
 # Falha no BUILD, nao em producao: sintaxe e diretivas conferidas aqui. O
 # `api` nao existe no build; com `resolve` o nginx aceita o nome mesmo assim.
 RUN nginx -t
-EXPOSE 1040
+EXPOSE 1050
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-  CMD wget -qO- http://127.0.0.1:1040/gateway/health >/dev/null || exit 1
+  CMD wget -qO- http://127.0.0.1:1050/gateway/health >/dev/null || exit 1
 
 # ---------- runtime: API
 FROM node:22-alpine AS runtime
