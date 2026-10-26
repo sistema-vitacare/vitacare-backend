@@ -45,8 +45,8 @@ export const buildDataSourceOptions = (
   migrationsTableName: settings.migrationsTableName,
   migrations: [join(__dirname, 'migrations', '*.{ts,js}')],
   entities: [join(__dirname, '..', '**', '*.entity.{ts,js}')],
-  // Pool do `pg` por processo. Cada replica abre ate `max` conexoes no
-  // Postgres compartilhado: replicas x DB_POOL_SIZE tem que caber no
+  // Pool do `pg` por processo. Cada processo abre ate `max` conexoes no
+  // Postgres compartilhado: processos x DB_POOL_SIZE tem que caber no
   // max_connections junto com os outros sistemas da VPS.
   extra: {
     max: settings.poolSize,

@@ -37,7 +37,7 @@ async function bootstrap(): Promise<void> {
   await app.listen(port, '0.0.0.0');
 
   // Hierarquia de timeouts, de dentro para fora: consulta (30s) < request do
-  // Node (60s) < proxy_read_timeout do gateway (75s) < proxy publico (>= 90s).
+  // Node (60s) < proxy publico (>= 90s).
   const server: Server = app.getHttpServer();
   const keepAliveTimeout = config.getOrThrow<number>('app.keepAliveTimeoutMs');
   server.keepAliveTimeout = keepAliveTimeout;

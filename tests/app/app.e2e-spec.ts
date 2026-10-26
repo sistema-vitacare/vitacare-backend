@@ -125,7 +125,7 @@ describe('Pipeline HTTP (e2e)', () => {
       corsCredentials: true,
       swaggerEnabled: true,
       swaggerPath: 'docs',
-      // supertest conecta por loopback, como o gateway por rede privada.
+      // supertest conecta por loopback, como um proxy por rede privada.
       trustProxy: 'loopback',
     });
 
@@ -169,7 +169,7 @@ describe('Pipeline HTTP (e2e)', () => {
     });
   });
 
-  describe('atras do gateway (trust proxy)', () => {
+  describe('atras de proxy (trust proxy)', () => {
     it('usa o cliente informado pelo proxy confiavel', async () => {
       const response = await request(server())
         .get('/api/v1/origem')

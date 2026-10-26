@@ -1,16 +1,14 @@
 # CI e deploy de produção.
 #
 #   push/PR em develop ou PR para main → só `testes`
-#   push na main (o merge de develop) → testes → imagens no GHCR → deploy
+#   push na main (o merge de develop) → testes → imagem no GHCR → deploy
 #
 #   1. testes: lint, build, unitários e e2e contra PostgreSQL e Redis REAIS de
 #      serviço (as suítes atrás de VITACARE_TEST_* deixam de ser puladas)
-#   2. imagem: build e push de duas imagens do mesmo Dockerfile
-#        ghcr.io/sistema-vitacare/vitacare-backend          (API, réplicas)
-#        ghcr.io/sistema-vitacare/vitacare-backend-gateway  (nginx de borda)
-#   3. deploy: POST no webhook da stack; o Portainer baixa as imagens, roda o
-#      migrate e recria as réplicas, e o job espera GET /api/v1 mostrar este
-#      commit em data.version.
+#   2. imagem: build e push para o GHCR (ghcr.io/sistema-vitacare/vitacare-backend)
+#   3. deploy: POST no webhook da stack; o Portainer baixa a imagem e recria o
+#      container (o entrypoint aplica as migrations), e o job espera
+#      GET /api/v1 mostrar este commit em data.version.
 # Qualquer etapa que falha interrompe as seguintes: nada quebrado chega à VPS.
 #
 # Configuração no GitHub (Settings → Secrets and variables → Actions):
@@ -124,7 +122,7 @@ jobs:
 
       # :latest é o que a stack usa; :sha-<commit> fica para rollback
       # (APP_IMAGE=...:sha-<commit> na stack).
-      - name: API
+      - name: Build e push
         uses: docker/build-push-action@v6
         with:
           context: .
@@ -137,23 +135,8 @@ jobs:
           labels: |
             org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
             org.opencontainers.image.revision=${{ github.sha }}
-          cache-from: type=gha,scope=api
-          cache-to: type=gha,mode=max,scope=api
-
-      - name: Gateway
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          target: gateway
-          push: true
-          tags: |
-            ${{ env.IMAGE }}-gateway:latest
-            ${{ env.IMAGE }}-gateway:sha-${{ github.sha }}
-          labels: |
-            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
-            org.opencontainers.image.revision=${{ github.sha }}
-          cache-from: type=gha,scope=gateway
-          cache-to: type=gha,mode=max,scope=gateway
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
   deploy:
     needs: imagem
@@ -174,8 +157,8 @@ jobs:
           curl -fsS -k -X POST --max-time 300 "$PORTAINER_WEBHOOK_URL"
 
       # /health/live responderia 200 também com a versão antiga; data.version
-      # só mostra este commit quando as réplicas NOVAS estão servindo. Depois,
-      # /health/ready prova que elas alcançam PostgreSQL e Redis.
+      # só mostra este commit quando o container NOVO está servindo. Depois,
+      # /health/ready prova que ele alcança PostgreSQL e Redis.
       - name: Espera a versão nova entrar no ar
         if: ${{ vars.APP_URL != '' }}
         env:
@@ -190,5 +173,5 @@ jobs:
             echo "Tentativa $i: no ar '${no_ar:-sem resposta}', aguardando 10s..."
             sleep 10
           done
-          echo "::error::A versão $GITHUB_SHA não entrou no ar em 6 minutos. Ver os logs: Grafana {stack=\"vitacare\"} ou o serviço migrate no Portainer."
+          echo "::error::A versão $GITHUB_SHA não entrou no ar em 6 minutos. Ver os logs: Grafana {stack=\"vitacare\"} ou o container app-vitacare no Portainer."
           exit 1

@@ -84,7 +84,7 @@ function prettyTransport() {
     ThrottlerModule.forRootAsync({
       inject: [ConfigService, REDIS_CLIENT],
       useFactory: (config: ConfigService, redis: Redis) => ({
-        // Contagem no Redis: o limite vale para a stack, nao por replica.
+        // Contagem no Redis: sobrevive a deploy e vale para todo processo.
         storage: new RedisThrottlerStorage(redis),
         throttlers: [
           {

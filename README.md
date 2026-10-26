@@ -1,9 +1,8 @@
 # VitaCare Backend
 
-Backend HTTP 100% API construido com Node.js 22, TypeScript e NestJS 11. Consome
-instancias **externas** de PostgreSQL e Redis. Em desenvolvimento roda em um
-unico container (`compose.yaml`); em producao, em replicas atras de um gateway
-nginx, com deploy automatico pela `main` ([deploy na VPS](docs/deploy-vps.md)).
+Backend HTTP 100% API construido com Node.js 22, TypeScript e NestJS 11. Roda em
+um unico container e consome instancias **externas** de PostgreSQL e Redis. Em
+producao, o deploy e automatico pela `main` ([deploy na VPS](docs/deploy-vps.md)).
 
 ## Sumario
 
@@ -68,18 +67,13 @@ VITACARE_ENV_FILE=.env.production HOST_PORT=8080 docker compose up -d
 ## Deploy de producao
 
 Merge na `main` → GitHub Actions (lint, build, unitarios e e2e contra PostgreSQL
-e Redis reais) → imagens `vitacare-backend` e `vitacare-backend-gateway` no GHCR
-→ webhook do Portainer → stack `vitacare` com tres servicos:
+e Redis reais) → imagem `vitacare-backend` no GHCR → webhook do Portainer →
+stack `vitacare` com **um container**, `app-vitacare`, na porta `1050`. O
+entrypoint aplica as migrations pendentes (`RUN_MIGRATIONS=true`) e sobe a API.
 
-| Servico | Papel |
-| --- | --- |
-| `migrate` | aplica as migrations pendentes uma vez por deploy e sai |
-| `api` | a API, em `API_REPLICAS` replicas (padrao 2), sem porta publicada |
-| `gateway` | `app-vitacare`, nginx na porta `1050`; distribui entre as replicas |
-
-PostgreSQL e Redis sao os das stacks `infra` da VPS, alcancados pela rede
-docker. Passo a passo, dimensionamento do pool e da memoria, timeouts, escala e
-rollback: [docs/deploy-vps.md](docs/deploy-vps.md). Variaveis da stack:
+PostgreSQL e Redis sao os da stack `infra` da VPS, alcancados pela rede
+docker. Passo a passo, pool, memoria, timeouts e rollback:
+[docs/deploy-vps.md](docs/deploy-vps.md). Variaveis da stack:
 `.env.production.example`.
 
 ## Desenvolvimento local
@@ -267,8 +261,8 @@ Contra o codigo ja compilado (container de desenvolvimento):
 docker compose run --rm api npm run migration:run:prod
 ```
 
-Em producao, o servico `migrate` do `docker-compose.prod.yml` faz isso a cada
-deploy, antes das replicas subirem (`RUN_MIGRATIONS=false` desliga).
+Em producao, o entrypoint do container faz isso a cada deploy, antes de subir
+a API (`RUN_MIGRATIONS=false` desliga; fora da stack de producao vem desligado).
 
 Entidades sao descobertas pelo glob `*.entity.ts` e registradas no modulo do
 dominio com `TypeOrmModule.forFeature([...])`.
@@ -286,8 +280,8 @@ e declara seu processor com `@Processor('...')`.
 
 Logs estruturados com `nestjs-pino`. Em producao saem em JSON puro para o
 coletor; em desenvolvimento passam por `pino-pretty`. Cada requisicao recebe um
-id, ecoado em `meta.requestId`; atras do gateway e o `X-Request-Id` gerado pelo
-nginx, o mesmo da linha `gw ... req=<id>` do access log.
+id, ecoado em `meta.requestId`; um `X-Request-Id` valido vindo de um proxy e
+adotado, para correlacionar com o log dele.
 
 `authorization`, `cookie` e `x-api-key` sao redigidos automaticamente. As rotas
 de health nao poluem o log.
@@ -300,12 +294,13 @@ de health nao poluem o log.
   desenvolvimento libera tudo; vazio em producao **desliga** o CORS e registra
   um aviso no boot.
 - **Rate limit** global via `@nestjs/throttler`, com contagem no Redis
-  (`RedisThrottlerStorage`, compartilhada entre replicas; `THROTTLE_LIMIT` requisicoes por
+  (`RedisThrottlerStorage`, compartilhada entre processos; `THROTTLE_LIMIT` requisicoes por
   `THROTTLE_TTL_MS`).
-- **Proxy confiavel** (`TRUST_PROXY`): desligado por padrao. Atras do gateway, a
-  stack de producao usa `loopback,uniquelocal` para o Express ler o IP real do
-  cliente em `X-Forwarded-For`; sem isso todos os clientes dividiriam o balde de
-  rate limit do IP do nginx. `true` e recusado no boot (aceitaria IP forjado).
+- **Proxy confiavel** (`TRUST_PROXY`): desligado por padrao. A stack de
+  producao usa `loopback,uniquelocal`: no acesso direto a conexao ja e o
+  cliente, e atras do Nginx Proxy Manager o Express le o IP real em
+  `X-Forwarded-For`; sem isso todos os clientes dividiriam o balde de rate limit
+  do IP do proxy. `true` e recusado no boot (aceitaria IP forjado).
 - **ValidationPipe** global com `whitelist` e `forbidNonWhitelisted`: campos nao
   declarados no DTO fazem a requisicao falhar com `400`.
 - O container roda como usuario `node`, sem privilegios adicionais

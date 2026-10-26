@@ -23,7 +23,7 @@ export interface AppSetupOptions {
   swaggerEnabled: boolean;
   swaggerPath: string;
   /**
-   * `trust proxy` do Express. Atras do gateway, sem isto `req.ip` vira o IP do
+   * `trust proxy` do Express. Atras de proxy, sem isto `req.ip` vira o IP do
    * nginx e todos os clientes dividem o mesmo balde do rate limit.
    */
   trustProxy?: false | number | string;
