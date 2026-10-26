@@ -75,7 +75,7 @@ e Redis reais) → imagens `vitacare-backend` e `vitacare-backend-gateway` no GH
 | --- | --- |
 | `migrate` | aplica as migrations pendentes uma vez por deploy e sai |
 | `api` | a API, em `API_REPLICAS` replicas (padrao 2), sem porta publicada |
-| `gateway` | `app-vitacare`, nginx na porta `1040`; distribui entre as replicas |
+| `gateway` | `app-vitacare`, nginx na porta `1050`; distribui entre as replicas |
 
 PostgreSQL e Redis sao os das stacks `infra` da VPS, alcancados pela rede
 docker. Passo a passo, dimensionamento do pool e da memoria, timeouts, escala e
