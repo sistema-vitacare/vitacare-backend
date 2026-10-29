@@ -104,7 +104,7 @@ describe('paginate', () => {
 });
 
 describe('requestIdFromHeaders', () => {
-  it('adota o id do gateway', () => {
+  it('adota o id do proxy', () => {
     const id = '0123456789abcdef0123456789abcdef';
 
     expect(requestIdFromHeaders({ headers: { 'x-request-id': id } })).toBe(id);

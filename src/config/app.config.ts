@@ -14,9 +14,9 @@ export default registerAs('app', () => ({
   /** Proxies confiaveis para ler o IP real em X-Forwarded-For. */
   trustProxy: toTrustProxy(process.env.TRUST_PROXY),
   /**
-   * Timeouts do servidor HTTP do Node. O keep-alive fica ACIMA do keepalive do
-   * gateway (30s): se o Node fechasse primeiro, o nginx reaproveitaria um
-   * socket morto e responderia 502.
+   * Timeouts do servidor HTTP do Node. O keep-alive fica ACIMA do keepalive de
+   * um proxy reverso (nginx/NPM, tipicamente 60s): se o Node fechasse primeiro,
+   * o proxy reaproveitaria um socket morto e responderia 502.
    */
   keepAliveTimeoutMs: Number(process.env.HTTP_KEEP_ALIVE_TIMEOUT_MS ?? 65000),
   requestTimeoutMs: Number(process.env.HTTP_REQUEST_TIMEOUT_MS ?? 60000),

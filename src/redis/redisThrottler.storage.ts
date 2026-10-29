@@ -30,8 +30,9 @@ const toSeconds = (milliseconds: number): number =>
 
 /**
  * Storage do rate limit global no Redis compartilhado. O padrao do
- * `@nestjs/throttler` guarda a contagem na memoria do processo: com N replicas
- * atras do gateway, cada uma teria o proprio balde e o limite efetivo por IP
+ * `@nestjs/throttler` guarda a contagem na memoria do processo: zera a cada
+ * deploy/restart e, com mais de um processo, cada um teria o proprio balde e o
+ * limite efetivo por IP
  * seria N vezes o configurado.
  *
  * Redis fora do ar NAO derruba a API: o limite global e protecao de volume, e
