@@ -57,6 +57,7 @@ interface OpenApiDocument {
     Record<
       string,
       {
+        summary?: string;
         security?: unknown[];
         responses: Record<
           string,
@@ -426,7 +427,7 @@ describe('Organization HTTP (e2e)', () => {
     });
   });
 
-  it('publica as oito rotas com envelope e Bearer no OpenAPI', async () => {
+  it('publica as oito rotas com resumo, envelope, Bearer e erros no OpenAPI', async () => {
     const response = await request(server()).get('/api/docs-json');
     const document = response.body as OpenApiDocument;
 
@@ -445,7 +446,11 @@ describe('Organization HTTP (e2e)', () => {
       const operation = document.paths[path]?.[method];
 
       expect(operation).toBeDefined();
+      expect(operation.summary).toEqual(expect.any(String));
       expect(operation.security).toEqual([{ bearer: [] }]);
+      expect(Object.keys(operation.responses)).toEqual(
+        expect.arrayContaining(['401', '403']),
+      );
       expect(
         operation.responses[status].content?.['application/json'].schema
           ?.required,

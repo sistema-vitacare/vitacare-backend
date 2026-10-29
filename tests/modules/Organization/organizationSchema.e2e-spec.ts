@@ -503,7 +503,7 @@ describeWithDatabase('organizacoes em PostgreSQL descartavel', () => {
   });
 
   describe('inativacao e reativacao', () => {
-    it('inativa, revoga sessoes na hora e reativa sem restaurar sessoes antigas', async () => {
+    it('inativa, revoga sessoes e links de recuperacao na hora e reativa sem restaura-los', async () => {
       const b = await scalar(
         "SELECT id AS value FROM organizations WHERE code = 'casa-b'",
       );
@@ -512,6 +512,17 @@ describeWithDatabase('organizacoes em PostgreSQL descartavel', () => {
       const hash = tokens.hash(session.accessToken);
 
       expect(await sessions.resolve(hash, new Date())).not.toBeNull();
+
+      // Link de recuperacao pendente do administrador da organizacao.
+      const resetHash = tokens.hash('link-pendente-casa-b');
+
+      await dataSource.query(
+        `INSERT INTO password_reset_tokens (organization_id, user_id, token_hash, expires_at)
+         SELECT organization_id, id, $2, now() + interval '15 minutes'
+           FROM users
+          WHERE organization_id = $1`,
+        [b, resetHash],
+      );
 
       const inactive = await deactivate.execute(b, master);
 
@@ -524,6 +535,12 @@ describeWithDatabase('organizacoes em PostgreSQL descartavel', () => {
           [hash],
         ),
       ).toBe('organization_deactivated');
+      expect(
+        await scalar(
+          'SELECT (revoked_at IS NOT NULL)::text AS value FROM password_reset_tokens WHERE token_hash = $1',
+          [resetHash],
+        ),
+      ).toBe('true');
       expect(
         await scalar(
           'SELECT status AS value FROM users WHERE organization_id = $1',
@@ -550,6 +567,12 @@ describeWithDatabase('organizacoes em PostgreSQL descartavel', () => {
       expect(active.status).toBe('active');
       expect(active.deletedAt).toBeNull();
       expect(await sessions.resolve(hash, new Date())).toBeNull();
+      expect(
+        await scalar(
+          'SELECT (revoked_at IS NOT NULL)::text AS value FROM password_reset_tokens WHERE token_hash = $1',
+          [resetHash],
+        ),
+      ).toBe('true');
 
       const again = await loginNormally('casa-b');
 
