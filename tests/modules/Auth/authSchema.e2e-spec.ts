@@ -250,7 +250,7 @@ describeWithDatabase('autenticacao em PostgreSQL descartavel', () => {
     }
 
     migrated = (await dataSource.runMigrations()).length;
-    expect(migrated).toBe(3);
+    expect(migrated).toBe(4);
 
     passwords = new PasswordHasher();
     tokens = new TokenService();
