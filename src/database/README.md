@@ -137,6 +137,22 @@ VITACARE_TEST_DATABASE_URL="postgresql://<usuario>:<senha>@127.0.0.1:<porta>/vit
   npm run test:e2e -- --runInBand tests/modules/Auth/authSchema.e2e-spec.ts
 ```
 
+## Organizacao de plataforma
+
+`migrations/1790100000000-AddOrganizationKind.ts` (tarefa 3, 2026-09-22)
+acrescenta `organizations.kind varchar(16) NOT NULL DEFAULT 'tenant'`, com CHECK
+`tenant`/`platform`, e torna `usage_plan_id` anulavel. Tres travas mantem a
+organizacao de plataforma dos administradores master: `(kind = 'platform') =
+(usage_plan_id IS NULL)` (cliente sempre com plano, plataforma nunca),
+`kind = 'tenant' OR status = 'active'` (a plataforma nao e inativada) e o indice
+unico parcial `organizations_single_platform_unique`, que admite uma so
+plataforma. O `down` recusa reverter enquanto existir a plataforma, que nao
+cabe no schema anterior, em vez de falhar no meio. A plataforma e o primeiro
+master nascem de `npm run seed:platform` (`seeds/platformSeed.ts`; na imagem,
+`node dist/cli/seed-platform.js`), que roda uma vez por banco. Evidencia em
+`tests/modules/Organization/organizationSchema.e2e-spec.ts`. **Nao aplicada no
+banco local de `.env` nem em producao.**
+
 ## Prazo da senha temporaria
 
 `migrations/1790200000000-AddTemporaryPasswordExpiry.ts` (BE-03, 2026-10-29)
@@ -150,7 +166,8 @@ Validada em PostgreSQL 16 descartavel com `migration:run`, `migration:show`,
 (`RUN_MIGRATIONS=true`, arquivos de `dist/`). **Nao aplicada no banco local de
 `.env` nem em producao.**
 
-`organizations.usage_plan_id` e obrigatorio e referencia `usage_plans.id` com
+`organizations.usage_plan_id` e obrigatorio nas organizacoes clientes (anulavel
+so na de plataforma, desde `1790100000000`) e referencia `usage_plans.id` com
 `ON DELETE RESTRICT`. A tabela de planos oferece somente a estrutura fisica do
 catalogo; ofertas, vigencia, troca e aplicacao dos limites continuam pendentes.
 `users.cpf` e obrigatorio, armazena 11 digitos e e unico por organizacao;

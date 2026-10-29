@@ -571,4 +571,35 @@ describeWithDatabase('organizacoes em PostgreSQL descartavel', () => {
       ).rejects.toMatchObject({ code: 'ORGANIZATION_PLATFORM_PROTECTED' });
     });
   });
+
+  describe('senha provisoria do cadastro', () => {
+    // Decisao de Mateus em 2026-10-29: sem prazo por ora. Ninguem alcanca o
+    // primeiro administrador para reemitir a senha, e o seed nao roda de novo.
+    it('primeiro administrador e master nascem sem prazo de senha provisoria e sem senha na auditoria', async () => {
+      const created = await createTenant('casa-prazo', CPFS[2]);
+
+      const rows: Array<{ id: string; expires: Date | null; must: boolean }> =
+        await dataSource.query(
+          `SELECT id, temporary_password_expires_at AS expires, must_change_password AS must
+             FROM users
+            WHERE id IN ($1, $2)`,
+          [created.administrator.id, master.userId],
+        );
+
+      expect(rows).toHaveLength(2);
+      expect(rows.every((row) => row.expires === null)).toBe(true);
+      expect(
+        rows.find((row) => row.id === created.administrator.id)?.must,
+      ).toBe(true);
+
+      const leaked = await scalar(
+        `SELECT count(*)::text AS value
+           FROM audit_events
+          WHERE coalesce(before_values::text, '') || coalesce(after_values::text, '') LIKE $1`,
+        [`%${created.temporaryPassword}%`],
+      );
+
+      expect(leaked).toBe('0');
+    }, 30000);
+  });
 });

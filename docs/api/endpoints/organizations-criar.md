@@ -1,7 +1,7 @@
 ---
 title: Cadastrar organização
 status: atual
-updated: 2026-09-22
+updated: 2026-10-29
 method: POST
 path: /api/v1/organizations
 source: src/modules/Organization/organization.controller.ts
@@ -112,7 +112,7 @@ Efeitos, em **uma** transação — falha em qualquer passo não deixa nada grav
 1. confere o plano (existente, `status = true`, sem `deleted_at`);
 2. cria a organização com `kind = 'tenant'` e `status = 'active'`;
 3. cria o perfil `admin` e concede `users:reset_password`, `organization:read` e `organization:update`;
-4. cria o usuário `active`, com `must_change_password = true`;
+4. cria o usuário `active`, com `must_change_password = true` e `temporary_password_expires_at = NULL` (senha provisória **sem prazo**);
 5. grava auditoria `organization.created` e `user.created` (motivo `first_administrator`) na nova organização como evento de sistema, com `platformActorUserId` em `after_values`, e `organization.created` na organização de plataforma com o master como autor.
 
 O administrador entra com `code`, e-mail e a senha provisória, recebe a sessão restrita do [primeiro acesso](auth-primeiro-acesso.md) e define a senha definitiva. Não há convite nem e-mail: o projeto não tem SMTP, e a entrega da senha é um processo fora da API.
@@ -203,7 +203,8 @@ O administrador entra com `code`, e-mail e a senha provisória, recebe a sessão
 - O limite de usuários do plano **não** é verificado aqui: contagem, vigência e bloqueio são da tarefa 5 (RF018, P05/P06).
 - Só o perfil `admin` é criado. Os perfis `professional`, `caregiver` e `family` e a matriz de permissões são da tarefa 4.
 - Repetir a chamada com o mesmo `code` responde `409`: a rota não é idempotente e não reemite senha.
+- A senha provisória **não vence**, ao contrário da emitida pela [redefinição administrativa](auth-redefinir-senha-usuario.md) (24 h). Decisão de Mateus em 2026-10-29: hoje ninguém alcança o primeiro administrador para reemitir a senha (o master não redefine senha de usuário de outra organização), então um prazo trancaria a organização. Prazo, convite e reemissão pelo master ficam para a gestão de usuários (BE-06). Por isso a resposta **não** traz `expiresAt`.
 
 ## Origem e validação
 
-Controller `src/modules/Organization/organization.controller.ts`; caso de uso `src/modules/Organization/CreateOrganization/createOrganization.useCase.ts`; DTO `src/modules/Organization/CreateOrganization/createOrganization.dto.ts`; validador `src/common/validation/isCpf.decorator.ts`. Repositório `src/modules/Organization/repositories/organization.repository.ts`; parser `src/modules/Organization/parsers/organization.parser.ts`; política `src/modules/Organization/policies/organization.policy.ts`; permissões `src/modules/Access/access.permissions.ts`; migration `src/database/migrations/1790100000000-AddOrganizationKind.ts`. Testes: `tests/modules/Organization/createOrganization.useCase.spec.ts`, `tests/modules/Organization/organization.e2e-spec.ts` (201, `no-store`, normalização, 422 aninhado, 409, 403 para tenant) e `tests/modules/Organization/organizationSchema.e2e-spec.ts` (transação completa, login do administrador, permissões, auditoria nas duas organizações, código e documento duplicados sem gravação parcial, plano inativo). Conferido contra o OpenAPI gerado e contra a API rodando sobre PostgreSQL descartável em 2026-09-22. Vault: [[2026-09-22-organizacoes-e-administracao-da-plataforma]] e [[2026-09-22-modulo-organizations]].
+Controller `src/modules/Organization/organization.controller.ts`; caso de uso `src/modules/Organization/CreateOrganization/createOrganization.useCase.ts`; DTO `src/modules/Organization/CreateOrganization/createOrganization.dto.ts`; validador `src/common/validation/isCpf.decorator.ts`. Repositório `src/modules/Organization/repositories/organization.repository.ts`; parser `src/modules/Organization/parsers/organization.parser.ts`; política `src/modules/Organization/policies/organization.policy.ts`; permissões `src/modules/Access/access.permissions.ts`; migration `src/database/migrations/1790100000000-AddOrganizationKind.ts`. Testes: `tests/modules/Organization/createOrganization.useCase.spec.ts`, `tests/modules/Organization/organization.e2e-spec.ts` (201, `no-store`, normalização, 422 aninhado, 409, 403 para tenant) e `tests/modules/Organization/organizationSchema.e2e-spec.ts` (transação completa, login do administrador, permissões, auditoria nas duas organizações, código e documento duplicados sem gravação parcial, plano inativo, primeiro administrador e master sem prazo de senha e sem senha na auditoria). Conferido contra o OpenAPI gerado e contra a API rodando sobre PostgreSQL descartável em 2026-09-22 e, após a integração com o BE-03, em 2026-10-29. Vault: [[2026-09-22-organizacoes-e-administracao-da-plataforma]] e [[2026-09-22-modulo-organizations]].
