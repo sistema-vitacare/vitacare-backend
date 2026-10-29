@@ -16,7 +16,7 @@ Autentica um usuário dentro de **uma** organização e devolve o token de sess�
 A resposta diz em qual estado a sessão nasceu:
 
 - `authenticated`: sessão normal, válida por 12 horas absolutas e 30 minutos sem atividade. Cada requisição aceita renova a janela de inatividade.
-- `password_change_required`: sessão **restrita**, válida por 10 minutos, que só alcança [primeiro acesso](auth-primeiro-acesso.md) e [logout](auth-logout.md). Ela aparece quando o usuário tem troca obrigatória pendente (conta criada pelo bootstrap ou senha redefinida por administrador).
+- `password_change_required`: sessão **restrita**, válida por 10 minutos, que só alcança [primeiro acesso](auth-primeiro-acesso.md) e [logout](auth-logout.md). Ela aparece quando o usuário tem troca obrigatória pendente (master criado por `npm run seed:platform`, administrador criado com a organização ou senha redefinida por administrador).
 
 O token é opaco: o servidor guarda apenas o SHA-256 dele. Não decodifique, não confie em nada escrito nele e não o persista em armazenamento compartilhado.
 

@@ -4,6 +4,7 @@ import { DataSource } from 'typeorm';
 import databaseConfig from '@/config/database.config';
 import {
   DEV_ORGANIZATIONS,
+  DEV_PLATFORM,
   DEV_PASSWORD,
   DEV_USERS,
   runDevSeed,
@@ -67,10 +68,11 @@ const main = async (): Promise<void> => {
       'Contas disponiveis (todas com a mesma senha de desenvolvimento):',
       ...DEV_USERS.map(
         (user) =>
-          `  ${user.organizationCode.padEnd(16)} ${user.profileCode.padEnd(13)} ${user.email}`,
+          `  ${user.organizationCode.padEnd(16)} ${user.profileCode.padEnd(15)} ${user.email}`,
       ),
       `  senha: ${DEV_PASSWORD}`,
       '',
+      `plataforma: ${DEV_PLATFORM.code}`,
       `organizacoes: ${DEV_ORGANIZATIONS.map((o) => o.code).join(', ')}`,
       'Zero criado em todas as linhas significa que o seed ja estava aplicado.',
       '',

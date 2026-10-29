@@ -3,6 +3,7 @@ import { DataSource } from 'typeorm';
 
 import { CreateInitialIdentitySchema1789674300000 } from '@/database/migrations/1789674300000-CreateInitialIdentitySchema';
 import { CreateAuthSchema1790000000000 } from '@/database/migrations/1790000000000-CreateAuthSchema';
+import { AddOrganizationKind1790100000000 } from '@/database/migrations/1790100000000-AddOrganizationKind';
 import { SnakeNamingStrategy } from '@/database/snakeNaming.strategy';
 import { ChangePasswordUseCase } from '@/modules/Auth/ChangePassword/changePassword.useCase';
 import { CompleteFirstAccessUseCase } from '@/modules/Auth/CompleteFirstAccess/completeFirstAccess.useCase';
@@ -201,6 +202,7 @@ describeWithDatabase('autenticacao em PostgreSQL descartavel', () => {
       migrations: [
         CreateInitialIdentitySchema1789674300000,
         CreateAuthSchema1790000000000,
+        AddOrganizationKind1790100000000,
       ],
       namingStrategy: new SnakeNamingStrategy(),
       synchronize: false,
@@ -219,7 +221,7 @@ describeWithDatabase('autenticacao em PostgreSQL descartavel', () => {
     }
 
     migrated = (await dataSource.runMigrations()).length;
-    expect(migrated).toBe(2);
+    expect(migrated).toBe(3);
 
     passwords = new PasswordHasher();
     tokens = new TokenService();

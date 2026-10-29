@@ -11,6 +11,7 @@ const sessionRow = {
   sessionType: 'normal',
   userId: 'user-1',
   organizationId: 'org-1',
+  organizationKind: 'tenant',
   absoluteExpiresAt: new Date('2026-09-22T12:00:00.000Z'),
   profileId: 'profile-1',
   profile: 'admin',
@@ -59,9 +60,48 @@ describe('AuthSessionRepository', () => {
       sessionType: 'normal',
       userId: 'user-1',
       organizationId: 'org-1',
+      organizationKind: 'tenant',
       absoluteExpiresAt: new Date('2026-09-22T12:00:00.000Z'),
       profile: 'admin',
       permissions: new Set(['users:reset_password']),
     });
+  });
+
+  it('descarta permissao de plataforma concedida a perfil de tenant', async () => {
+    const query = jest
+      .fn()
+      .mockResolvedValueOnce([sessionRow])
+      .mockResolvedValueOnce([
+        { code: 'organization:read' },
+        { code: 'platform_organizations:read' },
+      ]);
+
+    const repository = new AuthSessionRepository(
+      { query } as never,
+      config as never,
+    );
+
+    const principal = await repository.resolve('hash-token', now);
+
+    expect(principal?.permissions).toEqual(new Set(['organization:read']));
+  });
+
+  it('mantem as permissoes de plataforma na organizacao de plataforma', async () => {
+    const query = jest
+      .fn()
+      .mockResolvedValueOnce([{ ...sessionRow, organizationKind: 'platform' }])
+      .mockResolvedValueOnce([{ code: 'platform_organizations:read' }]);
+
+    const repository = new AuthSessionRepository(
+      { query } as never,
+      config as never,
+    );
+
+    const principal = await repository.resolve('hash-token', now);
+
+    expect(principal?.organizationKind).toBe('platform');
+    expect(principal?.permissions).toEqual(
+      new Set(['platform_organizations:read']),
+    );
   });
 });

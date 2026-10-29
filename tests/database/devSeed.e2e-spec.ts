@@ -3,9 +3,12 @@ import { DataSource } from 'typeorm';
 
 import { CreateInitialIdentitySchema1789674300000 } from '@/database/migrations/1789674300000-CreateInitialIdentitySchema';
 import { CreateAuthSchema1790000000000 } from '@/database/migrations/1790000000000-CreateAuthSchema';
+import { AddOrganizationKind1790100000000 } from '@/database/migrations/1790100000000-AddOrganizationKind';
+import { TENANT_ADMIN_PERMISSIONS } from '@/modules/Access/access.permissions';
 import {
   DEV_ORGANIZATIONS,
   DEV_PASSWORD,
+  DEV_PLATFORM,
   DEV_USERS,
   runDevSeed,
 } from '@/database/seeds/devSeed';
@@ -73,6 +76,7 @@ describeWithDatabase(
         migrations: [
           CreateInitialIdentitySchema1789674300000,
           CreateAuthSchema1790000000000,
+          AddOrganizationKind1790100000000,
         ],
         namingStrategy: new SnakeNamingStrategy(),
         synchronize: false,
@@ -114,6 +118,10 @@ describeWithDatabase(
         return;
       }
 
+      await dataSource.query(
+        'TRUNCATE audit_events, auth_sessions, password_reset_tokens, users, profile_permissions, permissions, access_profiles, organizations, usage_plans',
+      );
+
       for (let index = 0; index < migrated; index += 1) {
         await dataSource.undoLastMigration();
       }
@@ -121,11 +129,11 @@ describeWithDatabase(
       await dataSource.destroy();
     }, 60000);
 
-    it('cria planos, organizacoes, perfis e usuarios', async () => {
+    it('cria planos, plataforma, organizacoes, perfis e usuarios', async () => {
       expect(await countOf('usage_plans')).toBe(2);
-      expect(await countOf('organizations')).toBe(DEV_ORGANIZATIONS.length);
+      expect(await countOf('organizations')).toBe(DEV_ORGANIZATIONS.length + 1);
       expect(await countOf('access_profiles')).toBe(
-        DEV_ORGANIZATIONS.length * 4,
+        DEV_ORGANIZATIONS.length * 4 + 1,
       );
       expect(await countOf('users')).toBe(DEV_USERS.length);
     }, 30000);
@@ -140,7 +148,7 @@ describeWithDatabase(
         users: 0,
       });
       expect(await countOf('users')).toBe(DEV_USERS.length);
-      expect(await countOf('organizations')).toBe(DEV_ORGANIZATIONS.length);
+      expect(await countOf('organizations')).toBe(DEV_ORGANIZATIONS.length + 1);
     }, 60000);
 
     it('autentica cada conta do seed direto, sem troca obrigatoria', async () => {
@@ -165,7 +173,7 @@ describeWithDatabase(
       }
     }, 90000);
 
-    it('concede users:reset_password so ao perfil admin', async () => {
+    it('concede permissoes so aos perfis administradores', async () => {
       const rows: Array<{ code: string; total: string }> =
         await dataSource.query(
           `SELECT p.code, count(pp.id)::text AS total
@@ -179,11 +187,47 @@ describeWithDatabase(
         rows.map((row) => [row.code, Number(row.total)]),
       );
 
-      expect(byProfile.admin).toBe(DEV_ORGANIZATIONS.length);
+      expect(byProfile.admin).toBe(
+        DEV_ORGANIZATIONS.length * TENANT_ADMIN_PERMISSIONS.length,
+      );
+      expect(byProfile.platform_admin).toBe(7);
       expect(byProfile.professional).toBe(0);
       expect(byProfile.caregiver).toBe(0);
       expect(byProfile.family).toBe(0);
     }, 30000);
+
+    it('cria a plataforma sem plano e o master com permissoes de plataforma', async () => {
+      const [platform]: Array<{ kind: string; usagePlanId: string | null }> =
+        await dataSource.query(
+          `SELECT kind, usage_plan_id AS "usagePlanId" FROM organizations WHERE code = $1`,
+          [DEV_PLATFORM.code],
+        );
+
+      expect(platform).toEqual({ kind: 'platform', usagePlanId: null });
+
+      const master = DEV_USERS.find(
+        (user) => user.profileCode === 'platform_admin',
+      )!;
+
+      const session = await login.execute(
+        {
+          organizationCode: master.organizationCode,
+          email: master.email,
+          password: DEV_PASSWORD,
+        },
+        { ip: '127.0.0.1' },
+      );
+
+      const principal = await sessions.resolve(
+        tokens.hash(session.accessToken),
+        new Date(),
+      );
+
+      expect(principal?.organizationKind).toBe('platform');
+      expect(principal?.permissions.has('platform_organizations:create')).toBe(
+        true,
+      );
+    }, 60000);
 
     it('mantem as duas organizacoes isoladas', async () => {
       const [primeira, segunda] = DEV_ORGANIZATIONS;

@@ -13,6 +13,7 @@ const principal = {
   sessionType: 'normal' as const,
   userId: 'user-1',
   organizationId: 'org-1',
+  organizationKind: 'tenant' as const,
   profile: 'admin' as never,
   permissions: new Set(['users:reset_password']),
   absoluteExpiresAt: new Date('2026-09-22T12:00:00.000Z'),
@@ -147,6 +148,7 @@ describe('AuthGuard', () => {
       requestId: expect.any(String) as string,
       userId: 'user-1',
       organizationId: 'org-1',
+      organizationKind: 'tenant',
       profile: 'admin',
       permissions: principal.permissions,
     });

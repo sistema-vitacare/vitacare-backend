@@ -2,6 +2,8 @@ import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { DataSource } from 'typeorm';
 
+import { isPlatformPermission } from '@/modules/Access/access.permissions';
+
 import type { AuthenticatedPrincipal } from '../types/auth.types';
 
 interface SessionRow extends Omit<AuthenticatedPrincipal, 'permissions'> {
@@ -54,12 +56,13 @@ export class AuthSessionRepository {
             AND u.deleted_at IS NULL
             AND o.status = 'active'
             AND o.deleted_at IS NULL
-        RETURNING s.id, s.type, s.user_id, s.organization_id, s.expires_at, u.profile_id
+        RETURNING s.id, s.type, s.user_id, s.organization_id, s.expires_at, u.profile_id, o.kind
        )
        SELECT t.id AS "sessionId",
               t.type AS "sessionType",
               t.user_id AS "userId",
               t.organization_id AS "organizationId",
+              t.kind AS "organizationKind",
               t.expires_at AS "absoluteExpiresAt",
               t.profile_id AS "profileId",
               p.code AS profile
@@ -88,10 +91,16 @@ export class AuthSessionRepository {
     );
 
     const { profileId: _profileId, ...principal } = row;
+    const isPlatform = row.organizationKind === 'platform';
 
+    // Permissao de plataforma concedida a perfil de tenant nao vale nada.
     return {
       ...principal,
-      permissions: new Set(permissions.map((item) => item.code)),
+      permissions: new Set(
+        permissions
+          .map((item) => item.code)
+          .filter((code) => isPlatform || !isPlatformPermission(code)),
+      ),
     };
   }
 }

@@ -111,6 +111,10 @@ create(@Body() dto: CreatePatientDto, @CurrentContext() ctx: RequestContext) {
   exportacoes, arquivos, notificacoes e jobs. Job de fila reconstroi o
   `RequestContext` e passa pelo mesmo repositorio escopado.
 - Teste com **duas organizacoes** e criterio de conclusao de todo modulo.
+- Excecao unica: `Organization` e o proprio tenant e nao tem `organizationId`.
+  O `OrganizationRepository` aplica o escopo: fora da organizacao de plataforma
+  (`ctx.organizationKind === 'platform'`), so a organizacao da sessao e
+  alcancavel. Permissoes `platform_*` so entram em sessao da plataforma.
 
 ## DTO, type e parser
 

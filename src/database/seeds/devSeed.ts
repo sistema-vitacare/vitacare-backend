@@ -1,10 +1,17 @@
 import { DataSource, EntityManager } from 'typeorm';
 
+import {
+  PLATFORM_ADMIN_PERMISSIONS,
+  type PermissionName,
+  TENANT_ADMIN_PERMISSIONS,
+} from '@/modules/Access/access.permissions';
+import { grantPermissions } from '@/modules/Access/repositories/permissionGrant.repository';
 import { PasswordHasher } from '@/modules/Auth/security/passwordHasher';
 
 /**
- * Base minima de desenvolvimento: dois planos, duas organizacoes, perfis e
- * usuarios com senha conhecida. Serve para exercitar a API e, principalmente,
+ * Base minima de desenvolvimento: dois planos, a organizacao de plataforma com
+ * um administrador master, duas organizacoes clientes, perfis e usuarios com
+ * senha conhecida. Serve para exercitar a API e, principalmente,
  * para testar **isolamento entre organizacoes** — por isso duas, e nao uma.
  *
  * Nada aqui e catalogo comercial nem matriz de permissao aprovada: planos
@@ -80,9 +87,14 @@ export const DEV_ORGANIZATIONS: DevOrganization[] = [
   },
 ];
 
+export const DEV_PLATFORM = {
+  code: 'vitacare',
+  tradeName: 'VitaCare Plataforma',
+};
+
 /**
- * Perfis por organizacao. Os quatro codigos vem de `ProfileCode`; a matriz de
- * acao, campo e vinculo de cada um ainda nao foi decidida.
+ * Perfis por organizacao cliente. Os quatro codigos vem de `ProfileCode`; a
+ * matriz de acao, campo e vinculo de cada um ainda nao foi decidida.
  */
 export const DEV_PROFILES = [
   { code: 'admin', name: 'Administrador' },
@@ -91,15 +103,23 @@ export const DEV_PROFILES = [
   { code: 'family', name: 'Familiar' },
 ];
 
-/**
- * Unica permissao do catalogo hoje. Concedida so ao perfil `admin`: inventar o
- * resto da matriz aqui criaria regra de acesso sem decisao de produto.
- */
-const ADMIN_PERMISSIONS = [
-  { code: 'users:reset_password', name: 'Redefinir senha de usuario' },
-];
+/** Apenas o perfil administrador recebe permissoes; o resto da matriz e da tarefa 4. */
+const PERMISSIONS_BY_PROFILE: Readonly<
+  Record<string, readonly PermissionName[]>
+> = {
+  platform_admin: PLATFORM_ADMIN_PERMISSIONS,
+  admin: TENANT_ADMIN_PERMISSIONS,
+};
 
 export const DEV_USERS: DevUser[] = [
+  {
+    email: 'master@vitacare.test',
+    name: 'Administrador Master',
+    cpf: '44477700083',
+    phone: '11990000000',
+    organizationCode: 'vitacare',
+    profileCode: 'platform_admin',
+  },
   {
     email: 'mateusmenavila@gmail.com',
     name: 'Mateus Avila',
@@ -213,6 +233,24 @@ export const runDevSeed = async (
 
     const organizationIds = new Map<string, string>();
 
+    const platform = await upsertId(
+      manager,
+      {
+        sql: `INSERT INTO organizations (kind, trade_name, code)
+              VALUES ('platform', $1, $2)
+              ON CONFLICT DO NOTHING
+              RETURNING id`,
+        parameters: [DEV_PLATFORM.tradeName, DEV_PLATFORM.code],
+      },
+      {
+        sql: `SELECT id FROM organizations WHERE kind = 'platform'`,
+        parameters: [],
+      },
+    );
+
+    organizationIds.set(DEV_PLATFORM.code, platform.id);
+    result.organizations += platform.created ? 1 : 0;
+
     for (const organization of DEV_ORGANIZATIONS) {
       const { id, created } = await upsertId(
         manager,
@@ -242,24 +280,15 @@ export const runDevSeed = async (
       result.organizations += created ? 1 : 0;
     }
 
-    const permissionIds = new Map<string, string>();
-
-    for (const permission of ADMIN_PERMISSIONS) {
-      const rows = await manager.query<IdRow[]>(
-        `INSERT INTO permissions (code, name)
-         VALUES ($1, $2)
-         ON CONFLICT (code) DO UPDATE SET name = permissions.name
-         RETURNING id`,
-        [permission.code, permission.name],
-      );
-
-      permissionIds.set(permission.code, rows[0].id);
-    }
-
     const profileIds = new Map<string, string>();
 
     for (const [code, organizationId] of organizationIds) {
-      for (const profile of DEV_PROFILES) {
+      const profiles =
+        code === DEV_PLATFORM.code
+          ? [{ code: 'platform_admin', name: 'Administrador master' }]
+          : DEV_PROFILES;
+
+      for (const profile of profiles) {
         const { id, created } = await upsertId(
           manager,
           {
@@ -278,17 +307,10 @@ export const runDevSeed = async (
         profileIds.set(`${code}:${profile.code}`, id);
         result.profiles += created ? 1 : 0;
 
-        if (profile.code !== 'admin') {
-          continue;
-        }
+        const permissions = PERMISSIONS_BY_PROFILE[profile.code];
 
-        for (const permissionId of permissionIds.values()) {
-          await manager.query(
-            `INSERT INTO profile_permissions (organization_id, profile_id, permission_id)
-             VALUES ($1, $2, $3)
-             ON CONFLICT DO NOTHING`,
-            [organizationId, id, permissionId],
-          );
+        if (permissions) {
+          await grantPermissions(manager, organizationId, id, permissions);
         }
       }
     }

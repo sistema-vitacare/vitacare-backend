@@ -58,6 +58,7 @@ export class AuthGuard implements CanActivate {
       requestId: resolveRequestId(request),
       userId: principal.userId,
       organizationId: principal.organizationId,
+      organizationKind: principal.organizationKind,
       profile: principal.profile,
       permissions: principal.permissions,
     };

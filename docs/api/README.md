@@ -28,6 +28,14 @@ O corpo das rotas de negócio é JSON quando aplicável. Autenticação usa Bear
 | `POST /api/v1/auth/password-recovery/request` | Solicita recuperação | [auth-solicitar-recuperacao.md](endpoints/auth-solicitar-recuperacao.md) |
 | `POST /api/v1/auth/password-recovery/reset` | Redefine com token | [auth-redefinir-senha.md](endpoints/auth-redefinir-senha.md) |
 | `POST /api/v1/auth/users/:userId/temporary-password` | Redefinição administrativa | [auth-redefinir-senha-usuario.md](endpoints/auth-redefinir-senha-usuario.md) |
+| `GET /api/v1/organizations/me` | Consulta a organização da sessão | [organizations-consultar-propria.md](endpoints/organizations-consultar-propria.md) |
+| `PATCH /api/v1/organizations/me` | Atualiza a organização da sessão | [organizations-atualizar-propria.md](endpoints/organizations-atualizar-propria.md) |
+| `POST /api/v1/organizations` | Cadastra organização e primeiro administrador (plataforma) | [organizations-criar.md](endpoints/organizations-criar.md) |
+| `GET /api/v1/organizations` | Lista organizações clientes (plataforma) | [organizations-listar.md](endpoints/organizations-listar.md) |
+| `GET /api/v1/organizations/:organizationId` | Consulta qualquer organização (plataforma) | [organizations-consultar.md](endpoints/organizations-consultar.md) |
+| `PATCH /api/v1/organizations/:organizationId` | Atualiza qualquer organização (plataforma) | [organizations-atualizar.md](endpoints/organizations-atualizar.md) |
+| `POST /api/v1/organizations/:organizationId/deactivate` | Inativa organização (plataforma) | [organizations-inativar.md](endpoints/organizations-inativar.md) |
+| `POST /api/v1/organizations/:organizationId/reactivate` | Reativa organização (plataforma) | [organizations-reativar.md](endpoints/organizations-reativar.md) |
 
 Os caminhos de Swagger usam `SWAGGER_PATH=docs` e só existem com `SWAGGER_ENABLED=true`. O documento OpenAPI é gerado em runtime; consulte a rota JSON do ambiente para conferir a versão publicada. `/health/live` é excluída do OpenAPI de propósito, mas permanece documentada aqui.
 
@@ -54,6 +62,12 @@ Rotas públicas de autenticação: login, solicitação de recuperação e redef
 
 A senha tem de 8 a 128 **caracteres**, aceita espaços e Unicode e não tem regra de composição. O armazenamento usa Argon2id.
 
+### Administração da plataforma
+
+Existe uma única **organização de plataforma** (`kind = platform`), sem plano e sempre ativa. Os usuários dela com perfil `platform_admin` são os **administradores master**: cadastram, listam, consultam, editam, inativam e reativam as organizações clientes pelas rotas `/api/v1/organizations`. O master faz login como qualquer usuário, com o código da organização de plataforma. A primeira conta nasce de `npm run seed:platform`.
+
+Permissões com prefixo `platform_` (`platform_organizations:create`, `:read`, `:update`, `:change_status`) **só valem** em sessão da organização de plataforma: concedidas a um perfil de organização cliente, são descartadas ao resolver a sessão. O administrador de uma organização cliente usa `/api/v1/organizations/me` com `organization:read` e `organization:update`.
+
 ### Auditoria de acesso
 
 Todo evento de acesso é gravado em `audit_events`, sempre dentro de uma organização e na mesma transação da escrita que o originou. A consulta e a exportação desses registros são objeto da tarefa 14 (RF017, UC06); hoje eles apenas são gravados e **nenhuma rota os devolve**.
@@ -68,7 +82,14 @@ Todo evento de acesso é gravado em `audit_events`, sempre dentro de uma organiz
 | `auth.password_changed` | Troca da própria senha. |
 | `auth.password_recovered` | Senha redefinida por token de recuperação. |
 | `auth.admin_password_reset` | Senha temporária emitida por administrador. |
-| `auth.bootstrap_completed` | Primeira organização e primeiro administrador criados por `npm run auth:bootstrap`. |
+| `organization.platform_seeded` | Organização de plataforma e primeiro master criados por `npm run seed:platform`. Evento de sistema. |
+| `organization.created` | Organização cliente cadastrada pelo master. |
+| `user.created` | Primeiro administrador criado junto com a organização; `after_values.reason = "first_administrator"`. |
+| `organization.updated` | Dados cadastrais alterados; `after_values.changedFields` lista só os **nomes** dos campos. |
+| `organization.deactivated` | Organização inativada; sessões e links de recuperação dela revogados. |
+| `organization.reactivated` | Organização reativada. |
+
+Ação do master sobre outra organização gera **duas** linhas com o mesmo `request_id`: uma na organização alvo, como evento de sistema com `after_values.platformActorUserId`, porque a FK de autoria só aceita autor da própria organização; e outra na organização de plataforma, com o master como autor.
 
 O evento guarda organização, autor, ação, entidade, `request_id` e o momento. **Nada digitado na requisição entra ali**: nem e-mail, nem senha, nem IP. Para investigar uma tentativa, correlacione o `request_id` do evento com o log estruturado da mesma requisição.
 
