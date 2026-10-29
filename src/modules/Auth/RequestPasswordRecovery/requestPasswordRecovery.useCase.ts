@@ -1,6 +1,8 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 
+import { type EnvelopePayload, withMeta } from '@/common/http/envelope';
+
 import {
   PASSWORD_RECOVERY_MAILER,
   type PasswordRecoveryMailer,
@@ -10,6 +12,12 @@ import { PasswordResetRepository } from '../repositories/passwordReset.repositor
 import { AuthRateLimiter } from '../security/authRateLimiter';
 import { TokenService } from '../security/token.service';
 import type { LoginIdentity } from '../types/auth.types';
+
+const ADMINISTRATOR_MESSAGE =
+  'A recuperação por e-mail não está disponível. Procure o administrador da sua organização para receber uma senha temporária.';
+
+const emailMessage = (minutes: number): string =>
+  `Se a conta estiver ativa, enviaremos ao e-mail informado um link válido por ${minutes} minutos. Se não receber, procure o administrador da sua organização.`;
 
 @Injectable()
 export class RequestPasswordRecoveryUseCase {
@@ -24,14 +32,15 @@ export class RequestPasswordRecoveryUseCase {
   ) {}
 
   /**
-   * A resposta e sempre a mesma, exista ou nao a conta. Sem SMTP habilitado
-   * nao ha token: emitir um link que ninguem consegue receber so criaria
-   * credencial viva sem entrega possivel.
+   * A resposta e sempre a mesma, exista ou nao a conta; so o canal disponivel
+   * muda a orientacao em `meta.message`. Sem SMTP habilitado nao ha token:
+   * emitir um link que ninguem consegue receber so criaria credencial viva
+   * sem entrega possivel, e o caminho e a redefinicao administrativa.
    */
   async execute(
     input: { organizationCode: string; email: string },
     meta: { ip: string },
-  ): Promise<null> {
+  ): Promise<EnvelopePayload<null>> {
     const organizationCode = input.organizationCode.toLowerCase();
     const email = input.email.toLowerCase();
 
@@ -42,13 +51,19 @@ export class RequestPasswordRecoveryUseCase {
       email,
     );
 
-    if (!this.mailer.enabled || !this.canRecover(identity)) {
-      return null;
+    if (!this.mailer.enabled) {
+      return withMeta(null, { message: ADMINISTRATOR_MESSAGE });
     }
 
     const lifetimeSeconds = this.config.getOrThrow<number>(
       'auth.recoverySeconds',
     );
+    const expiresInMinutes = Math.round(lifetimeSeconds / 60);
+    const answer = withMeta(null, { message: emailMessage(expiresInMinutes) });
+
+    if (!this.canRecover(identity)) {
+      return answer;
+    }
 
     const token = this.tokens.issue();
 
@@ -69,14 +84,14 @@ export class RequestPasswordRecoveryUseCase {
       await this.mailer.send({
         to: email,
         resetUrl: resetUrl.toString(),
-        expiresInMinutes: Math.round(lifetimeSeconds / 60),
+        expiresInMinutes,
       });
     } catch {
       // Sem entrega nao pode sobrar token utilizavel.
       await this.resets.revoke(token.hash);
     }
 
-    return null;
+    return answer;
   }
 
   private canRecover(

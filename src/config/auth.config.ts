@@ -14,6 +14,8 @@ export default registerAs('auth', () => ({
   firstAccessSeconds: 600,
   /** Token de recuperacao por link: 15 minutos. */
   recoverySeconds: 900,
+  /** Senha temporaria da redefinicao administrativa: 24 horas. */
+  temporaryPasswordSeconds: 86400,
   /** Janela e bloqueio de login: 5 falhas em 15 minutos, bloqueio de 15. */
   loginWindowSeconds: 900,
   loginBlockSeconds: 900,

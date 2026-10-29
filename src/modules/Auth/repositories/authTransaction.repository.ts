@@ -52,6 +52,7 @@ export interface ResetUserPasswordAsAdminInput {
   organizationId: string;
   actorUserId: string;
   passwordHash: string;
+  expiresAt: Date;
   requestId: string;
 }
 
@@ -181,6 +182,7 @@ export class AuthTransactionRepository {
             SET password_hash = $1,
                 must_change_password = false,
                 password_changed_at = now(),
+                temporary_password_expires_at = NULL,
                 updated_at = now()
           WHERE id = $2
             AND organization_id = $3
@@ -212,6 +214,7 @@ export class AuthTransactionRepository {
             SET password_hash = $1,
                 must_change_password = false,
                 password_changed_at = now(),
+                temporary_password_expires_at = NULL,
                 updated_at = now()
           WHERE id = $2
             AND organization_id = $3
@@ -252,17 +255,31 @@ export class AuthTransactionRepository {
             SET password_hash = $1,
                 must_change_password = true,
                 password_changed_at = NULL,
+                temporary_password_expires_at = $4,
                 updated_at = now()
           WHERE id = $2
             AND organization_id = $3
             AND status = 'active'
             AND deleted_at IS NULL`,
-        [input.passwordHash, input.targetUserId, input.organizationId],
+        [
+          input.passwordHash,
+          input.targetUserId,
+          input.organizationId,
+          input.expiresAt,
+        ],
       );
 
       if (affectedRows(updated) !== 1) {
         return 'not_found';
       }
+
+      // Link de recuperacao emitido antes nao pode sobreviver a senha nova.
+      await manager.query<WriteResult>(
+        `DELETE FROM password_reset_tokens
+          WHERE user_id = $1
+            AND organization_id = $2`,
+        [input.targetUserId, input.organizationId],
+      );
 
       await this.revokeSessionsOf(
         manager,

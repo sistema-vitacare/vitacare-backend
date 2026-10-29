@@ -9,6 +9,8 @@ export interface LoginIdentity {
   deletedAt: Date | null;
   organizationStatus: 'active' | 'inactive';
   organizationDeletedAt: Date | null;
+  /** Prazo da senha emitida pela redefinicao administrativa; `null` sem prazo. */
+  temporaryPasswordExpiresAt: Date | null;
   profile: ProfileCode;
   permissions: ReadonlySet<string>;
 }
