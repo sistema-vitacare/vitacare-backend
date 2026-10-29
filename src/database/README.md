@@ -137,6 +137,19 @@ VITACARE_TEST_DATABASE_URL="postgresql://<usuario>:<senha>@127.0.0.1:<porta>/vit
   npm run test:e2e -- --runInBand tests/modules/Auth/authSchema.e2e-spec.ts
 ```
 
+## Prazo da senha temporaria
+
+`migrations/1790200000000-AddTemporaryPasswordExpiry.ts` (BE-03, 2026-10-29)
+acrescenta `users.temporary_password_expires_at timestamptz` anulavel e a
+constraint `users_temporary_password_expiry_check`: o prazo so existe enquanto
+`must_change_password` e verdadeiro. A redefinicao administrativa grava o prazo
+de 24 horas; toda troca definitiva de senha o limpa. `NULL` significa sem
+prazo, o que preserva contas criadas com troca obrigatoria fora desse fluxo.
+Validada em PostgreSQL 16 descartavel com `migration:run`, `migration:show`,
+`migration:revert` e `migration:run` pela CLI e pelo entrypoint da imagem
+(`RUN_MIGRATIONS=true`, arquivos de `dist/`). **Nao aplicada no banco local de
+`.env` nem em producao.**
+
 `organizations.usage_plan_id` e obrigatorio e referencia `usage_plans.id` com
 `ON DELETE RESTRICT`. A tabela de planos oferece somente a estrutura fisica do
 catalogo; ofertas, vigencia, troca e aplicacao dos limites continuam pendentes.

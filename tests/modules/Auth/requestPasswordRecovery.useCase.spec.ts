@@ -12,6 +12,7 @@ const activeIdentity: LoginIdentity = {
   deletedAt: null,
   organizationStatus: 'active',
   organizationDeletedAt: null,
+  temporaryPasswordExpiresAt: null,
   profile: 'admin' as never,
   permissions: new Set<string>(),
 };
@@ -75,13 +76,24 @@ const request = {
   email: 'user@example.test',
 };
 
+const EMAIL_MESSAGE =
+  'Se a conta estiver ativa, enviaremos ao e-mail informado um link válido por 15 minutos. Se não receber, procure o administrador da sua organização.';
+
+const ADMINISTRATOR_MESSAGE =
+  'A recuperação por e-mail não está disponível. Procure o administrador da sua organização para receber uma senha temporária.';
+
+const expectGenericAnswer = (result: unknown, message: string): void => {
+  expect(result).toMatchObject({ data: null, extras: { message } });
+};
+
 describe('RequestPasswordRecoveryUseCase', () => {
   it('emite token com prazo de configuração e envia o link', async () => {
     const { useCase, resets, mailer } = build({});
 
-    await expect(
-      useCase.execute(request, { ip: '127.0.0.1' }),
-    ).resolves.toBeNull();
+    expectGenericAnswer(
+      await useCase.execute(request, { ip: '127.0.0.1' }),
+      EMAIL_MESSAGE,
+    );
 
     const [organizationId, userId, tokenHash, expiresAt] = resets.create.mock
       .calls[0] as [string, string, string, Date];
@@ -103,9 +115,10 @@ describe('RequestPasswordRecoveryUseCase', () => {
   it('retorna resultado genérico quando a conta não existe', async () => {
     const { useCase, resets, mailer } = build({ identity: null });
 
-    await expect(
-      useCase.execute(request, { ip: '127.0.0.1' }),
-    ).resolves.toBeNull();
+    expectGenericAnswer(
+      await useCase.execute(request, { ip: '127.0.0.1' }),
+      EMAIL_MESSAGE,
+    );
 
     expect(resets.create).not.toHaveBeenCalled();
     expect(mailer.send).not.toHaveBeenCalled();
@@ -121,30 +134,42 @@ describe('RequestPasswordRecoveryUseCase', () => {
   ])('não emite token para %s', async (_case, identity) => {
     const { useCase, resets } = build({ identity });
 
-    await expect(
-      useCase.execute(request, { ip: '127.0.0.1' }),
-    ).resolves.toBeNull();
+    expectGenericAnswer(
+      await useCase.execute(request, { ip: '127.0.0.1' }),
+      EMAIL_MESSAGE,
+    );
 
     expect(resets.create).not.toHaveBeenCalled();
   });
 
-  it('não cria token quando o SMTP está desabilitado', async () => {
+  it('sem SMTP não cria token e orienta a procurar o administrador', async () => {
     const { useCase, resets } = build({ mailerEnabled: false });
 
-    await expect(
-      useCase.execute(request, { ip: '127.0.0.1' }),
-    ).resolves.toBeNull();
+    expectGenericAnswer(
+      await useCase.execute(request, { ip: '127.0.0.1' }),
+      ADMINISTRATOR_MESSAGE,
+    );
 
     expect(resets.create).not.toHaveBeenCalled();
+  });
+
+  it('sem SMTP responde igual exista ou não a conta', async () => {
+    const existing = build({ mailerEnabled: false });
+    const missing = build({ mailerEnabled: false, identity: null });
+
+    expect(await missing.useCase.execute(request, { ip: '127.0.0.1' })).toEqual(
+      await existing.useCase.execute(request, { ip: '127.0.0.1' }),
+    );
   });
 
   it('revoga o token quando o envio falha', async () => {
     const send = jest.fn().mockRejectedValue(new Error('SMTP fora do ar'));
     const { useCase, resets } = build({ send });
 
-    await expect(
-      useCase.execute(request, { ip: '127.0.0.1' }),
-    ).resolves.toBeNull();
+    expectGenericAnswer(
+      await useCase.execute(request, { ip: '127.0.0.1' }),
+      EMAIL_MESSAGE,
+    );
 
     expect(resets.revoke).toHaveBeenCalledWith('hash-token');
   });

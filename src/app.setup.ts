@@ -22,6 +22,11 @@ export interface AppSetupOptions {
   corsCredentials: boolean;
   swaggerEnabled: boolean;
   swaggerPath: string;
+  /**
+   * `trust proxy` do Express. Atras de proxy, sem isto `req.ip` vira o IP do
+   * nginx e todos os clientes dividem o mesmo balde do rate limit.
+   */
+  trustProxy?: false | number | string;
 }
 
 /**
@@ -50,6 +55,8 @@ export const setupApp = (
 ): { docsPath: string } => {
   const logger = new Logger('AppSetup');
   const docsPath = `/${options.apiPrefix}/${options.swaggerPath}`;
+
+  app.set('trust proxy', options.trustProxy ?? false);
 
   // A UI do Swagger depende de scripts inline; o CSP e removido apenas nela.
   const secureDefault = helmet();

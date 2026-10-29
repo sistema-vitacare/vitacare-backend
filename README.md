@@ -1,13 +1,15 @@
 # VitaCare Backend
 
 Backend HTTP 100% API construido com Node.js 22, TypeScript e NestJS 11. Roda em
-um unico container e consome instancias **externas** de PostgreSQL e Redis.
+um unico container e consome instancias **externas** de PostgreSQL e Redis. Em
+producao, o deploy e automatico pela `main` ([deploy na VPS](docs/deploy-vps.md)).
 
 ## Sumario
 
 - [Requisitos](#requisitos)
 - [Configuracao](#configuracao)
 - [Executar com Docker](#executar-com-docker)
+- [Deploy de producao](#deploy-de-producao)
 - [Desenvolvimento local](#desenvolvimento-local)
 - [Rotas](#rotas)
 - [Manual de integracao da API](#manual-de-integracao-da-api)
@@ -61,6 +63,18 @@ A porta interna do container e fixa em `3000`; publique outra no host com
 ```bash
 VITACARE_ENV_FILE=.env.production HOST_PORT=8080 docker compose up -d
 ```
+
+## Deploy de producao
+
+Merge na `main` → GitHub Actions (lint, build, unitarios e e2e contra PostgreSQL
+e Redis reais) → imagem `vitacare-backend` no GHCR → webhook do Portainer →
+stack `vitacare` com **um container**, `app-vitacare`, na porta `1050`. O
+entrypoint aplica as migrations pendentes (`RUN_MIGRATIONS=true`) e sobe a API.
+
+PostgreSQL e Redis sao os da stack `infra` da VPS, alcancados pela rede
+docker. Passo a passo, pool, memoria, timeouts e rollback:
+[docs/deploy-vps.md](docs/deploy-vps.md). Variaveis da stack:
+`.env.production.example`.
 
 ## Desenvolvimento local
 
@@ -249,11 +263,14 @@ Os comandos acima usam `ENV_FILE` (padrao `.env`) para achar o banco:
 ENV_FILE=.env.homolog npm run migration:run
 ```
 
-No deploy, rode contra o codigo ja compilado:
+Contra o codigo ja compilado (container de desenvolvimento):
 
 ```bash
 docker compose run --rm api npm run migration:run:prod
 ```
+
+Em producao, o entrypoint do container faz isso a cada deploy, antes de subir
+a API (`RUN_MIGRATIONS=false` desliga; fora da stack de producao vem desligado).
 
 Entidades sao descobertas pelo glob `*.entity.ts` e registradas no modulo do
 dominio com `TypeOrmModule.forFeature([...])`.
@@ -271,7 +288,8 @@ e declara seu processor com `@Processor('...')`.
 
 Logs estruturados com `nestjs-pino`. Em producao saem em JSON puro para o
 coletor; em desenvolvimento passam por `pino-pretty`. Cada requisicao recebe um
-id, ecoado no campo `requestId` das respostas de erro.
+id, ecoado em `meta.requestId`; um `X-Request-Id` valido vindo de um proxy e
+adotado, para correlacionar com o log dele.
 
 `authorization`, `cookie` e `x-api-key` sao redigidos automaticamente. As rotas
 de health nao poluem o log.
@@ -283,8 +301,14 @@ de health nao poluem o log.
 - **CORS** restrito a `CORS_ORIGINS` (lista separada por virgula). Vazio em
   desenvolvimento libera tudo; vazio em producao **desliga** o CORS e registra
   um aviso no boot.
-- **Rate limit** global via `@nestjs/throttler` (`THROTTLE_LIMIT` requisicoes por
+- **Rate limit** global via `@nestjs/throttler`, com contagem no Redis
+  (`RedisThrottlerStorage`, compartilhada entre processos; `THROTTLE_LIMIT` requisicoes por
   `THROTTLE_TTL_MS`).
+- **Proxy confiavel** (`TRUST_PROXY`): desligado por padrao. A stack de
+  producao usa `loopback,uniquelocal`: no acesso direto a conexao ja e o
+  cliente, e atras do Nginx Proxy Manager o Express le o IP real em
+  `X-Forwarded-For`; sem isso todos os clientes dividiriam o balde de rate limit
+  do IP do proxy. `true` e recusado no boot (aceitaria IP forjado).
 - **ValidationPipe** global com `whitelist` e `forbidNonWhitelisted`: campos nao
   declarados no DTO fazem a requisicao falhar com `400`.
 - O container roda como usuario `node`, sem privilegios adicionais
@@ -294,8 +318,9 @@ de health nao poluem o log.
 
 - `npm test` — unitarios de `tests/`, exceto `*.e2e-spec.ts`.
 - `npm run test:e2e` — sobe o pipeline HTTP real (helmet, CORS, versionamento,
-  validacao, filtro de erros, Swagger) com PostgreSQL e Redis mockados. Roda em
-  CI sem nenhum servico externo.
+  validacao, filtro de erros, Swagger) com PostgreSQL e Redis mockados. No CI as
+  suites de banco e Redis abaixo rodam contra servicos descartaveis do proprio
+  job (`.github/workflows/deploy.yml`).
 - `tests/modules/Auth/authRateLimiter.integration.e2e-spec.ts` exercita o
   limite de abuso contra um Redis **real** e pula sem
   `VITACARE_TEST_REDIS_URL`. Aponte para um banco logico descartavel, por

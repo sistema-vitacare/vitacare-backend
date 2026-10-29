@@ -4,6 +4,7 @@ import { DataSource } from 'typeorm';
 import { CreateInitialIdentitySchema1789674300000 } from '@/database/migrations/1789674300000-CreateInitialIdentitySchema';
 import { CreateAuthSchema1790000000000 } from '@/database/migrations/1790000000000-CreateAuthSchema';
 import { AddOrganizationKind1790100000000 } from '@/database/migrations/1790100000000-AddOrganizationKind';
+import { AddTemporaryPasswordExpiry1790200000000 } from '@/database/migrations/1790200000000-AddTemporaryPasswordExpiry';
 import { TENANT_ADMIN_PERMISSIONS } from '@/modules/Access/access.permissions';
 import {
   DEV_ORGANIZATIONS,
@@ -77,6 +78,7 @@ describeWithDatabase(
           CreateInitialIdentitySchema1789674300000,
           CreateAuthSchema1790000000000,
           AddOrganizationKind1790100000000,
+          AddTemporaryPasswordExpiry1790200000000,
         ],
         namingStrategy: new SnakeNamingStrategy(),
         synchronize: false,

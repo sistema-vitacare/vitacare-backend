@@ -11,5 +11,8 @@ coverage
 .DS_Store
 .idea
 .vscode
-README.md
-test
+*.md
+docs
+tests
+compose.yaml
+docker-compose*.yml

@@ -1,0 +1,137 @@
+# Compose de PRODUÇÃO: é este arquivo que a stack do Portainer lê
+# (Stacks → Repository → Compose path: docker-compose.prod.yml).
+# O compose.yaml continua sendo o de desenvolvimento (build local).
+#
+# Fluxo do deploy (docs/deploy-vps.md):
+#   merge develop → main → GitHub Actions: testes → imagem no GHCR → webhook
+#   → Portainer baixa a imagem e recria o container app-vitacare
+#   → entrypoint: migrations pendentes → API NestJS na porta 1050
+#
+# Container único, como os sistemas Laravel da VPS: um processo Node atende
+# vários requests ao mesmo tempo, o que basta para o volume do VitaCare.
+#
+# Nenhum .env vai para a imagem (.dockerignore) nem para o repositório. Os
+# valores ficam nas "Environment variables" da stack no Portainer, e o Compose
+# os interpola abaixo. Modelo: .env.production.example.
+# Variável com `:?` é obrigatória: sem ela a stack nem sobe, com a mensagem.
+# Nunca pôr um `:?` dentro do default de outra variável: o Portainer CE recusa
+# a stack mesmo com a variável de fora definida. O CI barra esse padrão.
+services:
+  app:
+    # Imagem buildada pelo GitHub Actions, sem `build:`: o Portainer não
+    # rebuilda no webhook. Rollback: APP_IMAGE=...:sha-<commit> na stack.
+    image: ${APP_IMAGE:-ghcr.io/sistema-vitacare/vitacare-backend:latest}
+    # Todo `compose up` (o redeploy do webhook) baixa a imagem; faz o papel do
+    # "Re-pull image", pago no Portainer CE.
+    pull_policy: always
+    container_name: app-vitacare
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      # Porta do host = porta interna (molde da VPS).
+      PORT: "1050"
+      API_PREFIX: ${API_PREFIX:-api}
+      API_VERSION: ${API_VERSION:-1}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      SWAGGER_ENABLED: ${SWAGGER_ENABLED:-true}
+      SWAGGER_PATH: ${SWAGGER_PATH:-docs}
+
+      # --- Entrypoint: migrations pendentes a cada deploy, antes da API.
+      # Container único: é seguro e idempotente. "false" pula.
+      RUN_MIGRATIONS: ${RUN_MIGRATIONS:-true}
+
+      # --- IP real do cliente. Acesso direto por IP: a conexão já é o cliente.
+      # Com o Nginx Proxy Manager (rede proxy, faixa privada), o IP vem em
+      # X-Forwarded-For. Nunca `true` (aceitaria IP forjado).
+      TRUST_PROXY: ${TRUST_PROXY:-loopback,uniquelocal}
+      # Timeouts: consulta 30s < request 60s < proxy público (>= 90s).
+      HTTP_REQUEST_TIMEOUT_MS: ${HTTP_REQUEST_TIMEOUT_MS:-60000}
+      HTTP_KEEP_ALIVE_TIMEOUT_MS: ${HTTP_KEEP_ALIVE_TIMEOUT_MS:-65000}
+      # Heap do V8 abaixo do mem_limit: o GC trabalha antes do OOM.
+      NODE_OPTIONS: --max-old-space-size=${API_HEAP_MB:-384}
+
+      # --- Banco: Postgres da stack infra, usuário PRÓPRIO do sistema (dono só
+      # do banco vitacare), nunca o superusuário.
+      DB_HOST: ${DB_HOST:-postgresql}
+      DB_PORT: ${DB_PORT:-5432}
+      DB_DATABASE: ${DB_DATABASE:-vitacare}
+      DB_USERNAME: ${DB_USERNAME:-vitacare}
+      DB_PASSWORD: ${DB_PASSWORD:?Defina DB_PASSWORD nas variaveis da stack}
+      DB_SCHEMA: ${DB_SCHEMA:-public}
+      # O Postgres da stack infra fala sem TLS dentro da rede docker.
+      DB_SSL: ${DB_SSL:-false}
+      DB_CONNECT_TIMEOUT_MS: ${DB_CONNECT_TIMEOUT_MS:-10000}
+      # Pool do processo: até DB_POOL_SIZE conexões no Postgres compartilhado
+      # (max_connections = 100 para todos os sistemas da VPS).
+      DB_POOL_SIZE: ${DB_POOL_SIZE:-10}
+      DB_POOL_IDLE_TIMEOUT_MS: ${DB_POOL_IDLE_TIMEOUT_MS:-30000}
+      DB_STATEMENT_TIMEOUT_MS: ${DB_STATEMENT_TIMEOUT_MS:-30000}
+      DB_APPLICATION_NAME: vitacare-api
+
+      # --- Redis compartilhado da stack infra: prefixo próprio OBRIGATÓRIO,
+      # senão um sistema lê/limpa a chave do outro. Senha = a da stack infra.
+      REDIS_HOST: ${REDIS_HOST:-redis}
+      REDIS_PORT: ${REDIS_PORT:-6379}
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?Defina REDIS_PASSWORD (a mesma da stack infra)}
+      REDIS_DB: ${REDIS_DB:-0}
+      REDIS_TLS: "false"
+      REDIS_KEY_PREFIX: ${REDIS_KEY_PREFIX:-vitacare:}
+      QUEUE_PREFIX: ${QUEUE_PREFIX:-vitacare}
+
+      # --- Frontend: origens aceitas, separadas por vírgula. Vazio = CORS
+      # desligado em produção (nenhum navegador de outra origem é aceito).
+      CORS_ORIGINS: ${CORS_ORIGINS:-}
+      CORS_CREDENTIALS: ${CORS_CREDENTIALS:-false}
+      THROTTLE_TTL_MS: ${THROTTLE_TTL_MS:-60000}
+      THROTTLE_LIMIT: ${THROTTLE_LIMIT:-120}
+
+      # --- E-mail: decisão de 2026-09-22, não existe SMTP no projeto.
+      SMTP_ENABLED: ${SMTP_ENABLED:-false}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_SECURE: ${SMTP_SECURE:-false}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_FROM: ${SMTP_FROM:-}
+      PASSWORD_RESET_URL: ${PASSWORD_RESET_URL:-}
+    ports:
+      # 127.0.0.1 por padrão: o público entra pelo Nginx Proxy Manager (rede
+      # proxy, https). Sem domínio: APP_BIND=0.0.0.0 expõe http://IP:1050.
+      - "${APP_BIND:-127.0.0.1}:1050:1050"
+    labels:
+      # Vira o label `stack` no Loki; igual ao nome da stack no Portainer.
+      stack: vitacare
+    logging:
+      # Sem teto, um loop de erro enche o disco da VPS. O Loki é a memória
+      # longa; este arquivo é só o buffer que o Alloy lê.
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    # Teto de RAM: quando vazar, o OOM fica no cgroup da app e não mata o
+    # Postgres do host. 2 vCPU para todas as apps: uma em loop não toma tudo.
+    mem_limit: ${API_MEM_LIMIT:-512m}
+    cpus: ${API_CPUS:-1.0}
+    # SIGTERM → o Nest fecha HTTP, pool e Redis (enableShutdownHooks).
+    stop_grace_period: 30s
+    healthcheck:
+      # Docker não reinicia unhealthy: o alerta "Container unhealthy" avisa.
+      # start_period cobre as migrations do entrypoint.
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:1050/health/live >/dev/null || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
+    networks:
+      - infra                      # postgresql e redis pelo nome
+      - proxy                      # Nginx Proxy Manager (fase com domínio)
+
+networks:
+  # Criada pela stack `infra`: Postgres e Redis pelo nome do container.
+  infra:
+    external: true
+    name: ${INFRA_NETWORK:-infra}
+  # Criada pela stack `proxy`. Separada da `infra`: o proxy não enxerga o banco.
+  proxy:
+    external: true
+    name: ${PROXY_NETWORK:-proxy}

@@ -28,14 +28,13 @@ export class PasswordResetRepository {
     expiresAt: Date,
   ): Promise<void> {
     await this.dataSource.transaction(async (manager) => {
-      // Uma nova solicitacao invalida as anteriores da mesma conta.
+      // Retencao: so o link mais recente de cada conta fica guardado. O
+      // anterior, vivo ou nao, e apagado; a redefinicao concluida ja fica na
+      // auditoria, e o hash de um link morto nao serve a mais nada.
       await manager.query<WriteResult>(
-        `UPDATE password_reset_tokens
-            SET revoked_at = now(), updated_at = now()
+        `DELETE FROM password_reset_tokens
           WHERE organization_id = $1
-            AND user_id = $2
-            AND revoked_at IS NULL
-            AND consumed_at IS NULL`,
+            AND user_id = $2`,
         [organizationId, userId],
       );
 
@@ -98,6 +97,7 @@ export class PasswordResetRepository {
             SET password_hash = $1,
                 must_change_password = false,
                 password_changed_at = now(),
+                temporary_password_expires_at = NULL,
                 updated_at = now()
           WHERE id = $2
             AND organization_id = $3

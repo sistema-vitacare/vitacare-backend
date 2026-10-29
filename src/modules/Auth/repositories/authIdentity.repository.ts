@@ -35,6 +35,10 @@ export class AuthIdentityRepository {
       .addSelect('user.id', 'userId')
       .addSelect('user.password_hash', 'passwordHash')
       .addSelect('user.must_change_password', 'mustChangePassword')
+      .addSelect(
+        'user.temporary_password_expires_at',
+        'temporaryPasswordExpiresAt',
+      )
       .addSelect('user.status', 'status')
       .addSelect('user.deleted_at', 'deletedAt')
       .addSelect('profile.code', 'profile')

@@ -17,6 +17,16 @@ export const environmentValidationSchema = Joi.object({
     .default('info'),
   SWAGGER_ENABLED: bool.default(true),
   SWAGGER_PATH: Joi.string().trim().default('docs'),
+  APP_VERSION: Joi.string().trim().allow('').optional(),
+  // `true` confiaria em qualquer X-Forwarded-For, inclusive forjado pelo
+  // cliente, e o rate limit por IP deixaria de valer.
+  TRUST_PROXY: Joi.string()
+    .trim()
+    .allow('')
+    .invalid('true', 'TRUE', 'True')
+    .default('false'),
+  HTTP_KEEP_ALIVE_TIMEOUT_MS: Joi.number().integer().min(1000).default(65000),
+  HTTP_REQUEST_TIMEOUT_MS: Joi.number().integer().min(1000).default(60000),
 
   // Seguranca
   CORS_ORIGINS: Joi.string().allow('').default(''),
@@ -71,6 +81,9 @@ export const environmentValidationSchema = Joi.object({
   DB_SSL: bool.default(false),
   DB_SSL_REJECT_UNAUTHORIZED: bool.default(true),
   DB_POOL_SIZE: Joi.number().integer().min(1).max(100).default(10),
+  DB_POOL_IDLE_TIMEOUT_MS: Joi.number().integer().min(1000).default(30000),
+  DB_STATEMENT_TIMEOUT_MS: Joi.number().integer().min(0).default(30000),
+  DB_APPLICATION_NAME: Joi.string().trim().max(63).default('vitacare-backend'),
   DB_CONNECT_TIMEOUT_MS: Joi.number().integer().min(1000).default(10000),
   DB_MIGRATIONS_TABLE: Joi.string().default('migrations'),
 

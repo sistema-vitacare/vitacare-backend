@@ -1,7 +1,7 @@
 ---
 title: Manual de integração da API VitaCare
 status: atual
-updated: 2026-09-22
+updated: 2026-10-29
 ---
 
 # Manual de integração da API VitaCare
@@ -58,7 +58,7 @@ Cada requisição aceita renova a janela de inatividade da sessão normal; o pra
 
 Rotas públicas de autenticação: login, solicitação de recuperação e redefinição por token. Todo o resto exige Bearer, e o OpenAPI marca isso no esquema `bearer`.
 
-> **Não existe SMTP configurado em nenhum ambiente** (decisão de 2026-09-22). A solicitação de recuperação responde `202`, mas não cria token nem envia mensagem; quem perdeu a senha depende da [redefinição administrativa](endpoints/auth-redefinir-senha-usuario.md). O contrato da rota descreve o comportamento que passa a valer quando houver servidor de e-mail.
+> **Não existe SMTP configurado em nenhum ambiente** (decisão de 2026-09-22). A solicitação de recuperação responde `202` com `meta.message` orientando a procurar o administrador, mas não cria token nem envia mensagem. O canal operacional de recuperação é a [redefinição administrativa](endpoints/auth-redefinir-senha-usuario.md) (recuperação assistida, 2026-10-29): senha temporária válida por 24 horas, reemitida pelo administrador quando vence ou se perde. O envio por link passa a valer apenas quando houver servidor de e-mail.
 
 A senha tem de 8 a 128 **caracteres**, aceita espaços e Unicode e não tem regra de composição. O armazenamento usa Argon2id.
 
@@ -135,7 +135,7 @@ Escrita pode acrescentar `meta.message`:
 | Propriedade | Tipo | Significado |
 | --- | --- | --- |
 | `data` | objeto, lista ou `null` | Conteúdo da operação. Operação sem conteúdo devolve `200` com `data: null`, não `204`. |
-| `meta.requestId` | texto | Identificador de correlação com o log. Sempre presente. |
+| `meta.requestId` | texto | Identificador de correlação com o log. Sempre presente. Um `X-Request-Id` recebido no formato `[A-Za-z0-9-]{16,64}` (por exemplo o de um proxy nginx) é adotado, para correlacionar com o log do proxy; header ausente ou fora do formato gera um UUID. |
 | `meta.timestamp` | texto ISO 8601 | Momento em que a resposta foi construída. Sempre presente. |
 | `meta.message` | texto, opcional | Confirmação amigável definida pelo caso de uso. |
 | `meta.pagination` | objeto, opcional | `page`, `limit`, `total` e `totalPages`. Só em resultado paginado. |

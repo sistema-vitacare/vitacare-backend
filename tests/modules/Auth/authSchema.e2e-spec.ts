@@ -4,6 +4,7 @@ import { DataSource } from 'typeorm';
 import { CreateInitialIdentitySchema1789674300000 } from '@/database/migrations/1789674300000-CreateInitialIdentitySchema';
 import { CreateAuthSchema1790000000000 } from '@/database/migrations/1790000000000-CreateAuthSchema';
 import { AddOrganizationKind1790100000000 } from '@/database/migrations/1790100000000-AddOrganizationKind';
+import { AddTemporaryPasswordExpiry1790200000000 } from '@/database/migrations/1790200000000-AddTemporaryPasswordExpiry';
 import { SnakeNamingStrategy } from '@/database/snakeNaming.strategy';
 import { ChangePasswordUseCase } from '@/modules/Auth/ChangePassword/changePassword.useCase';
 import { CompleteFirstAccessUseCase } from '@/modules/Auth/CompleteFirstAccess/completeFirstAccess.useCase';
@@ -30,6 +31,7 @@ const SETTINGS: Record<string, string | number> = {
   'auth.sessionAbsoluteSeconds': 43200,
   'auth.firstAccessSeconds': 600,
   'auth.recoverySeconds': 900,
+  'auth.temporaryPasswordSeconds': 86400,
   'mail.passwordResetUrl': 'https://app.example.test/redefinir-senha',
 };
 
@@ -172,6 +174,32 @@ describeWithDatabase('autenticacao em PostgreSQL descartavel', () => {
     return Number(rows[0].total);
   };
 
+  const resetTokensOf = async (userId: string): Promise<number> => {
+    const rows: Array<{ total: string }> = await dataSource.query(
+      `SELECT count(*)::text AS total
+         FROM password_reset_tokens
+        WHERE user_id = $1`,
+      [userId],
+    );
+
+    return Number(rows[0].total);
+  };
+
+  /** Administrador da propria organizacao, para agir sobre outro usuario. */
+  const seedAdmin = async (tenant: Tenant): Promise<string> =>
+    insertId(
+      `INSERT INTO users
+         (organization_id, profile_id, name, email, cpf, password_hash, status, must_change_password)
+       VALUES ($1, $2, 'Administradora', $3, '52998224725', $4, 'active', false)
+       RETURNING id`,
+      [
+        tenant.organizationId,
+        tenant.profileId,
+        `chefe@${tenant.code}.test`,
+        await passwords.hash('senha da chefe'),
+      ],
+    );
+
   const contextOf = (tenant: Tenant) =>
     ({
       requestId: 'req-integration',
@@ -203,6 +231,7 @@ describeWithDatabase('autenticacao em PostgreSQL descartavel', () => {
         CreateInitialIdentitySchema1789674300000,
         CreateAuthSchema1790000000000,
         AddOrganizationKind1790100000000,
+        AddTemporaryPasswordExpiry1790200000000,
       ],
       namingStrategy: new SnakeNamingStrategy(),
       synchronize: false,
@@ -258,7 +287,11 @@ describeWithDatabase('autenticacao em PostgreSQL descartavel', () => {
       config,
     );
     resetPassword = new ResetPasswordUseCase(passwords, tokens, resets);
-    adminReset = new ResetUserPasswordAsAdminUseCase(passwords, transactions);
+    adminReset = new ResetUserPasswordAsAdminUseCase(
+      passwords,
+      transactions,
+      config,
+    );
   }, 60000);
 
   afterAll(async () => {
@@ -743,8 +776,8 @@ describeWithDatabase('autenticacao em PostgreSQL descartavel', () => {
       ).resolves.toMatchObject({ state: 'authenticated' });
     }, 90000);
 
-    it('nova solicitacao invalida o link anterior', async () => {
-      await seedTenant(
+    it('nova solicitacao invalida o link anterior e apaga o registro dele', async () => {
+      const tenant = await seedTenant(
         'duas-solicitacoes',
         'duas@example.test',
         'senha bem valida',
@@ -759,6 +792,8 @@ describeWithDatabase('autenticacao em PostgreSQL descartavel', () => {
 
       await requestRecovery.execute(request, { ip: '127.0.0.1' });
       await requestRecovery.execute(request, { ip: '127.0.0.1' });
+
+      expect(await resetTokensOf(tenant.userId)).toBe(1);
 
       const calls = mailer.send.mock.calls as Array<[{ resetUrl: string }]>;
       const primeiro = new URL(calls[0][0].resetUrl).searchParams.get('token')!;
@@ -790,9 +825,198 @@ describeWithDatabase('autenticacao em PostgreSQL descartavel', () => {
           },
           { ip: '127.0.0.1' },
         ),
-      ).resolves.toBeNull();
+      ).resolves.toMatchObject({ data: null });
 
       expect(mailer.send).not.toHaveBeenCalled();
+    }, 60000);
+  });
+
+  describe('recuperacao assistida pelo administrador', () => {
+    const loginAs = (organizationCode: string, password: string) =>
+      login.execute(
+        { organizationCode, email: 'assistido@example.test', password },
+        { ip: '127.0.0.1', requestId: 'req-assistida' },
+      );
+
+    const adminContextOf = (tenant: Tenant, adminId: string) =>
+      ({ ...(contextOf(tenant) as object), userId: adminId }) as never;
+
+    it('leva da senha perdida ao acesso normal sem expor a senha temporaria', async () => {
+      const tenant = await seedTenant(
+        'assistida',
+        'assistido@example.test',
+        'senha esquecida',
+      );
+      const adminId = await seedAdmin(tenant);
+
+      const issued = await adminReset.execute(
+        { userId: tenant.userId },
+        adminContextOf(tenant, adminId),
+      );
+
+      await expect(
+        loginAs('assistida', 'senha esquecida'),
+      ).rejects.toMatchObject({ code: 'AUTH_INVALID_CREDENTIALS' });
+
+      const challenge = await loginAs('assistida', issued.temporaryPassword);
+
+      expect(challenge.state).toBe('password_change_required');
+
+      const principal = await sessions.resolve(
+        tokens.hash(challenge.accessToken),
+        new Date(),
+      );
+
+      await completeFirstAccess.execute(
+        {
+          newPassword: 'senha nova do usuario',
+          sessionId: principal!.sessionId,
+        },
+        contextOf(tenant),
+      );
+
+      await expect(
+        loginAs('assistida', 'senha nova do usuario'),
+      ).resolves.toMatchObject({ state: 'authenticated' });
+      await expect(
+        loginAs('assistida', issued.temporaryPassword),
+      ).rejects.toMatchObject({ code: 'AUTH_INVALID_CREDENTIALS' });
+
+      const users: Array<{ expiresAt: Date | null }> = await dataSource.query(
+        `SELECT temporary_password_expires_at AS "expiresAt"
+           FROM users WHERE id = $1`,
+        [tenant.userId],
+      );
+
+      expect(users[0].expiresAt).toBeNull();
+
+      const audit: Array<{ row: string }> = await dataSource.query(
+        `SELECT audit_events::text AS row
+           FROM audit_events WHERE organization_id = $1`,
+        [tenant.organizationId],
+      );
+
+      expect(audit.map(({ row }) => row).join()).not.toContain(
+        issued.temporaryPassword,
+      );
+      expect(
+        (await auditOf(tenant.organizationId)).map(({ action }) => action),
+      ).toEqual(
+        expect.arrayContaining([
+          'auth.admin_password_reset',
+          'auth.login_failed',
+          'auth.first_access_started',
+          'auth.first_access_completed',
+          'auth.login_succeeded',
+        ]),
+      );
+    }, 120000);
+
+    it('senha temporaria vencida falha como credencial invalida e o reenvio emite outra', async () => {
+      const tenant = await seedTenant(
+        'vencida',
+        'assistido@example.test',
+        'senha esquecida',
+      );
+      const adminId = await seedAdmin(tenant);
+
+      const first = await adminReset.execute(
+        { userId: tenant.userId },
+        adminContextOf(tenant, adminId),
+      );
+
+      const stored: Array<{ expiresAt: Date }> = await dataSource.query(
+        `SELECT temporary_password_expires_at AS "expiresAt"
+           FROM users WHERE id = $1`,
+        [tenant.userId],
+      );
+
+      expect(stored[0].expiresAt.getTime()).toBe(first.expiresAt.getTime());
+
+      await dataSource.query(
+        `UPDATE users
+            SET temporary_password_expires_at = now() - interval '1 minute'
+          WHERE id = $1`,
+        [tenant.userId],
+      );
+
+      await expect(
+        loginAs('vencida', first.temporaryPassword),
+      ).rejects.toMatchObject({ code: 'AUTH_INVALID_CREDENTIALS' });
+
+      const second = await adminReset.execute(
+        { userId: tenant.userId },
+        adminContextOf(tenant, adminId),
+      );
+
+      expect(second.temporaryPassword).not.toBe(first.temporaryPassword);
+
+      await dataSource.query(
+        `UPDATE users
+            SET temporary_password_expires_at = now() + interval '1 hour'
+          WHERE id = $1`,
+        [tenant.userId],
+      );
+
+      // Mesmo dentro do prazo, a senha anterior deixou de valer.
+      await expect(
+        loginAs('vencida', first.temporaryPassword),
+      ).rejects.toMatchObject({ code: 'AUTH_INVALID_CREDENTIALS' });
+      await expect(
+        loginAs('vencida', second.temporaryPassword),
+      ).resolves.toMatchObject({ state: 'password_change_required' });
+    }, 120000);
+
+    it('redefinicao administrativa apaga o link de recuperacao pendente', async () => {
+      const tenant = await seedTenant(
+        'link-pendente',
+        'assistido@example.test',
+        'senha esquecida',
+      );
+      const adminId = await seedAdmin(tenant);
+
+      mailer.send.mockClear();
+
+      await requestRecovery.execute(
+        { organizationCode: 'link-pendente', email: 'assistido@example.test' },
+        { ip: '127.0.0.1' },
+      );
+
+      const sent = mailer.send.mock.calls[0] as [{ resetUrl: string }];
+      const rawToken = new URL(sent[0].resetUrl).searchParams.get('token')!;
+
+      await adminReset.execute(
+        { userId: tenant.userId },
+        adminContextOf(tenant, adminId),
+      );
+
+      expect(await resetTokensOf(tenant.userId)).toBe(0);
+      await expect(
+        resetPassword.execute({
+          token: rawToken,
+          newPassword: 'senha do link!',
+        }),
+      ).rejects.toMatchObject({ code: 'AUTH_RESET_TOKEN_INVALID_OR_EXPIRED' });
+    }, 90000);
+
+    it('prazo de senha temporaria so existe com troca obrigatoria', async () => {
+      const tenant = await seedTenant(
+        'prazo-check',
+        'assistido@example.test',
+        'senha bem valida',
+      );
+
+      await expect(
+        dataSource.query(
+          `UPDATE users
+              SET must_change_password = false,
+                  temporary_password_expires_at = now()
+            WHERE id = $1`,
+          [tenant.userId],
+        ),
+      ).rejects.toMatchObject({
+        constraint: 'users_temporary_password_expiry_check',
+      });
     }, 60000);
   });
 

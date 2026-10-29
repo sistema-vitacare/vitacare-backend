@@ -12,6 +12,7 @@ const activeIdentity: LoginIdentity = {
   deletedAt: null,
   organizationStatus: 'active',
   organizationDeletedAt: null,
+  temporaryPasswordExpiresAt: null,
   profile: 'admin' as never,
   permissions: new Set<string>(),
 };
@@ -216,6 +217,37 @@ describe('LoginUseCase', () => {
     ['senha errada', { passwordMatches: false }],
   ])('esconde %s sob o mesmo erro de credenciais', async (_case, doubles) => {
     await expectInvalidCredentials(doubles);
+  });
+
+  it('recusa senha temporaria vencida como credencial invalida, sem verifica-la', async () => {
+    const expired = {
+      ...activeIdentity,
+      mustChangePassword: true,
+      temporaryPasswordExpiresAt: new Date(Date.now() - 1000),
+    };
+
+    await expectInvalidCredentials({ identity: expired });
+
+    const { useCase, passwords } = build({ identity: expired });
+
+    await useCase.execute(credentials, { ip: '127.0.0.1' }).catch(() => null);
+
+    expect(passwords.verify).not.toHaveBeenCalled();
+    expect(passwords.verifyDummy).toHaveBeenCalledWith('senha válida');
+  });
+
+  it('aceita senha temporaria dentro do prazo com sessao restrita', async () => {
+    const { useCase } = build({
+      identity: {
+        ...activeIdentity,
+        mustChangePassword: true,
+        temporaryPasswordExpiresAt: new Date(Date.now() + 60_000),
+      },
+    });
+
+    await expect(
+      useCase.execute(credentials, { ip: '127.0.0.1' }),
+    ).resolves.toMatchObject({ state: 'password_change_required' });
   });
 
   it('audita a tentativa falha na conta quando a conta existe', async () => {

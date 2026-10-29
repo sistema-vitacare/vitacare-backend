@@ -1,5 +1,14 @@
-import { Body, Controller, Get, INestApplication, Post } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  INestApplication,
+  Post,
+  Req,
+} from '@nestjs/common';
+import { ConfigModule } from '@nestjs/config';
 import type { NestExpressApplication } from '@nestjs/platform-express';
+import type { Request } from 'express';
 import { Test } from '@nestjs/testing';
 import { TypeOrmHealthIndicator } from '@nestjs/terminus';
 import { Type } from 'class-transformer';
@@ -69,6 +78,15 @@ class PacientesProbeController {
   }
 }
 
+/** Devolve o IP que o Express resolveu: e o que o rate limit enxerga. */
+@Controller('origem')
+class OrigemProbeController {
+  @Get()
+  origem(@Req() request: Request): { ip: string | undefined } {
+    return { ip: request.ip };
+  }
+}
+
 describe('Pipeline HTTP (e2e)', () => {
   let app: INestApplication;
   const redisHealth = { isHealthy: jest.fn() };
@@ -76,8 +94,18 @@ describe('Pipeline HTTP (e2e)', () => {
 
   beforeAll(async () => {
     const moduleRef = await Test.createTestingModule({
-      imports: [HealthModule],
-      controllers: [AppController, PacientesProbeController],
+      imports: [
+        ConfigModule.forRoot({
+          ignoreEnvFile: true,
+          load: [() => ({ app: { version: 'sha-de-teste' } })],
+        }),
+        HealthModule,
+      ],
+      controllers: [
+        AppController,
+        PacientesProbeController,
+        OrigemProbeController,
+      ],
     })
       .overrideProvider(RedisHealthIndicator)
       .useValue(redisHealth)
@@ -97,6 +125,8 @@ describe('Pipeline HTTP (e2e)', () => {
       corsCredentials: true,
       swaggerEnabled: true,
       swaggerPath: 'docs',
+      // supertest conecta por loopback, como um proxy por rede privada.
+      trustProxy: 'loopback',
     });
 
     await app.init();
@@ -121,12 +151,14 @@ describe('Pipeline HTTP (e2e)', () => {
       const body = response.body as EnvelopeBody<{
         name: string;
         status: string;
+        version: string;
       }>;
 
       expect(response.status).toBe(200);
       expect(body.data).toEqual({
         name: 'vitacare-backend',
         status: 'running',
+        version: 'sha-de-teste',
       });
       expect(body.meta.requestId).toEqual(expect.any(String));
       expect(body.meta.timestamp).toEqual(expect.any(String));
@@ -134,6 +166,37 @@ describe('Pipeline HTTP (e2e)', () => {
 
     it('nao expoe a raiz sem a versao', async () => {
       await request(server()).get('/api').expect(404);
+    });
+  });
+
+  describe('atras de proxy (trust proxy)', () => {
+    it('usa o cliente informado pelo proxy confiavel', async () => {
+      const response = await request(server())
+        .get('/api/v1/origem')
+        .set('X-Forwarded-For', '203.0.113.9');
+
+      expect((response.body as EnvelopeBody<{ ip: string }>).data.ip).toBe(
+        '203.0.113.9',
+      );
+    });
+
+    it('ignora o X-Forwarded-For forjado pelo cliente', async () => {
+      // O cliente manda um IP falso; o proxy acrescenta o IP real a direita.
+      const response = await request(server())
+        .get('/api/v1/origem')
+        .set('X-Forwarded-For', '198.51.100.1, 203.0.113.9');
+
+      expect((response.body as EnvelopeBody<{ ip: string }>).data.ip).toBe(
+        '203.0.113.9',
+      );
+    });
+
+    it('sem cabecalho de proxy, usa o IP da conexao', async () => {
+      const response = await request(server()).get('/api/v1/origem');
+
+      expect((response.body as EnvelopeBody<{ ip: string }>).data.ip).toMatch(
+        /127\.0\.0\.1|::1/,
+      );
     });
   });
 

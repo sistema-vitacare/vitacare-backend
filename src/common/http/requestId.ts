@@ -27,3 +27,21 @@ export const resolveRequestId = (request: unknown): string => {
   target.vitacareRequestId = resolved;
   return resolved;
 };
+
+/** Formato aceito no header: o `$request_id` do nginx (32 hex) ou um UUID. */
+const INCOMING_ID = /^[A-Za-z0-9-]{16,64}$/;
+
+/**
+ * `genReqId` do pino-http. Adota o `X-Request-Id` de um proxy, para que a linha
+ * do nginx e o log da API tenham o mesmo id no Loki; header ausente ou fora do
+ * formato (injecao de texto no log) gera um UUID novo.
+ */
+export const requestIdFromHeaders = (request: {
+  headers: Record<string, string | string[] | undefined>;
+}): string => {
+  const incoming = request.headers['x-request-id'];
+
+  return typeof incoming === 'string' && INCOMING_ID.test(incoming)
+    ? incoming
+    : randomUUID();
+};
