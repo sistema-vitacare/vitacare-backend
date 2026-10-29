@@ -119,7 +119,7 @@ Efeitos, na mesma transação: grava o hash da senha provisória, marca `must_ch
 - A rota não avisa o usuário alvo. A entrega da senha é um processo fora da API — a senha não deve circular junto com o código da organização e o e-mail em um mesmo canal inseguro.
 - Se o único administrador da organização perder a senha, esta rota não resolve: ele não pode redefinir a própria conta. Esse caso continua pendente (ver P03 no vault).
 - Administrador que precisa trocar a própria senha usa [PUT /auth/password](auth-alterar-senha.md).
-- A permissão `users:reset_password` é criada pelo bootstrap e concedida ao perfil `admin`; a matriz completa de perfis e permissões (RF005/RF016) continua pendente.
+- A permissão `users:reset_password` é concedida ao perfil `admin` de cada organização no [cadastro](organizations-criar.md) e ao `platform_admin` pelo seed da plataforma; a matriz completa de perfis e permissões (RF005/RF016) continua pendente.
 
 ## Origem e validação
 

@@ -18,6 +18,7 @@ const ctx: RequestContext = {
   requestId: 'req-1',
   userId: 'user-1',
   organizationId: 'org-1',
+  organizationKind: 'tenant',
   profile: ProfileCode.PROFESSIONAL,
   permissions: new Set<string>(),
 };

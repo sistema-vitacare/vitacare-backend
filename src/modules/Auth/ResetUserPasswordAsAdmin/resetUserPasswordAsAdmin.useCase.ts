@@ -1,6 +1,5 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { randomInt } from 'node:crypto';
 
 import type { RequestContext } from '@/common/context/requestContext.type';
 import { DomainException } from '@/common/errors/domain.exception';
@@ -8,17 +7,7 @@ import { DomainException } from '@/common/errors/domain.exception';
 import { AuthErrors } from '../auth.errors';
 import { AuthTransactionRepository } from '../repositories/authTransaction.repository';
 import { PasswordHasher } from '../security/passwordHasher';
-
-/** Sem caracteres ambiguos: a senha e lida e digitada por uma pessoa. */
-const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789';
-
-const TEMPORARY_PASSWORD_LENGTH = 20;
-
-export const generateTemporaryPassword = (): string =>
-  Array.from(
-    { length: TEMPORARY_PASSWORD_LENGTH },
-    () => ALPHABET[randomInt(ALPHABET.length)],
-  ).join('');
+import { generateTemporaryPassword } from '../security/temporaryPassword';
 
 @Injectable()
 export class ResetUserPasswordAsAdminUseCase {

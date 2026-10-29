@@ -1,4 +1,7 @@
-import { ProfileCode } from '@/common/context/requestContext.type';
+import {
+  type OrganizationKind,
+  ProfileCode,
+} from '@/common/context/requestContext.type';
 
 export interface LoginIdentity {
   userId: string;
@@ -33,6 +36,7 @@ export interface AuthenticatedPrincipal {
   sessionType: 'normal' | 'password_change';
   userId: string;
   organizationId: string;
+  organizationKind: OrganizationKind;
   profile: ProfileCode;
   permissions: ReadonlySet<string>;
   absoluteExpiresAt: Date;

@@ -3,24 +3,24 @@ import { DataSource } from 'typeorm';
 
 import { DomainException } from '@/common/errors/domain.exception';
 import databaseConfig from '@/config/database.config';
-import { buildDataSourceOptions } from '@/database/typeorm.options';
 import {
-  BootstrapAuthCommand,
-  parseBootstrapArguments,
-} from '@/modules/Auth/BootstrapAuth/bootstrapAuth.command';
+  parsePlatformSeedArguments,
+  runPlatformSeed,
+} from '@/database/seeds/platformSeed';
+import { buildDataSourceOptions } from '@/database/typeorm.options';
 import { PasswordHasher } from '@/modules/Auth/security/passwordHasher';
 
 const USAGE = `Uso:
-  npm run auth:bootstrap -- \\
-    --organization-code clinica-exemplo \\
-    --usage-plan-id <uuid do plano ja cadastrado> \\
-    --trade-name "Clinica Exemplo" \\
-    --admin-name "Nome do administrador" \\
-    --admin-email admin@example.test \\
+  npm run seed:platform -- \\
+    --organization-code vitacare \\
+    --trade-name "VitaCare" \\
+    --admin-name "Nome do administrador master" \\
+    --admin-email master@example.test \\
     --admin-cpf 00000000000
 
-O comando nao aceita senha por argumento: a senha provisoria e sorteada e
-mostrada uma unica vez ao final.`;
+Cria a organizacao de plataforma e o primeiro administrador master. As demais
+organizacoes sao cadastradas por ele em POST /api/v1/organizations. O comando
+nao aceita senha: a provisoria e sorteada e mostrada uma unica vez.`;
 
 const required = (name: string, value: string | undefined): string => {
   if (!value) {
@@ -30,10 +30,14 @@ const required = (name: string, value: string | undefined): string => {
   return value;
 };
 
-const buildDataSource = (): DataSource => {
+/** Escreve no processo, nunca no logger: a senha provisoria nao vai para log. */
+const main = async (): Promise<void> => {
+  loadEnv({ path: process.env.ENV_FILE ?? '.env', quiet: true });
+
+  const input = parsePlatformSeedArguments(process.argv.slice(2));
   const settings = databaseConfig();
 
-  return new DataSource(
+  const dataSource = new DataSource(
     buildDataSourceOptions({
       ...settings,
       host: required('DB_HOST', settings.host),
@@ -42,28 +46,19 @@ const buildDataSource = (): DataSource => {
       database: required('DB_DATABASE', settings.database),
     }),
   );
-};
-
-/**
- * Cria a primeira organizacao e o seu administrador em um banco ja migrado.
- * Escreve no processo, nunca no logger da aplicacao: a senha provisoria nao
- * pode acabar em log estruturado nem em auditoria.
- */
-const main = async (): Promise<void> => {
-  loadEnv({ path: process.env.ENV_FILE ?? '.env', quiet: true });
-
-  const input = parseBootstrapArguments(process.argv.slice(2));
-  const dataSource = buildDataSource();
 
   await dataSource.initialize();
 
   try {
-    const command = new BootstrapAuthCommand(dataSource, new PasswordHasher());
-    const result = await command.execute(input);
+    const result = await runPlatformSeed(
+      dataSource,
+      new PasswordHasher(),
+      input,
+    );
 
     process.stdout.write(
       [
-        'Organizacao e administrador criados.',
+        'Organizacao de plataforma e administrador master criados.',
         `organizationId: ${result.organizationId}`,
         `profileId: ${result.profileId}`,
         `userId: ${result.userId}`,
@@ -81,7 +76,7 @@ main().catch((error: unknown) => {
   const message =
     error instanceof DomainException
       ? `${error.code}: ${error.detail ?? 'sem detalhe.'}`
-      : 'Falha inesperada no bootstrap. Verifique conexao e migrations.';
+      : 'Falha inesperada no seed da plataforma. Verifique conexao e migrations.';
 
   process.stderr.write(`${message}\n\n${USAGE}\n`);
   process.exitCode = 1;

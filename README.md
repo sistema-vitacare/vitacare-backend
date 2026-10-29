@@ -133,34 +133,41 @@ O login recebe `organizationCode`, `email` e `password`; a sessão Bearer é opa
 
 `SMTP_ENABLED=false` permite iniciar a API sem SMTP e solicitações de recuperação continuam genéricas, sem criar token entregável. Com SMTP habilitado, configure `SMTP_HOST`, `SMTP_FROM` e `PASSWORD_RESET_URL`; os demais valores SMTP são opcionais conforme o provedor. Veja o manual de autenticação em `docs/api/`.
 
-## Bootstrap da primeira organizacao
+## Organizacao de plataforma e administrador master
 
-O banco nao nasce com organizacao nem administrador. Com as migrations ja
-aplicadas e um plano de uso cadastrado, crie os dois com:
+O banco nao nasce com organizacao nem administrador. O primeiro usuario e o
+**administrador master**, que pertence a organizacao de plataforma (unica, sem
+plano e sempre ativa) e cadastra, consulta, edita, inativa e reativa as
+organizacoes clientes pela API (`/api/v1/organizations`). Com as migrations
+aplicadas, crie a plataforma e o master com:
 
 ```bash
-npm run auth:bootstrap -- \
-  --organization-code clinica-exemplo \
-  --usage-plan-id <uuid do plano> \
-  --trade-name "Clinica Exemplo" \
-  --admin-name "Nome do administrador" \
-  --admin-email admin@example.test \
+npm run seed:platform -- \
+  --organization-code vitacare \
+  --trade-name "VitaCare" \
+  --admin-name "Nome do administrador master" \
+  --admin-email master@example.test \
   --admin-cpf 00000000000
 ```
 
 O comando **nao aceita senha por argumento**: a senha provisoria e sorteada,
-gravada apenas como hash e exibida uma unica vez no terminal, para nao ficar no
-historico do shell. O administrador entra com ela e e obrigado a trocar no
-primeiro acesso. Organizacao, perfil `admin`, permissao `users:reset_password`,
-vinculo e usuario sao criados em uma unica transacao; identificador ja usado
-falha em conflito, sem criacao parcial. Em imagem compilada use
-`npm run auth:bootstrap:prod`.
+gravada apenas como hash e exibida uma unica vez no terminal. O master entra com
+o codigo informado e e obrigado a trocar a senha no primeiro acesso. O comando
+roda uma vez por banco; a segunda execucao falha com
+`ORGANIZATION_PLATFORM_ALREADY_EXISTS`, sem emitir nova senha. Em imagem
+compilada use `npm run seed:platform:prod`.
+
+A organizacao cliente e o seu primeiro administrador sao criados pelo master em
+`POST /api/v1/organizations`, que devolve a senha provisoria desse
+administrador uma unica vez.
 
 ## Seed de desenvolvimento
 
 Com as migrations aplicadas, `npm run seed:dev` cria uma base minima para
-exercitar a API: dois planos, **duas organizacoes** (`clinica-vida` e
-`casa-bem-estar`), os quatro perfis em cada uma e tres usuarios ativos. Duas
+exercitar a API: dois planos, a organizacao de plataforma `vitacare` com o
+administrador master `master@vitacare.test`, **duas organizacoes** clientes
+(`clinica-vida` e `casa-bem-estar`), os quatro perfis em cada uma e tres
+usuarios ativos nelas. Duas
 organizacoes de proposito: e assim que se testa isolamento entre tenants.
 
 ```bash
@@ -174,8 +181,9 @@ login ja devolve sessao normal.
 
 > As contas do seed usam e-mails reais do time e a senha `12345678`. E dado de
 > desenvolvimento local: nao replicar em homologacao nem em producao, e nao
-> tratar os planos como catalogo comercial (P05/P06) nem a permissao concedida
-> ao perfil `admin` como matriz de acesso aprovada (RF005/RF016).
+> tratar os planos como catalogo comercial (P05/P06) nem as permissoes
+> concedidas aos perfis `admin` e `platform_admin` como matriz de acesso
+> aprovada (RF005/RF016).
 
 ## Manual de integracao da API
 
@@ -205,7 +213,7 @@ src/
 ├── modules/                 # modulos de dominio (ver modules/README.md)
 ├── queue/                   # BullMQ compartilhado
 ├── redis/                   # cliente ioredis + RedisService (cache)
-├── cli/                     # entrypoints de operacao (bootstrap)
+├── cli/                     # entrypoints de operacao (seeds)
 ├── app.setup.ts             # pipeline HTTP, reusado pelos testes e2e
 └── main.ts                  # bootstrap
 

@@ -169,10 +169,22 @@ curl -s http://<IP-da-VPS>:1050/health/ready    # postgres e redis "up"
 
 Swagger: `http://<IP-da-VPS>:1050/api/docs`.
 
-### 8. Primeira organização e administrador (uma vez)
+### 8. Plataforma, administrador master e primeira organização (uma vez)
 
-O banco nasce vazio e o `seed:dev` recusa produção. Plano de uso (os limites
-ainda não são aplicados pela API — P05/P06):
+O banco nasce vazio e o `seed:dev` recusa produção. Primeiro a organização de
+plataforma e o administrador master (CPF válido; a senha provisória aparece uma
+única vez no terminal e não vai para log nem auditoria):
+
+```bash
+docker exec -it app-vitacare node dist/cli/seed-platform.js \
+  --organization-code <codigo-da-plataforma> --trade-name "VitaCare" \
+  --admin-name "<Nome>" --admin-email <email> --admin-cpf <cpf>
+```
+
+O seed roda uma vez por banco; a segunda execução é recusada sem alterar nada.
+
+As organizações clientes precisam de um plano de uso ativo (os limites ainda
+não são aplicados pela API — P05/P06):
 
 ```bash
 docker exec -it postgresql psql -U vitacare -d vitacare -c \
@@ -180,14 +192,10 @@ docker exec -it postgresql psql -U vitacare -d vitacare -c \
    VALUES ('Inicial', 'Plano inicial de producao', 50, 500, NULL) RETURNING id;"
 ```
 
-Organização e administrador (CPF válido; a senha provisória aparece uma vez):
-
-```bash
-docker exec -it app-vitacare node dist/cli/auth-bootstrap.js \
-  --organization-code <codigo> --usage-plan-id <id do plano> \
-  --trade-name "<Nome da organização>" --admin-name "<Nome>" \
-  --admin-email <email> --admin-cpf <cpf>
-```
+Depois o master faz login com o código da plataforma, troca a senha provisória
+no primeiro acesso e cadastra cada organização com o primeiro administrador em
+`POST /api/v1/organizations` (manual:
+[`organizations-criar.md`](api/endpoints/organizations-criar.md)).
 
 ### 9. GitHub
 

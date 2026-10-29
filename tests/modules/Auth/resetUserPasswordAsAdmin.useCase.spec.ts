@@ -1,9 +1,7 @@
 import { DomainException } from '@/common/errors/domain.exception';
 
-import {
-  generateTemporaryPassword,
-  ResetUserPasswordAsAdminUseCase,
-} from '@/modules/Auth/ResetUserPasswordAsAdmin/resetUserPasswordAsAdmin.useCase';
+import { ResetUserPasswordAsAdminUseCase } from '@/modules/Auth/ResetUserPasswordAsAdmin/resetUserPasswordAsAdmin.useCase';
+import { generateTemporaryPassword } from '@/modules/Auth/security/temporaryPassword';
 
 const adminContext = {
   userId: 'admin-1',

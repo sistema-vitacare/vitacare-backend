@@ -28,7 +28,7 @@ case "${1:-api}" in
     run_migrations
     ;;
   *)
-    # Comando avulso (ex.: node dist/cli/auth-bootstrap.js ...).
+    # Comando avulso (ex.: node dist/cli/seed-platform.js ...).
     exec "$@"
     ;;
 esac
