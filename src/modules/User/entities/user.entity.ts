@@ -60,6 +60,9 @@ export class User {
   @Column({ type: 'timestamptz', nullable: true })
   passwordChangedAt!: Date | null;
 
+  @Column({ type: 'timestamptz', nullable: true })
+  temporaryPasswordExpiresAt!: Date | null;
+
   @Column({ type: 'varchar', length: 32, nullable: true })
   phone!: string | null;
 

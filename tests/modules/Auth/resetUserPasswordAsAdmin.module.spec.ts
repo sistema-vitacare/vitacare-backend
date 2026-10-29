@@ -1,3 +1,4 @@
+import { ConfigService } from '@nestjs/config';
 import { Test } from '@nestjs/testing';
 import { AuthTransactionRepository } from '@/modules/Auth/repositories/authTransaction.repository';
 import { PasswordHasher } from '@/modules/Auth/security/passwordHasher';
@@ -10,6 +11,7 @@ describe('ResetUserPasswordAsAdminUseCase DI', () => {
         ResetUserPasswordAsAdminUseCase,
         { provide: PasswordHasher, useValue: {} },
         { provide: AuthTransactionRepository, useValue: {} },
+        { provide: ConfigService, useValue: {} },
       ],
     }).compile();
     expect(module.get(ResetUserPasswordAsAdminUseCase)).toBeInstanceOf(

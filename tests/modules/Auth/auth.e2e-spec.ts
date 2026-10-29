@@ -12,6 +12,7 @@ import type { App } from 'supertest/types';
 import { setupApp } from '@/app.setup';
 import { ProfileCode } from '@/common/context/requestContext.type';
 import { DomainException } from '@/common/errors/domain.exception';
+import { withMeta } from '@/common/http/envelope';
 import { AuthController } from '@/modules/Auth/auth.controller';
 import { AuthErrors } from '@/modules/Auth/auth.errors';
 import { ChangePasswordUseCase } from '@/modules/Auth/ChangePassword/changePassword.useCase';
@@ -25,7 +26,7 @@ import type { AuthenticatedRequest } from '@/modules/Auth/types/authenticatedReq
 
 interface EnvelopeBody<T> {
   data: T;
-  meta: { requestId: string; timestamp: string };
+  meta: { requestId: string; timestamp: string; message?: string };
 }
 
 interface ErrorBody {
@@ -309,7 +310,11 @@ describe('Auth HTTP (e2e)', () => {
   });
 
   describe('recuperação de senha', () => {
-    it('aceita a solicitação com 202 sem revelar a conta', async () => {
+    it('aceita a solicitação com 202 e orienta o cliente sem revelar a conta', async () => {
+      requestRecovery.execute.mockResolvedValueOnce(
+        withMeta(null, { message: 'Procure o administrador.' }),
+      );
+
       const response = await request(server())
         .post('/api/v1/auth/password-recovery/request')
         .send({ organizationCode: 'clinica-a', email: 'user@example.test' });
@@ -318,6 +323,7 @@ describe('Auth HTTP (e2e)', () => {
 
       expect(response.status).toBe(202);
       expect(body.data).toBeNull();
+      expect(body.meta.message).toBe('Procure o administrador.');
     });
 
     it('redefine a senha por token com 201 e corpo nulo', async () => {
@@ -339,6 +345,7 @@ describe('Auth HTTP (e2e)', () => {
     it('devolve a senha temporária uma única vez e sem cache', async () => {
       adminReset.execute.mockResolvedValue({
         temporaryPassword: 'Senha-Temporaria-1',
+        expiresAt: new Date('2026-10-30T12:00:00.000Z'),
       });
 
       const response = await request(server())
@@ -347,11 +354,17 @@ describe('Auth HTTP (e2e)', () => {
         )
         .set('Authorization', 'Bearer sessao-valida');
 
-      const body = response.body as EnvelopeBody<{ temporaryPassword: string }>;
+      const body = response.body as EnvelopeBody<{
+        temporaryPassword: string;
+        expiresAt: string;
+      }>;
 
       expect(response.status).toBe(201);
       expect(response.headers['cache-control']).toBe('no-store');
-      expect(body.data).toEqual({ temporaryPassword: 'Senha-Temporaria-1' });
+      expect(body.data).toEqual({
+        temporaryPassword: 'Senha-Temporaria-1',
+        expiresAt: '2026-10-30T12:00:00.000Z',
+      });
     });
 
     it('rejeita identificador que não é UUID com 422', async () => {

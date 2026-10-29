@@ -1,7 +1,7 @@
 ---
 title: Login em uma organização
 status: atual
-updated: 2026-09-22
+updated: 2026-10-29
 method: POST
 path: /api/v1/auth/login
 source: src/modules/Auth/auth.controller.ts
@@ -85,7 +85,7 @@ A tentativa **recusada** também é auditada, como `auth.login_failed`, desde qu
 
 | Status | `error.code` | Quando |
 | --- | --- | --- |
-| `401` | `AUTH_INVALID_CREDENTIALS` | Organização inexistente ou inativa, conta inexistente, pendente, inativa ou excluída, conta sem senha definida, senha errada. **Todos** respondem igual. |
+| `401` | `AUTH_INVALID_CREDENTIALS` | Organização inexistente ou inativa, conta inexistente, pendente, inativa ou excluída, conta sem senha definida, senha errada, **senha temporária de redefinição administrativa vencida** (24 h). **Todos** respondem igual. |
 | `422` | `VALIDATION_FAILED` | Campo ausente, fora do formato ou fora dos limites; propriedade desconhecida no corpo. |
 | `429` | `AUTH_TEMPORARILY_BLOCKED` | Cinco falhas na mesma combinação organização/e-mail ou no mesmo IP dentro de 15 minutos. O bloqueio dura 15 minutos e não altera `users.status`. |
 | `503` | `AUTH_DEPENDENCY_UNAVAILABLE` | Redis indisponível: sem o contador de abuso a tentativa é recusada, nunca liberada. |

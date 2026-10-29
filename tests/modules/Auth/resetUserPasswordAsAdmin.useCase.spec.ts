@@ -18,9 +18,16 @@ const build = (result: 'updated' | 'not_found' = 'updated') => {
 
   const passwords = { hash: jest.fn().mockResolvedValue('hash-temporario') };
 
+  const config = {
+    getOrThrow: jest.fn((key: string) =>
+      key === 'auth.temporaryPasswordSeconds' ? 86400 : undefined,
+    ),
+  };
+
   const useCase = new ResetUserPasswordAsAdminUseCase(
     passwords as never,
     transactions as never,
+    config as never,
   );
 
   return { useCase, transactions, passwords };
@@ -40,8 +47,19 @@ describe('ResetUserPasswordAsAdminUseCase', () => {
         organizationId: 'org-1',
         actorUserId: 'admin-1',
         passwordHash: 'hash-temporario',
+        expiresAt: result.expiresAt,
       }),
     );
+  });
+
+  it('dá prazo de 24 horas à senha temporária', async () => {
+    const { useCase } = build();
+
+    const result = await useCase.execute({ userId: 'user-2' }, adminContext);
+    const lifetimeMs = result.expiresAt.getTime() - Date.now();
+
+    expect(lifetimeMs).toBeGreaterThan(86400 * 1000 - 5000);
+    expect(lifetimeMs).toBeLessThanOrEqual(86400 * 1000);
   });
 
   it('recusa redefinir a própria conta', async () => {

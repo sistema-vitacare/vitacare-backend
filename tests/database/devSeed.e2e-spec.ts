@@ -3,6 +3,7 @@ import { DataSource } from 'typeorm';
 
 import { CreateInitialIdentitySchema1789674300000 } from '@/database/migrations/1789674300000-CreateInitialIdentitySchema';
 import { CreateAuthSchema1790000000000 } from '@/database/migrations/1790000000000-CreateAuthSchema';
+import { AddTemporaryPasswordExpiry1790200000000 } from '@/database/migrations/1790200000000-AddTemporaryPasswordExpiry';
 import {
   DEV_ORGANIZATIONS,
   DEV_PASSWORD,
@@ -73,6 +74,7 @@ describeWithDatabase(
         migrations: [
           CreateInitialIdentitySchema1789674300000,
           CreateAuthSchema1790000000000,
+          AddTemporaryPasswordExpiry1790200000000,
         ],
         namingStrategy: new SnakeNamingStrategy(),
         synchronize: false,

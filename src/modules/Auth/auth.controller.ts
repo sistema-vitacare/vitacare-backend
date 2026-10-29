@@ -18,6 +18,7 @@ import { ApiEnvelope } from '@/common/http/apiEnvelope.decorator';
 import { ApiErrors } from '@/common/http/apiErrors.decorator';
 import { resolveRequestId } from '@/common/http/requestId';
 import { BEARER_SECURITY_SCHEME } from '@/common/http/bearerAuth';
+import type { EnvelopePayload } from '@/common/http/envelope';
 import { UuidParam } from '@/common/http/uuidParam.pipe';
 
 import { ChangePasswordDto } from './ChangePassword/changePassword.dto';
@@ -151,7 +152,8 @@ export class AuthController {
   @Public()
   @HttpCode(HttpStatus.ACCEPTED)
   @ApiOperation({
-    summary: 'Solicita o link de recuperacao sem revelar se a conta existe.',
+    summary:
+      'Solicita recuperacao sem revelar se a conta existe; meta.message indica o canal disponivel.',
   })
   @ApiEnvelope(null, { status: HttpStatus.ACCEPTED })
   @ApiErrors(
@@ -162,7 +164,7 @@ export class AuthController {
   async requestPasswordRecovery(
     @Body() body: RequestPasswordRecoveryDto,
     @Req() request: Request,
-  ): Promise<null> {
+  ): Promise<EnvelopePayload<null>> {
     return this.requestPasswordRecoveryUseCase.execute(body, {
       ip: clientIp(request),
     });

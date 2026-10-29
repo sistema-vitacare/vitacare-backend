@@ -116,8 +116,8 @@ export class LoginUseCase {
 
   /**
    * Organizacao ausente ou inativa, conta ausente, inativa ou excluida, hash
-   * ausente e senha errada valem o mesmo: nenhuma dessas diferencas pode
-   * vazar na resposta nem no tempo gasto ate a falha.
+   * ausente, senha temporaria vencida e senha errada valem o mesmo: nenhuma
+   * dessas diferencas pode vazar na resposta nem no tempo gasto ate a falha.
    */
   private async hasValidCredentials(
     identity: LoginIdentity | null,
@@ -128,7 +128,8 @@ export class LoginUseCase {
       identity.status === 'active' &&
       identity.deletedAt === null &&
       identity.organizationStatus === 'active' &&
-      identity.organizationDeletedAt === null
+      identity.organizationDeletedAt === null &&
+      !this.isTemporaryPasswordExpired(identity)
         ? identity.passwordHash
         : null;
 
@@ -138,5 +139,13 @@ export class LoginUseCase {
     }
 
     return this.passwords.verify(usableHash, password);
+  }
+
+  private isTemporaryPasswordExpired(identity: LoginIdentity): boolean {
+    return (
+      identity.mustChangePassword &&
+      identity.temporaryPasswordExpiresAt !== null &&
+      identity.temporaryPasswordExpiresAt.getTime() <= Date.now()
+    );
   }
 }
