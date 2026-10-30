@@ -166,6 +166,41 @@ Validada em PostgreSQL 16 descartavel com `migration:run`, `migration:show`,
 (`RUN_MIGRATIONS=true`, arquivos de `dist/`). **Nao aplicada no banco local de
 `.env` nem em producao.**
 
+## Perfis fixos e matriz
+
+Toda organizacao cliente tem os quatro perfis fixos `admin`, `professional`,
+`caregiver` e `family`, com as concessoes da matriz do BE-05 (RF005/RF016,
+2026-10-30), definida em `src/modules/Access/access.permissions.ts`
+(`TENANT_PROFILES`, 33 codigos de tenant). Organizacao nova recebe os perfis
+pelo `provisionTenantProfiles` no cadastro; o seed de desenvolvimento usa o
+mesmo provisionamento. A organizacao de plataforma continua so com
+`platform_admin` e as 7 concessoes do `platformSeed`.
+
+`migrations/1790300000000-SyncTenantAccessProfiles.ts` alinha as organizacoes
+que ja existem no banco, com a mesma semantica do provisionamento: garante os 33
+codigos no catalogo `permissions` com rotulo padronizado e `deleted_at` limpo;
+para toda organizacao `kind = 'tenant'` cria ou padroniza (nome, descricao,
+`deleted_at` limpo) os quatro perfis; cria ou reativa as concessoes da matriz e
+marca `deleted_at = now()` nas concessoes vivas desses perfis que estao fora
+dela, sem apaga-las. Nao toca a plataforma nem perfil de tenant com codigo fora
+dos quatro. A matriz entra como dado literal da data, sem importar codigo da
+aplicacao: mudanca futura na matriz exige migration nova.
+
+O `down` e de melhor esforco, porque o estado anterior variava entre ambientes:
+apaga as concessoes e os codigos de catalogo dos 30 codigos novos e mantem os
+tres antigos (`organization:read`, `organization:update`,
+`users:reset_password`), que continuam concedidos ao `admin`. Nao remove perfis
+nem restaura textos ou concessoes revogadas; em banco vazio, os tres codigos
+antigos ficam no catalogo apos o `down`.
+
+Evidencia em `tests/modules/Access/accessSchema.e2e-spec.ts` (bloco
+`migration SyncTenantAccessProfiles`), que monta o estado anterior com as quatro
+migrations antigas e roda so a nova. Validada em 2026-10-30 **somente em
+PostgreSQL descartavel** (`vitacare_schema_test`) com `migration:show`,
+`migration:run`, `migration:revert` e `migration:run` pela CLI e com
+`migration:run:prod` a partir de `dist/`. **Nao aplicada no banco local de
+`.env` nem em producao.**
+
 `organizations.usage_plan_id` e obrigatorio nas organizacoes clientes (anulavel
 so na de plataforma, desde `1790100000000`) e referencia `usage_plans.id` com
 `ON DELETE RESTRICT`. A tabela de planos oferece somente a estrutura fisica do
