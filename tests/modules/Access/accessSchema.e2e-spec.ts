@@ -6,6 +6,10 @@ import { CreateAuthSchema1790000000000 } from '@/database/migrations/17900000000
 import { AddOrganizationKind1790100000000 } from '@/database/migrations/1790100000000-AddOrganizationKind';
 import { AddTemporaryPasswordExpiry1790200000000 } from '@/database/migrations/1790200000000-AddTemporaryPasswordExpiry';
 import { SyncTenantAccessProfiles1790300000000 } from '@/database/migrations/1790300000000-SyncTenantAccessProfiles';
+import {
+  ProfileCode,
+  type RequestContext,
+} from '@/common/context/requestContext.type';
 import { runPlatformSeed } from '@/database/seeds/platformSeed';
 import { SnakeNamingStrategy } from '@/database/snakeNaming.strategy';
 import {
@@ -17,6 +21,7 @@ import {
   TENANT_PROFILE_CODES,
   TENANT_PROFILES,
 } from '@/modules/Access/access.permissions';
+import { AccessProfileRepository } from '@/modules/Access/repositories/accessProfile.repository';
 import { grantPermissions } from '@/modules/Access/repositories/permissionGrant.repository';
 import { provisionTenantProfiles } from '@/modules/Access/repositories/tenantProfileProvisioning.repository';
 import { PasswordHasher } from '@/modules/Auth/security/passwordHasher';
@@ -305,6 +310,120 @@ describeWithDatabase('perfis de acesso em PostgreSQL descartavel', () => {
       expect(await livePermissionsOf(otherId, 'family')).toContain(
         'users:read',
       );
+    }, 30000);
+  });
+
+  describe('AccessProfileRepository.listLiveWithPermissions', () => {
+    let repository: AccessProfileRepository;
+    let organizationA: string;
+    let organizationB: string;
+    let idsA: Record<string, string>;
+
+    const contextOf = (organizationId: string): RequestContext => ({
+      requestId: 'req-perfis',
+      userId: 'admin',
+      organizationId,
+      organizationKind: 'tenant',
+      profile: ProfileCode.ADMIN,
+      permissions: new Set([Permissions.ACCESS_PROFILES_READ]),
+    });
+
+    const expectedProfile = (code: (typeof TENANT_PROFILE_CODES)[number]) => ({
+      code,
+      name: TENANT_PROFILES[code].name,
+      description: TENANT_PROFILES[code].description,
+      permissions: [...TENANT_PROFILES[code].permissions]
+        .sort()
+        .map((permission) => ({
+          code: permission,
+          name: PERMISSION_LABELS[permission],
+        })),
+    });
+
+    beforeAll(async () => {
+      repository = new AccessProfileRepository(dataSource);
+      organizationA = await insertTenant('casa-catalogo-a');
+      organizationB = await insertTenant('casa-catalogo-b');
+      idsA = await provision(organizationA);
+      await provision(organizationB);
+
+      // Desvio so na organizacao B: nao pode aparecer na leitura de A.
+      await dataSource.query(
+        `INSERT INTO access_profiles (organization_id, code, name, description)
+         VALUES ($1, 'supervisor', 'Supervisor de B', NULL)`,
+        [organizationB],
+      );
+    }, 30000);
+
+    it('devolve so os perfis vivos da organizacao do contexto, com permissoes por codigo', async () => {
+      const records = await repository.listLiveWithPermissions(
+        contextOf(organizationA),
+      );
+
+      expect(
+        [...records].sort((left, right) => left.code.localeCompare(right.code)),
+      ).toEqual(
+        [...TENANT_PROFILE_CODES].sort().map((code) => expectedProfile(code)),
+      );
+
+      const recordsB = await repository.listLiveWithPermissions(
+        contextOf(organizationB),
+      );
+
+      expect(recordsB.map((record) => record.code).sort()).toEqual(
+        [...TENANT_PROFILE_CODES, 'supervisor'].sort(),
+      );
+      expect(recordsB.find((record) => record.code === 'supervisor')).toEqual({
+        code: 'supervisor',
+        name: 'Supervisor de B',
+        description: null,
+        permissions: [],
+      });
+    }, 30000);
+
+    it('omite perfil excluido, concessao revogada e permissao excluida', async () => {
+      await dataSource.query(
+        'UPDATE access_profiles SET deleted_at = now() WHERE id = $1',
+        [idsA.caregiver],
+      );
+      await dataSource.query(
+        `UPDATE profile_permissions pp
+            SET deleted_at = now()
+           FROM permissions p
+          WHERE p.id = pp.permission_id
+            AND pp.profile_id = $1
+            AND p.code = 'alerts:read'`,
+        [idsA.family],
+      );
+      await dataSource.query(
+        "UPDATE permissions SET deleted_at = now() WHERE code = 'patient_evolution:read'",
+      );
+
+      try {
+        const records = await repository.listLiveWithPermissions(
+          contextOf(organizationA),
+        );
+
+        expect(records.map((record) => record.code).sort()).toEqual([
+          'admin',
+          'family',
+          'professional',
+        ]);
+        expect(
+          records
+            .find((record) => record.code === 'family')
+            ?.permissions.map((permission) => permission.code),
+        ).toEqual(['patient_history:read', 'patients:read']);
+        expect(
+          records
+            .find((record) => record.code === 'admin')
+            ?.permissions.map((permission) => permission.code),
+        ).not.toContain('patient_evolution:read');
+      } finally {
+        await dataSource.query(
+          "UPDATE permissions SET deleted_at = NULL WHERE code = 'patient_evolution:read'",
+        );
+      }
     }, 30000);
   });
 
