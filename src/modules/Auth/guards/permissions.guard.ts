@@ -1,9 +1,8 @@
 import { CanActivate, ExecutionContext, Injectable } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 
-import { DomainException } from '@/common/errors/domain.exception';
+import { assertPermission } from '@/modules/Access/policies/access.policy';
 
-import { AuthErrors } from '../auth.errors';
 import type { AuthenticatedRequest } from '../types/authenticatedRequest.type';
 import { REQUIRED_PERMISSIONS_KEY } from './requiredPermissions.decorator';
 
@@ -27,15 +26,8 @@ export class PermissionsGuard implements CanActivate {
     }
 
     const request = context.switchToHttp().getRequest<AuthenticatedRequest>();
-    const granted = request.context?.permissions;
+    required.forEach((code) => assertPermission(request.context, code));
 
-    if (granted && required.every((permission) => granted.has(permission))) {
-      return true;
-    }
-
-    throw new DomainException({
-      ...AuthErrors.FORBIDDEN,
-      detail: 'Permissão necessária não concedida à sessão.',
-    });
+    return true;
   }
 }
