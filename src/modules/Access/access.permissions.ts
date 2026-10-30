@@ -195,7 +195,7 @@ export const TENANT_PROFILES: Readonly<
   },
 };
 
-export const TENANT_PROFILE_CODES = Object.keys(
+export const TENANT_PROFILE_CODES: readonly TenantProfileCode[] = Object.keys(
   TENANT_PROFILES,
 ) as TenantProfileCode[];
 
@@ -203,13 +203,6 @@ export const TENANT_PROFILE_CODES = Object.keys(
 export const TENANT_PERMISSION_CODES: readonly PermissionName[] = (
   Object.values(Permissions) as PermissionName[]
 ).filter((code) => !isPlatformPermission(code));
-
-/** Removido na tarefa 2; mantido para nao quebrar consumidores. */
-export const TENANT_ADMIN_PERMISSIONS: readonly PermissionName[] = [
-  Permissions.USERS_RESET_PASSWORD,
-  Permissions.ORGANIZATION_READ,
-  Permissions.ORGANIZATION_UPDATE,
-];
 
 export const PLATFORM_ADMIN_PERMISSIONS: readonly PermissionName[] = [
   Permissions.USERS_RESET_PASSWORD,

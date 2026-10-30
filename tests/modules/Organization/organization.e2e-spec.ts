@@ -14,7 +14,7 @@ import type { RequestContext } from '@/common/context/requestContext.type';
 import { DomainException } from '@/common/errors/domain.exception';
 import {
   PLATFORM_ADMIN_PERMISSIONS,
-  TENANT_ADMIN_PERMISSIONS,
+  TENANT_PROFILES,
 } from '@/modules/Access/access.permissions';
 import { AuthErrors } from '@/modules/Auth/auth.errors';
 import { PermissionsGuard } from '@/modules/Auth/guards/permissions.guard';
@@ -75,7 +75,7 @@ const SESSIONS: Record<string, RequestContext> = {
   },
   'Bearer admin-a': {
     ...tenantContext,
-    permissions: new Set(TENANT_ADMIN_PERMISSIONS),
+    permissions: new Set(TENANT_PROFILES.admin.permissions),
   },
   'Bearer admin-a-com-permissao-de-plataforma': {
     ...tenantContext,

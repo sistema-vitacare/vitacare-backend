@@ -10,6 +10,10 @@ import { CreateAuthSchema1790000000000 } from '@/database/migrations/17900000000
 import { AddOrganizationKind1790100000000 } from '@/database/migrations/1790100000000-AddOrganizationKind';
 import { AddTemporaryPasswordExpiry1790200000000 } from '@/database/migrations/1790200000000-AddTemporaryPasswordExpiry';
 import { runPlatformSeed } from '@/database/seeds/platformSeed';
+import {
+  TENANT_PROFILE_CODES,
+  TENANT_PROFILES,
+} from '@/modules/Access/access.permissions';
 import { SnakeNamingStrategy } from '@/database/snakeNaming.strategy';
 import { LoginUseCase } from '@/modules/Auth/Login/login.useCase';
 import { AuthIdentityRepository } from '@/modules/Auth/repositories/authIdentity.repository';
@@ -310,7 +314,7 @@ describeWithDatabase('organizacoes em PostgreSQL descartavel', () => {
   });
 
   describe('cadastro pela plataforma', () => {
-    it('cria organizacao, perfil admin e primeiro administrador em primeiro acesso', async () => {
+    it('cria organizacao, os quatro perfis e primeiro administrador em primeiro acesso', async () => {
       const created = await createTenant(
         'casa-a',
         CPFS[0],
@@ -345,11 +349,38 @@ describeWithDatabase('organizacoes em PostgreSQL descartavel', () => {
         [created.organization.id],
       );
 
-      expect(permissions.map((row) => row.code)).toEqual([
-        'organization:read',
-        'organization:update',
-        'users:reset_password',
-      ]);
+      expect(permissions.map((row) => row.code)).toEqual(
+        [...TENANT_PROFILES.admin.permissions].sort(),
+      );
+
+      const profiles: Array<{ code: string; total: string }> =
+        await dataSource.query(
+          `SELECT profile.code, count(pp.id)::text AS total
+             FROM access_profiles profile
+             LEFT JOIN profile_permissions pp
+               ON pp.profile_id = profile.id AND pp.deleted_at IS NULL
+            WHERE profile.organization_id = $1
+            GROUP BY profile.code
+            ORDER BY profile.code`,
+          [created.organization.id],
+        );
+
+      expect(profiles).toEqual(
+        [...TENANT_PROFILE_CODES].sort().map((code) => ({
+          code,
+          total: String(TENANT_PROFILES[code].permissions.length),
+        })),
+      );
+
+      expect(
+        await scalar(
+          `SELECT profile.code AS value
+             FROM users
+             JOIN access_profiles profile ON profile.id = users.profile_id
+            WHERE users.id = $1`,
+          [created.administrator.id],
+        ),
+      ).toBe('admin');
 
       expect(await auditOf(created.organization.id)).toEqual([
         {

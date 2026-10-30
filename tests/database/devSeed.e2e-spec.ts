@@ -5,7 +5,10 @@ import { CreateInitialIdentitySchema1789674300000 } from '@/database/migrations/
 import { CreateAuthSchema1790000000000 } from '@/database/migrations/1790000000000-CreateAuthSchema';
 import { AddOrganizationKind1790100000000 } from '@/database/migrations/1790100000000-AddOrganizationKind';
 import { AddTemporaryPasswordExpiry1790200000000 } from '@/database/migrations/1790200000000-AddTemporaryPasswordExpiry';
-import { TENANT_ADMIN_PERMISSIONS } from '@/modules/Access/access.permissions';
+import {
+  PLATFORM_ADMIN_PERMISSIONS,
+  TENANT_PROFILES,
+} from '@/modules/Access/access.permissions';
 import {
   DEV_ORGANIZATIONS,
   DEV_PASSWORD,
@@ -175,27 +178,38 @@ describeWithDatabase(
       }
     }, 90000);
 
-    it('concede permissoes so aos perfis administradores', async () => {
-      const rows: Array<{ code: string; total: string }> =
-        await dataSource.query(
-          `SELECT p.code, count(pp.id)::text AS total
+    it('concede a cada perfil das organizacoes clientes exatamente a matriz', async () => {
+      for (const organization of DEV_ORGANIZATIONS) {
+        for (const [code, profile] of Object.entries(TENANT_PROFILES)) {
+          const rows: Array<{ code: string }> = await dataSource.query(
+            `SELECT permission.code
+               FROM profile_permissions pp
+               JOIN permissions permission ON permission.id = pp.permission_id
+               JOIN access_profiles p ON p.id = pp.profile_id
+               JOIN organizations o ON o.id = pp.organization_id
+              WHERE o.code = $1
+                AND p.code = $2
+                AND pp.deleted_at IS NULL
+              ORDER BY permission.code`,
+            [organization.code, code],
+          );
+
+          expect(rows.map((row) => row.code)).toEqual(
+            [...profile.permissions].sort(),
+          );
+        }
+      }
+
+      const [platformGrants]: Array<{ total: string }> = await dataSource.query(
+        `SELECT count(pp.id)::text AS total
            FROM access_profiles p
            LEFT JOIN profile_permissions pp ON pp.profile_id = p.id
-          GROUP BY p.code
-          ORDER BY p.code`,
-        );
-
-      const byProfile = Object.fromEntries(
-        rows.map((row) => [row.code, Number(row.total)]),
+          WHERE p.code = 'platform_admin'`,
       );
 
-      expect(byProfile.admin).toBe(
-        DEV_ORGANIZATIONS.length * TENANT_ADMIN_PERMISSIONS.length,
+      expect(Number(platformGrants.total)).toBe(
+        PLATFORM_ADMIN_PERMISSIONS.length,
       );
-      expect(byProfile.platform_admin).toBe(7);
-      expect(byProfile.professional).toBe(0);
-      expect(byProfile.caregiver).toBe(0);
-      expect(byProfile.family).toBe(0);
     }, 30000);
 
     it('cria a plataforma sem plano e o master com permissoes de plataforma', async () => {
