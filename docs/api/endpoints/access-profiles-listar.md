@@ -113,6 +113,28 @@ Sem efeito colateral: a rota só lê e não grava auditoria.
 | `401` | `AUTH_UNAUTHENTICATED` | Bearer ausente, inválido, expirado, restrito (primeiro acesso) ou revogado, inclusive porque a organização foi inativada. |
 | `403` | `AUTH_FORBIDDEN` | Sessão sem `access_profiles:read`: perfis `professional`, `caregiver`, `family` e administrador master. |
 
+`401`:
+
+```json
+{
+  "error": {
+    "code": "AUTH_UNAUTHENTICATED",
+    "message": "Autenticação necessária.",
+    "detail": "Sessão inválida, expirada ou revogada.",
+    "fields": null
+  },
+  "meta": {
+    "requestId": "a3f5b7c9-1d2e-4f60-8a9b-0c1d2e3f4a5b",
+    "timestamp": "2026-10-30T12:30:00.000Z",
+    "path": "/api/v1/access-profiles",
+    "method": "GET",
+    "status": 401
+  }
+}
+```
+
+`403`:
+
 ```json
 {
   "error": {
@@ -142,4 +164,4 @@ Sem efeito colateral: a rota só lê e não grava auditoria.
 
 ## Origem e validação
 
-Controller `src/modules/Access/access.controller.ts`; caso de uso `src/modules/Access/ListAccessProfiles/listAccessProfiles.useCase.ts`; DTOs `src/modules/Access/ListAccessProfiles/listAccessProfiles.dto.ts`; parser `src/modules/Access/ListAccessProfiles/listAccessProfiles.parser.ts`; repositório `src/modules/Access/repositories/accessProfile.repository.ts`; matriz e rótulos `src/modules/Access/access.permissions.ts`; provisionamento `src/modules/Access/repositories/tenantProfileProvisioning.repository.ts`; migration `src/database/migrations/1790300000000-SyncTenantAccessProfiles.ts`. Testes: `tests/modules/Access/listAccessProfiles.useCase.spec.ts` (ordem e campos), `tests/modules/Access/access.e2e-spec.ts` (200 para `admin`, 403 para os demais perfis e para o master, 401 sem bearer, OpenAPI) e `tests/modules/Access/accessSchema.e2e-spec.ts` (duas organizações, perfil excluído, concessão revogada e permissão excluída em PostgreSQL descartável). Conferido contra o OpenAPI gerado (`/api/docs-json`, tag `access-profiles`) em 2026-10-30. Spec: `docs/superpowers/specs/2026-10-29-be-05-perfis-permissoes-design.md`, seção 5.4. Vault: [[2026-10-29-be-05-access]] e [[2026-10-29-matriz-perfis-permissoes]].
+Controller `src/modules/Access/access.controller.ts`; caso de uso `src/modules/Access/ListAccessProfiles/listAccessProfiles.useCase.ts`; DTOs `src/modules/Access/ListAccessProfiles/listAccessProfiles.dto.ts`; parser `src/modules/Access/ListAccessProfiles/listAccessProfiles.parser.ts`; repositório `src/modules/Access/repositories/accessProfile.repository.ts`; matriz e rótulos `src/modules/Access/access.permissions.ts`; provisionamento `src/modules/Access/repositories/tenantProfileProvisioning.repository.ts`; migration `src/database/migrations/1790300000000-SyncTenantAccessProfiles.ts`. Testes: `tests/modules/Access/listAccessProfiles.useCase.spec.ts` (ordem e campos), `tests/modules/Access/access.e2e-spec.ts` (200 para `admin`, 403 para os demais perfis e para o master, 401 sem bearer, OpenAPI) `tests/modules/Access/accessSchema.e2e-spec.ts` (duas organizações, perfil excluído, concessão revogada e permissão excluída em PostgreSQL descartável) e `tests/modules/Access/accessControl.e2e-spec.ts` (matriz por rota em duas organizações com o guard real). Conferido contra o OpenAPI gerado (`/api/docs-json`, tag `access-profiles`) em 2026-10-30. Spec: `docs/superpowers/specs/2026-10-29-be-05-perfis-permissoes-design.md`, seção 5.4. Vault: [[2026-10-29-be-05-access]] e [[2026-10-29-matriz-perfis-permissoes]].
