@@ -282,3 +282,19 @@ container para conferir `/api/docs-json`.
 
 Nomes de arquivos auxiliares e tipos, forma do SQL da migration, organização
 interna dos testes e fixtures, texto exato das mensagens de erro.
+
+## 9. Notas de implementacao (2026-10-30)
+
+- (a) A trava da organizacao na troca de perfil usa `FOR NO KEY UPDATE` em vez de
+  `FOR UPDATE`. Serializa igualmente as trocas concorrentes, mas nao conflita
+  com o `FOR KEY SHARE` tomado por inserts com FK para `organizations`
+  (`audit_events`, `auth_sessions`), que gerava deadlock com troca de senha,
+  primeiro acesso e redefinicao administrativa do mesmo usuario (teste de
+  regressao em `tests/modules/User/userSchema.e2e-spec.ts`). Escolha tecnica
+  pendente de confirmacao de Mateus.
+- (b) A checagem de troca da propria conta compara os ids sem diferenciar
+  maiusculas, pois o `ParseUUIDPipe` aceita UUID em maiusculas.
+- (c) A migration passa a matriz literal por parametros `unnest`, e nao por texto
+  `VALUES` inline; os dados continuam literais no arquivo da migration.
+- (d) `grantPermissions` tambem padroniza o rotulo do catalogo e limpa
+  `deleted_at` do codigo no catalogo.

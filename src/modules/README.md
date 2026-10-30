@@ -162,6 +162,26 @@ Toda rota declara `@ApiEnvelope(Dto)` e `@ApiErrors(...)`. Sem eles o OpenAPI
 publica o DTO **sem** o envelope e a documentacao deixa de descrever o
 comportamento real.
 
+## Autorizacao por permissao
+
+A matriz em `src/modules/Access/access.permissions.ts` e a fonte de verdade:
+catalogo de permissoes e os quatro perfis fixos de tenant (`admin`,
+`professional`, `caregiver`, `family`). A unica heranca e admin contem
+professional (Figura 28); `follow_ups:create` e so do cuidador; o familiar e
+somente leitura; `platform_admin` (master) nao muda. As organizacoes ganham os
+perfis por `provisionTenantProfiles` (criacao de organizacao e seed de
+desenvolvimento) e, para as ja existentes, pela migration
+`1790300000000-SyncTenantAccessProfiles`.
+
+- Rota declara `@RequirePermissions(...)`; o `PermissionsGuard` decide por
+  `hasPermission`/`assertPermission` (`Access/policies/access.policy.ts`).
+- Use case ou job sem guard HTTP na frente chama `assertPermission(ctx, code)`.
+- As permissoes sao relidas do banco a cada requisicao: troca de perfil vale na
+  chamada seguinte, sem revogar sessao.
+- Permissao nova exige matriz, migration e testes.
+- Ainda **nao** cobertos: escopo por vinculo com paciente (BE-10) e campos
+  visiveis por perfil (BE-09/BE-19).
+
 ## Outras regras
 
 - Toda alteracao de schema entra como migration em `src/database/migrations`.

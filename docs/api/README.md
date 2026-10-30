@@ -58,6 +58,8 @@ Cada requisição recompõe o contexto no banco, então revogação, expiração
 
 Cada requisição aceita renova a janela de inatividade da sessão normal; o prazo absoluto não é renovado. A organização efetiva **sempre** vem da sessão: nenhuma rota aceita `organizationId` do cliente como prova de autorização. Autorização por permissão nomeada usa o formato `recurso:acao`; falta de permissão responde `403 AUTH_FORBIDDEN`.
 
+Todo usuário de organização cliente tem um de quatro **perfis fixos**: `admin`, `professional`, `caregiver` e `family`. O catálogo de permissões e a matriz de cada perfil são consultados em [GET /access-profiles](endpoints/access-profiles-listar.md); o administrador troca o perfil de um usuário por [PATCH /users/:userId/profile](endpoints/users-alterar-perfil.md). As permissões são relidas do banco a cada requisição, então a troca vale na chamada seguinte do usuário, sem revogar a sessão.
+
 Rotas públicas de autenticação: login, solicitação de recuperação e redefinição por token. Todo o resto exige Bearer, e o OpenAPI marca isso no esquema `bearer`.
 
 > **Não existe SMTP configurado em nenhum ambiente** (decisão de 2026-09-22). A solicitação de recuperação responde `202` com `meta.message` orientando a procurar o administrador, mas não cria token nem envia mensagem. O canal operacional de recuperação é a [redefinição administrativa](endpoints/auth-redefinir-senha-usuario.md) (recuperação assistida, 2026-10-29): senha temporária válida por 24 horas, reemitida pelo administrador quando vence ou se perde. O envio por link passa a valer apenas quando houver servidor de e-mail.
