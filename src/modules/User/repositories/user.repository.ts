@@ -36,6 +36,13 @@ export class UserRepository {
    * depois dela, entao um admin rebaixado por outra troca em curso nao consegue
    * mais agir. O status do alvo nao importa; o perfil atual do alvo e lido sem
    * filtro de `deleted_at` para que um perfil excluido ainda possa ser trocado.
+   *
+   * A trava e `FOR NO KEY UPDATE`, nao `FOR UPDATE`: ela conflita consigo mesma
+   * (serializa as trocas) mas nao com o `FOR KEY SHARE` que o PostgreSQL pede
+   * na organizacao a cada INSERT com FK para ela (auditoria, sessoes). Com
+   * `FOR UPDATE`, login e auditoria do tenant esperariam pela troca, e uma
+   * transacao que atualiza o usuario alvo e depois audita entraria em deadlock
+   * com esta (40P01).
    */
   async changeProfile(
     command: ChangeProfileCommand,
@@ -54,7 +61,7 @@ export class UserRepository {
     command: ChangeProfileCommand,
   ): Promise<ChangeProfileOutcome> {
     await manager.query(
-      `SELECT 1 FROM organizations WHERE id = $1 FOR UPDATE`,
+      `SELECT 1 FROM organizations WHERE id = $1 FOR NO KEY UPDATE`,
       [command.organizationId],
     );
 
@@ -80,6 +87,9 @@ export class UserRepository {
       return { kind: 'unchanged', user: target };
     }
 
+    // Invariante: sempre resta um admin ativo porque toda troca rele o ator sob
+    // esta trava. Qualquer caminho futuro que rebaixe, inative ou exclua
+    // usuario precisa tomar a mesma trava da organizacao, senao a garantia cai.
     const [actor] = await manager.query<Array<{ id: string }>>(
       `SELECT u.id
          FROM users u

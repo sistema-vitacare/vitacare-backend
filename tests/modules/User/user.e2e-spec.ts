@@ -310,6 +310,9 @@ describe('User HTTP (e2e)', () => {
       document.components.schemas[bodyRef.replace('#/components/schemas/', '')];
 
     expect(bodySchema.required).toEqual(['profileCode']);
+    expect(
+      document.components.schemas.UserProfileRefDto.properties?.code.enum,
+    ).toEqual(['admin', 'professional', 'caregiver', 'family']);
     expect(bodySchema.properties?.profileCode.enum).toEqual([
       'admin',
       'professional',

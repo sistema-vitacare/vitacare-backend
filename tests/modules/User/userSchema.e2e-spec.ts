@@ -45,6 +45,7 @@ describeWithDatabase(
     let inactiveAdminA: string;
     let targetA: string;
     let userB: string;
+    let raceTargetA: string;
     let cpfSequence = 0;
 
     const scalar = async (sql: string, parameters: unknown[] = []) => {
@@ -182,6 +183,11 @@ describeWithDatabase(
         'pending',
       );
       userB = await insertUser(organizationB, profilesB.caregiver, 'usuario-b');
+      raceTargetA = await insertUser(
+        organizationA,
+        profilesA.professional,
+        'alvo-corrida-a',
+      );
 
       repository = new UserRepository(dataSource);
     }, 90000);
@@ -310,6 +316,95 @@ describeWithDatabase(
       },
       30000,
     );
+
+    it('responde unchanged para ator rebaixado que pede o perfil atual do alvo', async () => {
+      const before = await auditCount();
+
+      const outcome = await repository.changeProfile(
+        command({
+          actorUserId: professionalA,
+          profileCode: ProfileCode.FAMILY,
+        }),
+      );
+
+      expect(outcome).toMatchObject({
+        kind: 'unchanged',
+        user: { id: targetA, profileCode: 'family' },
+      });
+      expect(await auditCount()).toBe(before);
+    }, 30000);
+
+    /**
+     * Regressao de deadlock: uma transacao de autenticacao atualiza a linha do
+     * usuario e depois insere em `audit_events`, o que pede FOR KEY SHARE na
+     * linha da organizacao. Com `FOR UPDATE` na organizacao a troca de perfil
+     * esperaria pela linha do usuario enquanto a outra transacao esperaria pela
+     * organizacao (40P01). Com `FOR NO KEY UPDATE` as duas terminam.
+     */
+    it('nao entra em deadlock com transacao que atualiza o alvo e audita na organizacao', async () => {
+      const blocker = dataSource.createQueryRunner();
+      let change: Promise<unknown> | undefined;
+
+      await blocker.connect();
+
+      try {
+        await blocker.startTransaction();
+        await blocker.query(
+          'UPDATE users SET updated_at = now() WHERE id = $1',
+          [raceTargetA],
+        );
+
+        change = repository.changeProfile(
+          command({
+            targetUserId: raceTargetA,
+            profileCode: ProfileCode.CAREGIVER,
+          }),
+        );
+        // Evita rejeicao nao tratada enquanto o teste ainda nao a aguardou.
+        change.catch(() => undefined);
+
+        // Espera a troca de perfil ficar bloqueada na linha do alvo.
+        const deadline = Date.now() + 10000;
+
+        while (
+          (await scalar(
+            `SELECT count(*)::text AS value
+               FROM pg_stat_activity
+              WHERE datname = current_database()
+                AND wait_event_type = 'Lock'
+                AND query LIKE 'UPDATE users%profile_id%'`,
+          )) !== '1'
+        ) {
+          if (Date.now() > deadline) {
+            throw new Error('A troca de perfil nao bloqueou na linha do alvo.');
+          }
+
+          await new Promise((resolve) => setTimeout(resolve, 20));
+        }
+
+        await blocker.query(
+          `INSERT INTO audit_events (organization_id, actor_type, action, entity_type)
+           VALUES ($1, 'system', 'auth.teste_concorrencia', 'user')`,
+          [organizationA],
+        );
+        await blocker.commitTransaction();
+      } catch (error) {
+        if (blocker.isTransactionActive) {
+          await blocker.rollbackTransaction();
+        }
+
+        await change?.catch(() => undefined);
+        throw error;
+      } finally {
+        await blocker.release();
+      }
+
+      await expect(change).resolves.toMatchObject({
+        kind: 'changed',
+        user: { id: raceTargetA, profileCode: 'caregiver' },
+      });
+      expect(await profileCodeOf(raceTargetA)).toBe('caregiver');
+    }, 30000);
 
     it('troca o perfil de usuario inativo: o status do alvo nao importa', async () => {
       const outcome = await repository.changeProfile(

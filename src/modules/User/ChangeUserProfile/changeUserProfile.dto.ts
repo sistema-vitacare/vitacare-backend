@@ -20,7 +20,11 @@ export class ChangeUserProfileDto {
 }
 
 export class UserProfileRefDto {
-  @ApiProperty({ example: 'professional', description: 'Codigo do perfil.' })
+  @ApiProperty({
+    enum: [...TENANT_PROFILE_CODES],
+    example: 'professional',
+    description: 'Codigo do perfil.',
+  })
   code!: string;
 
   @ApiProperty({
