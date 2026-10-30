@@ -1,7 +1,6 @@
 import { DomainException } from '@/common/errors/domain.exception';
 import { ProfileCode } from '@/common/context/requestContext.type';
 import {
-  Permissions,
   TENANT_PERMISSION_CODES,
   TENANT_PROFILES,
 } from '@/modules/Access/access.permissions';
@@ -23,15 +22,20 @@ describe('access.policy', () => {
   });
 
   it('assertPermission lanca AUTH_FORBIDDEN 403', () => {
+    expect(() => assertPermission(ctx([]), 'a')).toThrow(DomainException);
+
+    let thrown: DomainException | undefined;
+
     try {
       assertPermission(ctx([]), 'a');
-      throw new Error('nao lancou');
     } catch (error) {
-      expect(error).toBeInstanceOf(DomainException);
-      const e = error as DomainException;
-      expect(e.getStatus()).toBe(403);
-      expect(JSON.stringify(e.getResponse())).toContain('AUTH_FORBIDDEN');
+      thrown = error as DomainException;
     }
+
+    expect(thrown?.getStatus()).toBe(403);
+    expect(thrown?.code).toBe('AUTH_FORBIDDEN');
+    expect(thrown?.detail).toBe('Permissão necessária não concedida à sessão.');
+    expect(thrown?.getResponse()).toMatchObject({ code: 'AUTH_FORBIDDEN' });
   });
 
   it('assertPermission nao lanca quando presente', () => {
@@ -39,12 +43,17 @@ describe('access.policy', () => {
   });
 
   it('familiar so tem permissoes de leitura', () => {
-    const family = ctx([...TENANT_PROFILES[ProfileCode.FAMILY].permissions]);
+    const familyCodes = TENANT_PROFILES[ProfileCode.FAMILY].permissions;
+    const family = ctx([...familyCodes]);
+
+    expect(familyCodes.length).toBeGreaterThan(0);
+    for (const code of familyCodes) {
+      expect(code.endsWith(':read')).toBe(true);
+    }
     for (const code of TENANT_PERMISSION_CODES) {
       if (!code.endsWith(':read')) {
         expect(hasPermission(family, code)).toBe(false);
       }
     }
-    expect(Permissions).toBeDefined();
   });
 });

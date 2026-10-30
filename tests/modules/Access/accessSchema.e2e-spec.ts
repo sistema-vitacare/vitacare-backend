@@ -14,7 +14,6 @@ import { runPlatformSeed } from '@/database/seeds/platformSeed';
 import { SnakeNamingStrategy } from '@/database/snakeNaming.strategy';
 import {
   PERMISSION_LABELS,
-  type PermissionName,
   Permissions,
   PLATFORM_ADMIN_PERMISSIONS,
   TENANT_PERMISSION_CODES,
@@ -44,6 +43,145 @@ const LEGACY_TENANT_CODES = [
   'organization:update',
   'users:reset_password',
 ];
+
+/**
+ * Snapshot literal da matriz de 2026-10-30 que a migration
+ * `SyncTenantAccessProfiles1790300000000` grava. A migration e congelada: o
+ * bloco abaixo a compara com este snapshot, e nao com a matriz atual do codigo,
+ * para que uma mudanca futura da matriz nao quebre o teste de uma migration
+ * correta (mudancas futuras ganham migration propria).
+ */
+const SNAPSHOT_PROFILES: Record<
+  string,
+  { name: string; description: string; permissions: string[] }
+> = {
+  admin: {
+    name: 'Administrador',
+    description: 'Administrador da organizacao',
+    permissions: [
+      'access_profiles:read',
+      'alert_rules:manage',
+      'alerts:read',
+      'audit_events:export',
+      'audit_events:read',
+      'dashboard:read',
+      'forms:create',
+      'forms:deactivate',
+      'forms:read',
+      'forms:update',
+      'medications:create',
+      'medications:deactivate',
+      'medications:read',
+      'medications:update',
+      'organization:read',
+      'organization:update',
+      'patient_evolution:read',
+      'patient_history:read',
+      'patient_links:manage',
+      'patients:create',
+      'patients:deactivate',
+      'patients:read',
+      'patients:update',
+      'plan:read',
+      'plan_change_requests:create',
+      'reports:generate',
+      'users:change_profile',
+      'users:change_status',
+      'users:create',
+      'users:read',
+      'users:reset_password',
+      'users:update',
+    ],
+  },
+  professional: {
+    name: 'Profissional de saude',
+    description: 'Profissional de saude responsavel pelo acompanhamento',
+    permissions: [
+      'alert_rules:manage',
+      'alerts:read',
+      'forms:create',
+      'forms:deactivate',
+      'forms:read',
+      'forms:update',
+      'medications:create',
+      'medications:deactivate',
+      'medications:read',
+      'medications:update',
+      'patient_evolution:read',
+      'patient_history:read',
+      'patients:create',
+      'patients:deactivate',
+      'patients:read',
+      'patients:update',
+      'reports:generate',
+    ],
+  },
+  caregiver: {
+    name: 'Cuidador',
+    description: 'Cuidador que registra o acompanhamento',
+    permissions: [
+      'alerts:read',
+      'follow_ups:create',
+      'forms:read',
+      'patient_history:read',
+      'patients:read',
+    ],
+  },
+  family: {
+    name: 'Familiar',
+    description: 'Familiar com acesso somente leitura',
+    permissions: [
+      'alerts:read',
+      'patient_evolution:read',
+      'patient_history:read',
+      'patients:read',
+    ],
+  },
+};
+
+const SNAPSHOT_LABELS: Record<string, string> = {
+  'patients:read': 'Consultar pacientes',
+  'patients:create': 'Cadastrar pacientes',
+  'patients:update': 'Editar pacientes',
+  'patients:deactivate': 'Inativar pacientes',
+  'patient_history:read': 'Consultar historico do paciente',
+  'patient_evolution:read': 'Consultar evolucao do paciente',
+  'alerts:read': 'Consultar alertas',
+  'forms:read': 'Consultar formularios',
+  'forms:create': 'Criar formularios',
+  'forms:update': 'Editar formularios',
+  'forms:deactivate': 'Desativar formularios',
+  'alert_rules:manage': 'Configurar regras de alerta',
+  'follow_ups:create': 'Registrar acompanhamento',
+  'medications:read': 'Consultar medicamentos',
+  'medications:create': 'Cadastrar medicamentos',
+  'medications:update': 'Editar medicamentos',
+  'medications:deactivate': 'Inativar medicamentos',
+  'reports:generate': 'Gerar relatorio do paciente',
+  'organization:read': 'Consultar a propria organizacao',
+  'organization:update': 'Editar a propria organizacao',
+  'users:read': 'Consultar usuarios',
+  'users:create': 'Cadastrar usuarios',
+  'users:update': 'Editar usuarios',
+  'users:change_status': 'Inativar e reativar usuarios',
+  'users:change_profile': 'Alterar perfil de usuario',
+  'users:reset_password': 'Redefinir senha de usuario',
+  'access_profiles:read': 'Consultar perfis de acesso',
+  'patient_links:manage': 'Gerenciar vinculos com pacientes',
+  'plan:read': 'Consultar plano e uso',
+  'plan_change_requests:create': 'Solicitar alteracao de plano',
+  'dashboard:read': 'Consultar painel operacional',
+  'audit_events:read': 'Consultar auditoria',
+  'audit_events:export': 'Exportar auditoria',
+  'platform_organizations:create': 'Cadastrar organizacoes',
+  'platform_organizations:read': 'Consultar qualquer organizacao',
+  'platform_organizations:update': 'Editar qualquer organizacao',
+  'platform_organizations:change_status': 'Inativar e reativar organizacoes',
+};
+
+const SNAPSHOT_TENANT_CODES = Object.keys(SNAPSHOT_LABELS).filter(
+  (code) => !code.startsWith('platform_'),
+);
 
 const TRUNCATE_ALL =
   'TRUNCATE audit_events, auth_sessions, password_reset_tokens, users, profile_permissions, permissions, access_profiles, organizations, usage_plans';
@@ -473,10 +611,8 @@ describeWithDatabase('perfis de acesso em PostgreSQL descartavel', () => {
           ORDER BY code COLLATE "C"`,
       );
 
-    const expectedCatalog = (codes: readonly PermissionName[]) =>
-      [...codes]
-        .sort()
-        .map((code) => ({ code, name: PERMISSION_LABELS[code] }));
+    const expectedCatalog = (codes: readonly string[]) =>
+      [...codes].sort().map((code) => ({ code, name: SNAPSHOT_LABELS[code] }));
 
     beforeAll(async () => {
       fullDataSource = new DataSource({
@@ -531,6 +667,28 @@ describeWithDatabase('perfis de acesso em PostgreSQL descartavel', () => {
       await fullDataSource.destroy();
     }, 30000);
 
+    // Esta e a unica assercao que acompanha a matriz atual do codigo. Ela deve
+    // falhar quando a matriz mudar: entao crie uma migration nova, atualize o
+    // snapshot (ou mova este bloco para a migration mais recente) e ajuste aqui.
+    it('o snapshot congelado ainda e igual a matriz atual do codigo', () => {
+      const current = Object.fromEntries(
+        TENANT_PROFILE_CODES.map((code) => [
+          code,
+          {
+            name: TENANT_PROFILES[code].name,
+            description: TENANT_PROFILES[code].description,
+            permissions: [...TENANT_PROFILES[code].permissions].sort(),
+          },
+        ]),
+      );
+
+      expect(current).toEqual(SNAPSHOT_PROFILES);
+      expect(PERMISSION_LABELS).toEqual(SNAPSHOT_LABELS);
+      expect([...TENANT_PERMISSION_CODES].sort()).toEqual(
+        [...SNAPSHOT_TENANT_CODES].sort(),
+      );
+    });
+
     it('sincroniza organizacao preexistente com a matriz', async () => {
       const first = await insertLegacyTenant('casa-antiga');
       const second = await insertLegacyTenant('casa-antiga-dois');
@@ -559,31 +717,33 @@ describeWithDatabase('perfis de acesso em PostgreSQL descartavel', () => {
         );
 
         expect(profiles.map(({ id: _id, ...profile }) => profile)).toEqual(
-          [...TENANT_PROFILE_CODES].sort().map((code) => ({
-            code,
-            name: TENANT_PROFILES[code].name,
-            description: TENANT_PROFILES[code].description,
-            deletedAt: null,
-          })),
+          Object.keys(SNAPSHOT_PROFILES)
+            .sort()
+            .map((code) => ({
+              code,
+              name: SNAPSHOT_PROFILES[code].name,
+              description: SNAPSHOT_PROFILES[code].description,
+              deletedAt: null,
+            })),
         );
         // O perfil admin existente e reaproveitado, nao recriado.
         expect(profiles.find((profile) => profile.code === 'admin')?.id).toBe(
           adminId,
         );
 
-        for (const code of TENANT_PROFILE_CODES) {
+        for (const code of Object.keys(SNAPSHOT_PROFILES)) {
           expect(await livePermissionsOf(organizationId, code)).toEqual(
-            [...TENANT_PROFILES[code].permissions].sort(),
+            [...SNAPSHOT_PROFILES[code].permissions].sort(),
           );
         }
       }
 
       expect(await catalog()).toEqual(
-        expectedCatalog(Object.values(Permissions)),
+        expectedCatalog(Object.keys(SNAPSHOT_LABELS)),
       );
       expect(
         (await catalog()).filter(({ code }) => !code.startsWith('platform_')),
-      ).toEqual(expectedCatalog(TENANT_PERMISSION_CODES));
+      ).toEqual(expectedCatalog(SNAPSHOT_TENANT_CODES));
 
       // A plataforma nao ganha perfil nem concessao.
       expect(await grantsOf(platformId)).toEqual(platformBefore);
@@ -604,7 +764,7 @@ describeWithDatabase('perfis de acesso em PostgreSQL descartavel', () => {
       await runSync();
 
       expect(await catalog()).toEqual(
-        expectedCatalog(Object.values(Permissions)),
+        expectedCatalog(Object.keys(SNAPSHOT_LABELS)),
       );
       expect(await grantsOf(platformId)).toEqual(platformBefore);
       expect(await livePermissionsOf(platformId, 'platform_admin')).toEqual(
@@ -667,17 +827,17 @@ describeWithDatabase('perfis de acesso em PostgreSQL descartavel', () => {
         { id: extraBefore.id, revoked: true },
       ]);
       expect(await livePermissionsOf(organizationId, 'admin')).toEqual(
-        [...TENANT_PROFILES.admin.permissions].sort(),
+        [...SNAPSHOT_PROFILES.admin.permissions].sort(),
       );
       expect(await livePermissionsOf(organizationId, 'family')).toEqual(
-        [...TENANT_PROFILES.family.permissions].sort(),
+        [...SNAPSHOT_PROFILES.family.permissions].sort(),
       );
       expect(
         await scalar(
           'SELECT name AS value FROM access_profiles WHERE id = $1',
           [familyId],
         ),
-      ).toBe(TENANT_PROFILES.family.name);
+      ).toBe(SNAPSHOT_PROFILES.family.name);
     }, 30000);
 
     it('perfil de tenant fora dos quatro fica intacto', async () => {
@@ -737,7 +897,7 @@ describeWithDatabase('perfis de acesso em PostgreSQL descartavel', () => {
           'SELECT count(*)::text AS value FROM access_profiles WHERE organization_id = $1',
           [organizationId],
         ),
-      ).toBe(String(TENANT_PROFILE_CODES.length));
+      ).toBe(String(Object.keys(SNAPSHOT_PROFILES).length));
       expect(await livePermissionsOf(organizationId, 'admin')).toEqual(
         [...LEGACY_TENANT_CODES].sort(),
       );

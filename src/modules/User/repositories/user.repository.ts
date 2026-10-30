@@ -60,6 +60,7 @@ export class UserRepository {
     manager: EntityManager,
     command: ChangeProfileCommand,
   ): Promise<ChangeProfileOutcome> {
+    // tests/modules/Access/accessControl.e2e-spec.ts (ORG_LOCK_QUERY) e tests/modules/User/userSchema.e2e-spec.ts repetem este SQL exato: mudou aqui, mude la.
     await manager.query(
       `SELECT 1 FROM organizations WHERE id = $1 FOR NO KEY UPDATE`,
       [command.organizationId],
