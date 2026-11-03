@@ -61,6 +61,24 @@ export interface ResetUserPasswordAsAdminInput {
  * e auditoria nunca podem sair pela metade. Toda gravacao daqui e sempre por
  * organizacao e usuario, nunca por identificador solto.
  */
+/** Revoga todas as sessoes abertas do usuario, na transacao do chamador. */
+export const revokeUserSessions = async (
+  manager: EntityManager,
+  userId: string,
+  organizationId: string,
+  reason: string,
+): Promise<void> => {
+  await manager.query(
+    `UPDATE auth_sessions
+        SET revoked_at = now(), revoked_reason = $3, updated_at = now()
+      WHERE user_id = $1
+        AND organization_id = $2
+        AND revoked_at IS NULL
+        AND deleted_at IS NULL`,
+    [userId, organizationId, reason],
+  );
+};
+
 @Injectable()
 export class AuthTransactionRepository {
   constructor(private readonly dataSource: DataSource) {}
@@ -228,7 +246,7 @@ export class AuthTransactionRepository {
         return false;
       }
 
-      await this.revokeSessionsOf(
+      await revokeUserSessions(
         manager,
         input.userId,
         input.organizationId,
@@ -282,7 +300,7 @@ export class AuthTransactionRepository {
         [input.targetUserId, input.organizationId],
       );
 
-      await this.revokeSessionsOf(
+      await revokeUserSessions(
         manager,
         input.targetUserId,
         input.organizationId,
@@ -299,23 +317,6 @@ export class AuthTransactionRepository {
 
       return 'updated';
     });
-  }
-
-  private async revokeSessionsOf(
-    manager: EntityManager,
-    userId: string,
-    organizationId: string,
-    reason: string,
-  ): Promise<void> {
-    await manager.query<WriteResult>(
-      `UPDATE auth_sessions
-          SET revoked_at = now(), revoked_reason = $3, updated_at = now()
-        WHERE user_id = $1
-          AND organization_id = $2
-          AND revoked_at IS NULL
-          AND deleted_at IS NULL`,
-      [userId, organizationId, reason],
-    );
   }
 
   /**
