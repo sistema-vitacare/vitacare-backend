@@ -116,8 +116,10 @@ export class LoginUseCase {
 
   /**
    * Organizacao ausente ou inativa, conta ausente, inativa ou excluida, hash
-   * ausente, senha temporaria vencida e senha errada valem o mesmo: nenhuma
-   * dessas diferencas pode vazar na resposta nem no tempo gasto ate a falha.
+   * ausente, senha temporaria ou convite vencido e senha errada valem o mesmo:
+   * nenhuma dessas diferencas pode vazar na resposta nem no tempo gasto ate a
+   * falha. O convidado `pending` so entra com troca obrigatoria, entao recebe
+   * apenas a sessao de primeiro acesso.
    */
   private async hasValidCredentials(
     identity: LoginIdentity | null,
@@ -125,7 +127,8 @@ export class LoginUseCase {
   ): Promise<boolean> {
     const usableHash =
       identity &&
-      identity.status === 'active' &&
+      (identity.status === 'active' ||
+        (identity.status === 'pending' && identity.mustChangePassword)) &&
       identity.deletedAt === null &&
       identity.organizationStatus === 'active' &&
       identity.organizationDeletedAt === null &&

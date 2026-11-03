@@ -52,7 +52,8 @@ export class AuthSessionRepository {
             AND s.deleted_at IS NULL
             AND s.expires_at > $2
             AND s.last_activity_at > $3
-            AND u.status = 'active'
+            AND (u.status = 'active'
+                 OR (u.status = 'pending' AND s.type = 'password_change'))
             AND u.deleted_at IS NULL
             AND o.status = 'active'
             AND o.deleted_at IS NULL

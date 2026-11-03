@@ -85,7 +85,7 @@ export class AuthTransactionRepository {
             SET last_access_at = now(), updated_at = now()
           WHERE id = $1
             AND organization_id = $2
-            AND status = 'active'
+            AND status IN ('pending', 'active')
             AND deleted_at IS NULL`,
         [input.userId, input.organizationId],
       );
@@ -183,10 +183,11 @@ export class AuthTransactionRepository {
                 must_change_password = false,
                 password_changed_at = now(),
                 temporary_password_expires_at = NULL,
+                status = 'active',
                 updated_at = now()
           WHERE id = $2
             AND organization_id = $3
-            AND status = 'active'
+            AND status IN ('pending', 'active')
             AND deleted_at IS NULL`,
         [input.passwordHash, input.userId, input.organizationId],
       );

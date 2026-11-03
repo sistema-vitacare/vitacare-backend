@@ -199,8 +199,19 @@ describe('LoginUseCase', () => {
       { identity: { ...activeIdentity, organizationDeletedAt: new Date() } },
     ],
     [
-      'conta ainda pendente',
+      'conta pendente sem troca obrigatoria',
       { identity: { ...activeIdentity, status: 'pending' as const } },
+    ],
+    [
+      'convite vencido',
+      {
+        identity: {
+          ...activeIdentity,
+          status: 'pending' as const,
+          mustChangePassword: true,
+          temporaryPasswordExpiresAt: new Date(Date.now() - 1000),
+        },
+      },
     ],
     [
       'conta inativa',
@@ -248,6 +259,24 @@ describe('LoginUseCase', () => {
     await expect(
       useCase.execute(credentials, { ip: '127.0.0.1' }),
     ).resolves.toMatchObject({ state: 'password_change_required' });
+  });
+
+  it('aceita convidado pendente dentro do prazo so com sessao de troca de senha', async () => {
+    const { useCase, transactions } = build({
+      identity: {
+        ...activeIdentity,
+        status: 'pending',
+        mustChangePassword: true,
+        temporaryPasswordExpiresAt: new Date(Date.now() + 60_000),
+      },
+    });
+
+    await expect(
+      useCase.execute(credentials, { ip: '127.0.0.1' }),
+    ).resolves.toMatchObject({ state: 'password_change_required' });
+    expect(transactions.createLoginSession).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'password_change' }),
+    );
   });
 
   it('audita a tentativa falha na conta quando a conta existe', async () => {

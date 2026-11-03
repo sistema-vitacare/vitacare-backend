@@ -84,7 +84,7 @@ export class AuthIdentityRepository {
          FROM users
         WHERE id = $1
           AND organization_id = $2
-          AND status = 'active'
+          AND status IN ('pending', 'active')
           AND deleted_at IS NULL`,
       [userId, organizationId],
     );
