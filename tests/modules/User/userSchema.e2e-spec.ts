@@ -7,6 +7,7 @@ import { CreateAuthSchema1790000000000 } from '@/database/migrations/17900000000
 import { AddOrganizationKind1790100000000 } from '@/database/migrations/1790100000000-AddOrganizationKind';
 import { AddTemporaryPasswordExpiry1790200000000 } from '@/database/migrations/1790200000000-AddTemporaryPasswordExpiry';
 import { SyncTenantAccessProfiles1790300000000 } from '@/database/migrations/1790300000000-SyncTenantAccessProfiles';
+import { AddUserPendingCheck1790400000000 } from '@/database/migrations/1790400000000-AddUserPendingCheck';
 import { SnakeNamingStrategy } from '@/database/snakeNaming.strategy';
 import type { TenantProfileCode } from '@/modules/Access/access.permissions';
 import { provisionTenantProfiles } from '@/modules/Access/repositories/tenantProfileProvisioning.repository';
@@ -21,6 +22,7 @@ const MIGRATIONS = [
   AddOrganizationKind1790100000000,
   AddTemporaryPasswordExpiry1790200000000,
   SyncTenantAccessProfiles1790300000000,
+  AddUserPendingCheck1790400000000,
 ];
 
 const TRUNCATE_ALL =
@@ -73,8 +75,10 @@ describeWithDatabase(
       cpfSequence += 1;
 
       return (await scalar(
-        `INSERT INTO users (organization_id, profile_id, name, email, cpf, status, deleted_at)
-       VALUES ($1, $2, $3, $4, $5, $6::varchar, CASE WHEN $6::varchar = 'inactive' THEN now() END)
+        `INSERT INTO users (organization_id, profile_id, name, email, cpf, status, deleted_at, temporary_password_expires_at)
+       VALUES ($1, $2, $3, $4, $5, $6::varchar,
+               CASE WHEN $6::varchar = 'inactive' THEN now() END,
+               CASE WHEN $6::varchar = 'pending' THEN now() + interval '1 day' END)
        RETURNING id AS value`,
         [
           organizationId,
@@ -405,6 +409,56 @@ describeWithDatabase(
       });
       expect(await profileCodeOf(raceTargetA)).toBe('caregiver');
     }, 30000);
+
+    describe('users_pending_check', () => {
+      const insertPending = (
+        label: string,
+        mustChangePassword: boolean,
+        expiresAt: string | null,
+      ) => {
+        cpfSequence += 1;
+
+        return dataSource.query(
+          `INSERT INTO users (organization_id, profile_id, name, email, cpf, status, must_change_password, temporary_password_expires_at)
+           VALUES ($1, $2, $3, $4, $5, 'pending', $6, $7::timestamptz)`,
+          [
+            organizationA,
+            profilesA.caregiver,
+            `Usuario ${label}`,
+            `${label}@example.test`,
+            String(cpfSequence).padStart(11, '0'),
+            mustChangePassword,
+            expiresAt,
+          ],
+        );
+      };
+
+      it.each([
+        ['sem troca obrigatoria', false, '2999-01-01T00:00:00Z'],
+        ['sem prazo de convite', true, null],
+      ])(
+        'recusa usuario pendente %s',
+        async (label, mustChangePassword, expiresAt) => {
+          await expect(
+            insertPending(
+              `pendente-${label.replace(/ /g, '-')}`,
+              mustChangePassword,
+              expiresAt,
+            ),
+          ).rejects.toMatchObject({
+            code: '23514',
+            constraint: 'users_pending_check',
+          });
+        },
+        30000,
+      );
+
+      it('aceita usuario pendente com troca obrigatoria e prazo', async () => {
+        await expect(
+          insertPending('pendente-valido', true, '2999-01-01T00:00:00Z'),
+        ).resolves.toBeDefined();
+      }, 30000);
+    });
 
     it('troca o perfil de usuario inativo: o status do alvo nao importa', async () => {
       const outcome = await repository.changeProfile(

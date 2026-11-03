@@ -6,6 +6,8 @@ import {
   type TenantProfileCode,
 } from '@/modules/Access/access.permissions';
 
+import { UserProfileRefDto } from '../dtos/user.dto';
+
 export class ChangeUserProfileDto {
   @ApiProperty({
     enum: [...TENANT_PROFILE_CODES],
@@ -17,21 +19,6 @@ export class ChangeUserProfileDto {
     message: 'O perfil deve ser admin, professional, caregiver ou family.',
   })
   profileCode!: TenantProfileCode;
-}
-
-export class UserProfileRefDto {
-  @ApiProperty({
-    enum: [...TENANT_PROFILE_CODES],
-    example: 'professional',
-    description: 'Codigo do perfil.',
-  })
-  code!: string;
-
-  @ApiProperty({
-    example: 'Profissional de saude',
-    description: 'Nome do perfil para exibicao.',
-  })
-  name!: string;
 }
 
 export class ChangeUserProfileResponseDto {

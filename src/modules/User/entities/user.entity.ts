@@ -32,6 +32,10 @@ import { Organization } from '@/modules/Organization/entities/organization.entit
   'users_deactivation_check',
   "(status = 'inactive') = (deleted_at IS NOT NULL)",
 )
+@Check(
+  'users_pending_check',
+  "status <> 'pending' OR (must_change_password AND temporary_password_expires_at IS NOT NULL)",
+)
 export class User {
   @PrimaryColumn('uuid', { default: () => 'gen_random_uuid()' })
   id!: string;

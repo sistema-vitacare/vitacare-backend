@@ -55,9 +55,9 @@ import { OrganizationController } from '@/modules/Organization/organization.cont
 import { ReactivateOrganizationUseCase } from '@/modules/Organization/ReactivateOrganization/reactivateOrganization.useCase';
 import { OrganizationRepository } from '@/modules/Organization/repositories/organization.repository';
 import { UpdateOrganizationUseCase } from '@/modules/Organization/UpdateOrganization/updateOrganization.useCase';
-import { ChangeUserProfileUseCase } from '@/modules/User/ChangeUserProfile/changeUserProfile.useCase';
 import { UserRepository } from '@/modules/User/repositories/user.repository';
 import { UserController } from '@/modules/User/user.controller';
+import { USER_USE_CASES } from '@/modules/User/user.module';
 
 /**
  * BE-05 de ponta a ponta: `AuthGuard` e `PermissionsGuard` reais resolvendo a
@@ -340,7 +340,7 @@ describeWithDatabase('autorizacao por perfil em PostgreSQL (e2e)', () => {
         ListAccessProfilesUseCase,
         AccessProfileRepository,
 
-        ChangeUserProfileUseCase,
+        ...USER_USE_CASES,
         UserRepository,
 
         { provide: APP_GUARD, useClass: AuthGuard },

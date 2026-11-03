@@ -14,6 +14,8 @@ export interface CreateLoginSessionInput {
   tokenHash: string;
   type: AuthSessionType;
   expiresAt: Date;
+  /** Hash contra o qual a senha foi verificada, fora da transacao. */
+  passwordHash: string;
   requestId?: string;
 }
 
@@ -56,6 +58,24 @@ export interface ResetUserPasswordAsAdminInput {
   requestId: string;
 }
 
+/** Revoga todas as sessoes abertas do usuario, na transacao do chamador. */
+export const revokeUserSessions = async (
+  manager: EntityManager,
+  userId: string,
+  organizationId: string,
+  reason: string,
+): Promise<void> => {
+  await manager.query(
+    `UPDATE auth_sessions
+        SET revoked_at = now(), revoked_reason = $3, updated_at = now()
+      WHERE user_id = $1
+        AND organization_id = $2
+        AND revoked_at IS NULL
+        AND deleted_at IS NULL`,
+    [userId, organizationId, reason],
+  );
+};
+
 /**
  * Escritas de autenticacao que precisam ser atomicas: sessao, senha, revogacao
  * e auditoria nunca podem sair pela metade. Toda gravacao daqui e sempre por
@@ -65,8 +85,31 @@ export interface ResetUserPasswordAsAdminInput {
 export class AuthTransactionRepository {
   constructor(private readonly dataSource: DataSource) {}
 
-  async createLoginSession(input: CreateLoginSessionInput): Promise<void> {
-    await this.dataSource.transaction(async (manager) => {
+  /**
+   * A senha foi verificada sem trava, entao uma reemissao de convite, uma
+   * redefinicao administrativa ou uma inativacao pode ter comitado no meio. A
+   * linha do usuario e travada e relida com o hash verificado antes de abrir a
+   * sessao: senha trocada ou conta inativada nao abrem sessao, e quem revogar
+   * depois desta transacao ja enxerga a sessao nova. Devolve `false` sem gravar.
+   */
+  async createLoginSession(input: CreateLoginSessionInput): Promise<boolean> {
+    return this.dataSource.transaction(async (manager) => {
+      const [current] = await manager.query<Array<{ id: string }>>(
+        `SELECT id
+           FROM users
+          WHERE id = $1
+            AND organization_id = $2
+            AND password_hash = $3
+            AND status IN ('pending', 'active')
+            AND deleted_at IS NULL
+          FOR NO KEY UPDATE`,
+        [input.userId, input.organizationId, input.passwordHash],
+      );
+
+      if (!current) {
+        return false;
+      }
+
       await manager.query<WriteResult>(
         `INSERT INTO auth_sessions
            (organization_id, user_id, token_hash, type, expires_at, last_activity_at)
@@ -85,7 +128,7 @@ export class AuthTransactionRepository {
             SET last_access_at = now(), updated_at = now()
           WHERE id = $1
             AND organization_id = $2
-            AND status = 'active'
+            AND status IN ('pending', 'active')
             AND deleted_at IS NULL`,
         [input.userId, input.organizationId],
       );
@@ -100,6 +143,8 @@ export class AuthTransactionRepository {
             : 'auth.first_access_started',
         requestId: input.requestId ?? null,
       });
+
+      return true;
     });
   }
 
@@ -156,8 +201,18 @@ export class AuthTransactionRepository {
     });
   }
 
+  /**
+   * A linha do usuario e travada antes da sessao, na mesma ordem da
+   * inativacao e da reemissao do convite (usuario, depois sessoes); na ordem
+   * inversa as duas transacoes se esperariam (40P01).
+   */
   async completeFirstAccess(input: CompleteFirstAccessInput): Promise<boolean> {
     return this.dataSource.transaction(async (manager) => {
+      await manager.query(
+        `SELECT 1 FROM users WHERE id = $1 AND organization_id = $2 FOR NO KEY UPDATE`,
+        [input.userId, input.organizationId],
+      );
+
       const revoked = await manager.query<WriteResult>(
         `UPDATE auth_sessions
             SET revoked_at = now(),
@@ -183,10 +238,11 @@ export class AuthTransactionRepository {
                 must_change_password = false,
                 password_changed_at = now(),
                 temporary_password_expires_at = NULL,
+                status = 'active',
                 updated_at = now()
           WHERE id = $2
             AND organization_id = $3
-            AND status = 'active'
+            AND status IN ('pending', 'active')
             AND deleted_at IS NULL`,
         [input.passwordHash, input.userId, input.organizationId],
       );
@@ -227,7 +283,7 @@ export class AuthTransactionRepository {
         return false;
       }
 
-      await this.revokeSessionsOf(
+      await revokeUserSessions(
         manager,
         input.userId,
         input.organizationId,
@@ -281,7 +337,7 @@ export class AuthTransactionRepository {
         [input.targetUserId, input.organizationId],
       );
 
-      await this.revokeSessionsOf(
+      await revokeUserSessions(
         manager,
         input.targetUserId,
         input.organizationId,
@@ -298,23 +354,6 @@ export class AuthTransactionRepository {
 
       return 'updated';
     });
-  }
-
-  private async revokeSessionsOf(
-    manager: EntityManager,
-    userId: string,
-    organizationId: string,
-    reason: string,
-  ): Promise<void> {
-    await manager.query<WriteResult>(
-      `UPDATE auth_sessions
-          SET revoked_at = now(), revoked_reason = $3, updated_at = now()
-        WHERE user_id = $1
-          AND organization_id = $2
-          AND revoked_at IS NULL
-          AND deleted_at IS NULL`,
-      [userId, organizationId, reason],
-    );
   }
 
   /**

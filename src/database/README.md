@@ -201,10 +201,34 @@ PostgreSQL descartavel** (`vitacare_schema_test`) com `migration:show`,
 `migration:run:prod` a partir de `dist/`. **Nao aplicada no banco local de
 `.env` nem em producao.**
 
+## Usuario pendente (convite)
+
+`migrations/1790400000000-AddUserPendingCheck.ts` (BE-06, 2026-11-03) cria a
+constraint `users_pending_check`: `status = 'pending'` exige
+`must_change_password` e `temporary_password_expires_at` preenchido. `pending`
+e o convidado cadastrado por `POST /api/v1/users` que ainda nao concluiu o
+primeiro acesso; assim o login nunca lhe entrega sessao normal e todo convite
+tem prazo (24 h). O primeiro acesso grava `status = 'active'`. Nenhum fluxo
+anterior gravava `pending`, entao a constraint nasce valida em bancos
+existentes. O `down` so remove a constraint.
+
+O limite de usuarios do plano (`usage_plans.user_limit`) passa a ser aplicado
+no cadastro e na reativacao de usuarios: contam `pending` e `active`, o
+primeiro administrador incluido; inativos nao contam. A contagem roda sob a
+trava `FOR NO KEY UPDATE` da organizacao, que serializa as escritas de usuario
+do tenant. Validada em 2026-11-03 **somente em PostgreSQL descartavel**
+(`vitacare_schema_test`) com `migration:show`, `migration:run`,
+`migration:revert` e `migration:run` pela CLI e pelo entrypoint da imagem
+`runtime` (`RUN_MIGRATIONS=true`). Evidencia em
+`tests/modules/User/userSchema.e2e-spec.ts` e
+`tests/modules/User/userManagement.e2e-spec.ts`. **Nao aplicada no banco local
+de `.env` nem em producao.**
+
 `organizations.usage_plan_id` e obrigatorio nas organizacoes clientes (anulavel
 so na de plataforma, desde `1790100000000`) e referencia `usage_plans.id` com
 `ON DELETE RESTRICT`. A tabela de planos oferece somente a estrutura fisica do
-catalogo; ofertas, vigencia, troca e aplicacao dos limites continuam pendentes.
+catalogo; ofertas, vigencia, troca e o limite de pacientes continuam pendentes
+(o de usuarios e aplicado desde o BE-06).
 `users.cpf` e obrigatorio, armazena 11 digitos e e unico por organizacao;
 o banco verifica o formato, nao os digitos verificadores. E-mail de usuario
 tambem e unico por organizacao. `organizations.legal_name` e a razao social

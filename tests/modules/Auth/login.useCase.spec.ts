@@ -54,7 +54,7 @@ const build = (doubles: Doubles = {}) => {
 
   const transactions = {
     createLoginSession:
-      doubles.createLoginSession ?? jest.fn().mockResolvedValue(undefined),
+      doubles.createLoginSession ?? jest.fn().mockResolvedValue(true),
     recordLoginFailure: jest.fn().mockResolvedValue(undefined),
   };
 
@@ -199,8 +199,19 @@ describe('LoginUseCase', () => {
       { identity: { ...activeIdentity, organizationDeletedAt: new Date() } },
     ],
     [
-      'conta ainda pendente',
+      'conta pendente sem troca obrigatoria',
       { identity: { ...activeIdentity, status: 'pending' as const } },
+    ],
+    [
+      'convite vencido',
+      {
+        identity: {
+          ...activeIdentity,
+          status: 'pending' as const,
+          mustChangePassword: true,
+          temporaryPasswordExpiresAt: new Date(Date.now() - 1000),
+        },
+      },
     ],
     [
       'conta inativa',
@@ -248,6 +259,39 @@ describe('LoginUseCase', () => {
     await expect(
       useCase.execute(credentials, { ip: '127.0.0.1' }),
     ).resolves.toMatchObject({ state: 'password_change_required' });
+  });
+
+  it('aceita convidado pendente dentro do prazo so com sessao de troca de senha', async () => {
+    const { useCase, transactions } = build({
+      identity: {
+        ...activeIdentity,
+        status: 'pending',
+        mustChangePassword: true,
+        temporaryPasswordExpiresAt: new Date(Date.now() + 60_000),
+      },
+    });
+
+    await expect(
+      useCase.execute(credentials, { ip: '127.0.0.1' }),
+    ).resolves.toMatchObject({ state: 'password_change_required' });
+    expect(transactions.createLoginSession).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'password_change' }),
+    );
+  });
+
+  it('recusa como credencial invalida quando a senha ou a conta mudam durante o login', async () => {
+    const { useCase, transactions } = build({
+      createLoginSession: jest.fn().mockResolvedValue(false),
+    });
+
+    await expect(
+      useCase.execute(credentials, { ip: '127.0.0.1' }),
+    ).rejects.toMatchObject<Partial<DomainException>>({
+      code: 'AUTH_INVALID_CREDENTIALS',
+    });
+    expect(transactions.createLoginSession).toHaveBeenCalledWith(
+      expect.objectContaining({ passwordHash: 'hash' }),
+    );
   });
 
   it('audita a tentativa falha na conta quando a conta existe', async () => {

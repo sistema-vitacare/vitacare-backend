@@ -120,4 +120,18 @@ describe('AllExceptionsFilter', () => {
     filter.catch(new Error('boom'), hostFor('/api/v1/patients'));
     expect(errorLog).toHaveBeenCalledTimes(1);
   });
+
+  it('mascara o termo de busca na linha de log do erro', () => {
+    const warnLog = jest.spyOn(Logger.prototype, 'warn');
+
+    filter.catch(
+      new NotFoundException(),
+      hostFor('/api/v1/users?search=ana%40example.test&page=1'),
+    );
+
+    expect(warnLog).toHaveBeenCalledWith(
+      expect.stringContaining('/api/v1/users?search=%5BRedacted%5D&page=1'),
+    );
+    expect(String(warnLog.mock.calls[0][0])).not.toContain('example');
+  });
 });
