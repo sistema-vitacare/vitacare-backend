@@ -9,6 +9,7 @@ import type {
   ChangeProfileCommand,
   ChangeProfileOutcome,
 } from '../ChangeUserProfile/changeUserProfile.type';
+import type { ListUsersFilter, UserRow } from '../types/user.types';
 
 interface TargetRow {
   id: string;
@@ -22,13 +23,105 @@ interface ProfileRow {
   name: string;
 }
 
+const USER_SELECT = `
+  SELECT u.id,
+         u.name,
+         u.email,
+         u.cpf,
+         u.phone,
+         u.status,
+         p.code AS "profileCode",
+         p.name AS "profileName",
+         u.temporary_password_expires_at AS "temporaryPasswordExpiresAt",
+         u.last_access_at AS "lastAccessAt",
+         u.created_at AS "createdAt",
+         u.updated_at AS "updatedAt",
+         u.deleted_at AS "deletedAt"
+    FROM users u
+    JOIN access_profiles p
+      ON p.id = u.profile_id
+     AND p.organization_id = u.organization_id`;
+
+/** `%`, `_` e `\` digitados na busca sao texto, nao curinga do ILIKE. */
+const escapeLike = (value: string): string => value.replace(/[\\%_]/g, '\\$&');
+
 /**
- * Escritas sobre usuarios da organizacao da sessao. Toda consulta e escopada
- * por `organization_id`; usuario de outro tenant se comporta como inexistente.
+ * Leituras e escritas sobre usuarios da organizacao da sessao. Toda consulta e
+ * escopada por `organization_id`; usuario de outro tenant se comporta como
+ * inexistente.
  */
 @Injectable()
 export class UserRepository {
   constructor(private readonly dataSource: DataSource) {}
+
+  async list(
+    organizationId: string,
+    filter: ListUsersFilter,
+  ): Promise<[UserRow[], number]> {
+    const where = `
+      WHERE u.organization_id = $1
+        AND ($2::varchar IS NULL OR u.status = $2)
+        AND ($3::varchar IS NULL OR p.code = $3)
+        AND ($4::text IS NULL
+             OR u.name ILIKE $4 ESCAPE '\\'
+             OR u.email::text ILIKE $4 ESCAPE '\\')`;
+    const parameters = [
+      organizationId,
+      filter.status ?? null,
+      filter.profileCode ?? null,
+      filter.search ? `%${escapeLike(filter.search)}%` : null,
+    ];
+
+    try {
+      const [rows, [{ total }]] = await Promise.all([
+        this.dataSource.query<UserRow[]>(
+          `${USER_SELECT} ${where}
+            ORDER BY u.name, u.id
+            LIMIT $5 OFFSET $6`,
+          [...parameters, filter.take, filter.skip],
+        ),
+        this.dataSource.query<Array<{ total: number }>>(
+          `SELECT count(*)::int AS total
+             FROM users u
+             JOIN access_profiles p
+               ON p.id = u.profile_id
+              AND p.organization_id = u.organization_id
+           ${where}`,
+          parameters,
+        ),
+      ]);
+
+      return [rows, total];
+    } catch (error) {
+      throw translatePgError(error, 'users');
+    }
+  }
+
+  async findById(
+    organizationId: string,
+    userId: string,
+  ): Promise<UserRow | null> {
+    try {
+      return await this.findIn(this.dataSource.manager, organizationId, userId);
+    } catch (error) {
+      throw translatePgError(error, 'users');
+    }
+  }
+
+  private async findIn(
+    manager: EntityManager,
+    organizationId: string,
+    userId: string,
+  ): Promise<UserRow | null> {
+    const [row] = await manager.query<UserRow[]>(
+      `${USER_SELECT}
+        WHERE u.organization_id = $1
+          AND u.id = $2`,
+      [organizationId, userId],
+    );
+
+    return row ?? null;
+  }
 
   /**
    * Troca de perfil em uma transacao (BE-05, spec 5.5). A trava na linha da
