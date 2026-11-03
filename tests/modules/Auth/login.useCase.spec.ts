@@ -54,7 +54,7 @@ const build = (doubles: Doubles = {}) => {
 
   const transactions = {
     createLoginSession:
-      doubles.createLoginSession ?? jest.fn().mockResolvedValue(undefined),
+      doubles.createLoginSession ?? jest.fn().mockResolvedValue(true),
     recordLoginFailure: jest.fn().mockResolvedValue(undefined),
   };
 
@@ -276,6 +276,21 @@ describe('LoginUseCase', () => {
     ).resolves.toMatchObject({ state: 'password_change_required' });
     expect(transactions.createLoginSession).toHaveBeenCalledWith(
       expect.objectContaining({ type: 'password_change' }),
+    );
+  });
+
+  it('recusa como credencial invalida quando a senha ou a conta mudam durante o login', async () => {
+    const { useCase, transactions } = build({
+      createLoginSession: jest.fn().mockResolvedValue(false),
+    });
+
+    await expect(
+      useCase.execute(credentials, { ip: '127.0.0.1' }),
+    ).rejects.toMatchObject<Partial<DomainException>>({
+      code: 'AUTH_INVALID_CREDENTIALS',
+    });
+    expect(transactions.createLoginSession).toHaveBeenCalledWith(
+      expect.objectContaining({ passwordHash: 'hash' }),
     );
   });
 

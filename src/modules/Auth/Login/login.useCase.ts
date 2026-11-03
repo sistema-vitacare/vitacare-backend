@@ -54,12 +54,12 @@ export class LoginUseCase {
       await this.identities.findForAuthentication(organizationCode, email);
 
     // A verificacao roda antes do desvio para nao encurtar o caminho da falha.
-    const credentialsValid = await this.hasValidCredentials(
+    const verifiedHash = await this.verifiedPasswordHash(
       identity,
       input.password,
     );
 
-    if (!identity || !credentialsValid) {
+    if (!identity || !verifiedHash) {
       await this.rateLimiter.recordLoginFailure(
         organizationCode,
         email,
@@ -96,14 +96,22 @@ export class LoginUseCase {
     const token = this.tokens.issue();
     const expiresAt = new Date(Date.now() + lifetimeSeconds * 1000);
 
-    await this.transactions.createLoginSession({
+    const opened = await this.transactions.createLoginSession({
       organizationId: identity.organizationId,
       userId: identity.userId,
       tokenHash: token.hash,
       type,
       expiresAt,
+      passwordHash: verifiedHash,
       requestId: meta.requestId,
     });
+
+    if (!opened) {
+      throw new DomainException({
+        ...AuthErrors.INVALID_CREDENTIALS,
+        detail: 'Senha ou estado da conta mudaram durante o login.',
+      });
+    }
 
     return {
       state: type === 'normal' ? 'authenticated' : 'password_change_required',
@@ -121,10 +129,10 @@ export class LoginUseCase {
    * falha. O convidado `pending` so entra com troca obrigatoria, entao recebe
    * apenas a sessao de primeiro acesso.
    */
-  private async hasValidCredentials(
+  private async verifiedPasswordHash(
     identity: LoginIdentity | null,
     password: string,
-  ): Promise<boolean> {
+  ): Promise<string | null> {
     const usableHash =
       identity &&
       (identity.status === 'active' ||
@@ -138,10 +146,14 @@ export class LoginUseCase {
 
     // Sem hash utilizavel ainda se gasta o tempo de uma verificacao real.
     if (!usableHash) {
-      return this.passwords.verifyDummy(password);
+      await this.passwords.verifyDummy(password);
+
+      return null;
     }
 
-    return this.passwords.verify(usableHash, password);
+    return (await this.passwords.verify(usableHash, password))
+      ? usableHash
+      : null;
   }
 
   private isTemporaryPasswordExpired(identity: LoginIdentity): boolean {

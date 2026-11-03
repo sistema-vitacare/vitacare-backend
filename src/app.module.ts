@@ -5,6 +5,7 @@ import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import type Redis from 'ioredis';
 import { LoggerModule } from 'nestjs-pino';
 import { AppController } from './app.controller';
+import { redactRequestLog } from './common/http/logRedaction';
 import { requestIdFromHeaders } from './common/http/requestId';
 import appConfig from './config/app.config';
 import authConfig from './config/auth.config';
@@ -69,6 +70,7 @@ function prettyTransport() {
               ? undefined
               : prettyTransport(),
           genReqId: requestIdFromHeaders,
+          serializers: { req: redactRequestLog },
           redact: [
             'req.headers.authorization',
             'req.headers.cookie',

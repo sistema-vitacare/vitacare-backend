@@ -14,6 +14,8 @@ export interface CreateLoginSessionInput {
   tokenHash: string;
   type: AuthSessionType;
   expiresAt: Date;
+  /** Hash contra o qual a senha foi verificada, fora da transacao. */
+  passwordHash: string;
   requestId?: string;
 }
 
@@ -56,11 +58,6 @@ export interface ResetUserPasswordAsAdminInput {
   requestId: string;
 }
 
-/**
- * Escritas de autenticacao que precisam ser atomicas: sessao, senha, revogacao
- * e auditoria nunca podem sair pela metade. Toda gravacao daqui e sempre por
- * organizacao e usuario, nunca por identificador solto.
- */
 /** Revoga todas as sessoes abertas do usuario, na transacao do chamador. */
 export const revokeUserSessions = async (
   manager: EntityManager,
@@ -79,12 +76,40 @@ export const revokeUserSessions = async (
   );
 };
 
+/**
+ * Escritas de autenticacao que precisam ser atomicas: sessao, senha, revogacao
+ * e auditoria nunca podem sair pela metade. Toda gravacao daqui e sempre por
+ * organizacao e usuario, nunca por identificador solto.
+ */
 @Injectable()
 export class AuthTransactionRepository {
   constructor(private readonly dataSource: DataSource) {}
 
-  async createLoginSession(input: CreateLoginSessionInput): Promise<void> {
-    await this.dataSource.transaction(async (manager) => {
+  /**
+   * A senha foi verificada sem trava, entao uma reemissao de convite, uma
+   * redefinicao administrativa ou uma inativacao pode ter comitado no meio. A
+   * linha do usuario e travada e relida com o hash verificado antes de abrir a
+   * sessao: senha trocada ou conta inativada nao abrem sessao, e quem revogar
+   * depois desta transacao ja enxerga a sessao nova. Devolve `false` sem gravar.
+   */
+  async createLoginSession(input: CreateLoginSessionInput): Promise<boolean> {
+    return this.dataSource.transaction(async (manager) => {
+      const [current] = await manager.query<Array<{ id: string }>>(
+        `SELECT id
+           FROM users
+          WHERE id = $1
+            AND organization_id = $2
+            AND password_hash = $3
+            AND status IN ('pending', 'active')
+            AND deleted_at IS NULL
+          FOR NO KEY UPDATE`,
+        [input.userId, input.organizationId, input.passwordHash],
+      );
+
+      if (!current) {
+        return false;
+      }
+
       await manager.query<WriteResult>(
         `INSERT INTO auth_sessions
            (organization_id, user_id, token_hash, type, expires_at, last_activity_at)
@@ -118,6 +143,8 @@ export class AuthTransactionRepository {
             : 'auth.first_access_started',
         requestId: input.requestId ?? null,
       });
+
+      return true;
     });
   }
 
@@ -174,8 +201,18 @@ export class AuthTransactionRepository {
     });
   }
 
+  /**
+   * A linha do usuario e travada antes da sessao, na mesma ordem da
+   * inativacao e da reemissao do convite (usuario, depois sessoes); na ordem
+   * inversa as duas transacoes se esperariam (40P01).
+   */
   async completeFirstAccess(input: CompleteFirstAccessInput): Promise<boolean> {
     return this.dataSource.transaction(async (manager) => {
+      await manager.query(
+        `SELECT 1 FROM users WHERE id = $1 AND organization_id = $2 FOR NO KEY UPDATE`,
+        [input.userId, input.organizationId],
+      );
+
       const revoked = await manager.query<WriteResult>(
         `UPDATE auth_sessions
             SET revoked_at = now(),

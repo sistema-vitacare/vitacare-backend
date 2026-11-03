@@ -150,6 +150,7 @@ describeWithDatabase('gestao de usuarios em PostgreSQL (e2e)', () => {
 
   let passwords: PasswordHasher;
   let login: LoginUseCase;
+  let transactions: AuthTransactionRepository;
 
   let masterToken: string;
   let cpfSequence = 0;
@@ -377,6 +378,7 @@ describeWithDatabase('gestao de usuarios em PostgreSQL (e2e)', () => {
 
     passwords = moduleRef.get(PasswordHasher);
     login = moduleRef.get(LoginUseCase);
+    transactions = moduleRef.get(AuthTransactionRepository);
 
     const plan = async (userLimit: number) =>
       (await scalar(
@@ -962,6 +964,118 @@ describeWithDatabase('gestao de usuarios em PostgreSQL (e2e)', () => {
         );
       }
     }, 60000);
+  });
+
+  describe('corridas com o login e o primeiro acesso', () => {
+    const passwordHashOf = async (userId: string) =>
+      (await scalar('SELECT password_hash AS value FROM users WHERE id = $1', [
+        userId,
+      ]))!;
+
+    const sessionsOf = async (userId: string) =>
+      Number(
+        await scalar(
+          `SELECT count(*)::text AS value FROM auth_sessions
+            WHERE user_id = $1 AND revoked_at IS NULL`,
+          [userId],
+        ),
+      );
+
+    it('nao abre sessao com o hash verificado antes de uma reemissao ou inativacao', async () => {
+      const { user } = await created(tenants.A);
+      const verifiedHash = await passwordHashOf(user.id);
+      const session = {
+        organizationId: tenants.A.id,
+        userId: user.id,
+        tokenHash: 'b'.repeat(64),
+        type: 'password_change' as const,
+        expiresAt: new Date(Date.now() + 600_000),
+        passwordHash: verifiedHash,
+      };
+
+      await userAction(tenants.A, user.id, 'invitation');
+      await expect(transactions.createLoginSession(session)).resolves.toBe(
+        false,
+      );
+
+      const current = await passwordHashOf(user.id);
+      await userAction(tenants.A, user.id, 'deactivate');
+      await expect(
+        transactions.createLoginSession({
+          ...session,
+          tokenHash: 'c'.repeat(64),
+          passwordHash: current,
+        }),
+      ).resolves.toBe(false);
+
+      expect(await sessionsOf(user.id)).toBe(0);
+    });
+
+    /**
+     * A inativacao trava o usuario e depois revoga as sessoes. Se o primeiro
+     * acesso travasse a sessao antes do usuario, as duas transacoes se
+     * esperariam (40P01) e uma delas viraria 500.
+     */
+    it('primeiro acesso e inativacao simultaneos nao entram em deadlock', async () => {
+      const email = nextEmail();
+      const data = await created(tenants.A, { email });
+      await tryLogin(tenants.A.code, email, data.temporaryPassword);
+      const sessionId = (await scalar(
+        `SELECT id AS value FROM auth_sessions
+          WHERE user_id = $1 AND type = 'password_change' AND revoked_at IS NULL`,
+        [data.user.id],
+      ))!;
+
+      const blocker = dataSource.createQueryRunner();
+      let firstAccess: Promise<boolean> | undefined;
+      await blocker.connect();
+
+      try {
+        await blocker.startTransaction();
+        await blocker.query('SELECT 1 FROM users WHERE id = $1 FOR UPDATE', [
+          data.user.id,
+        ]);
+
+        firstAccess = transactions.completeFirstAccess({
+          organizationId: tenants.A.id,
+          userId: data.user.id,
+          sessionId,
+          passwordHash: await passwords.hash(NEW_PASSWORD),
+          requestId: 'req-corrida-primeiro-acesso',
+        });
+        firstAccess.catch(() => undefined);
+
+        const deadline = Date.now() + 10000;
+        while (
+          (await scalar(
+            `SELECT count(*)::text AS value FROM pg_stat_activity
+              WHERE datname = current_database() AND wait_event_type = 'Lock'`,
+          )) !== '1'
+        ) {
+          if (Date.now() > deadline) {
+            throw new Error('O primeiro acesso nao bloqueou.');
+          }
+          await new Promise((resolve) => setTimeout(resolve, 20));
+        }
+
+        await blocker.query(
+          `UPDATE auth_sessions SET revoked_at = now(), revoked_reason = 'user_deactivated'
+            WHERE user_id = $1 AND revoked_at IS NULL`,
+          [data.user.id],
+        );
+        await blocker.commitTransaction();
+      } catch (error) {
+        if (blocker.isTransactionActive) {
+          await blocker.rollbackTransaction();
+        }
+        await firstAccess?.catch(() => undefined);
+        throw error;
+      } finally {
+        await blocker.release();
+      }
+
+      await expect(firstAccess).resolves.toBe(false);
+    }, 30000);
   });
 
   describe('limite do plano (user_limit = 3)', () => {
