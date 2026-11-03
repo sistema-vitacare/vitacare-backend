@@ -106,7 +106,7 @@ Todo evento de acesso é gravado em `audit_events`, sempre dentro de uma organiz
 
 Ação do master sobre outra organização gera **duas** linhas com o mesmo `request_id`: uma na organização alvo, como evento de sistema com `after_values.platformActorUserId`, porque a FK de autoria só aceita autor da própria organização; e outra na organização de plataforma, com o master como autor.
 
-O evento guarda organização, autor, ação, entidade, `request_id` e o momento. **Nada digitado na requisição entra ali**: nem e-mail, nem senha, nem IP. Para investigar uma tentativa, correlacione o `request_id` do evento com o log estruturado da mesma requisição.
+O evento guarda organização, autor, ação, entidade, `request_id` e o momento. **Nada digitado na requisição entra ali**: nem e-mail, nem senha, nem IP. Para investigar uma tentativa, correlacione o `request_id` do evento com o log estruturado da mesma requisição. O log HTTP mascara o parâmetro de query `search` (na URL e na query interpretada) como `[Redacted]`, porque a busca de usuários recebe nome ou e-mail.
 
 ## Contrato transversal
 

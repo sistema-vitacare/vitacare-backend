@@ -9,7 +9,8 @@ interface SerializedRequest {
   [key: string]: unknown;
 }
 
-const redactUrl = (url: string): string => {
+/** Mascara na URL os parametros de query sensiveis. */
+export const redactUrl = (url: string): string => {
   const separator = url.indexOf('?');
 
   if (separator === -1) {

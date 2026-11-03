@@ -9,6 +9,7 @@ import {
 import type { Response } from 'express';
 import { CommonErrors } from '../errors/commonErrors';
 import { DomainException } from '../errors/domain.exception';
+import { redactUrl } from '../http/logRedaction';
 import type { FieldError } from '../errors/domainError.type';
 import { isExcludedPath } from '../http/excludedPaths';
 import { resolveRequestId } from '../http/requestId';
@@ -195,7 +196,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
     exception: unknown,
     requestId: string,
   ): void {
-    const line = `${request.method} ${request.url} -> ${status} [${requestId}]`;
+    const line = `${request.method} ${redactUrl(request.url)} -> ${status} [${requestId}]`;
 
     if (status >= SERVER_ERROR_THRESHOLD) {
       this.logger.error(

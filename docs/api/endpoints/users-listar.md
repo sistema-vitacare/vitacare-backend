@@ -117,7 +117,7 @@ Nunca saem hash ou prazo bruto da senha, troca obrigatória, identificadores int
 | `meta.pagination.totalPages` | inteiro | não | `ceil(total / limit)`. |
 | `meta.requestId` / `meta.timestamp` | texto | não | Correlação e momento da resposta. |
 
-O CPF sai **mascarado** na listagem (minimização: a lista mostra só os seis dígitos do meio). O valor inteiro sai na [consulta](users-consultar.md). Leitura não é auditada.
+O CPF sai **mascarado** na listagem (minimização: a lista mostra só os seis dígitos do meio). O valor inteiro sai na [consulta](users-consultar.md). Leitura não é auditada. O valor de `search` é mascarado (`[Redacted]`) no log HTTP.
 
 ## Erros
 

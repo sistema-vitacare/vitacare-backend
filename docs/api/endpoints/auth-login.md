@@ -136,6 +136,7 @@ A tentativa **recusada** também é auditada, como `auth.login_failed`, desde qu
 - O limite de abuso usa o IP resolvido pelo Express. `trust proxy` está desligado, então `X-Forwarded-For` enviado pelo cliente **não** decide a contagem. Publicar atrás de proxy exige decidir essa configuração antes (pendência aberta).
 - Datas sempre em ISO 8601 UTC. Não há `0`, `false` ou `null` com significado especial nesta rota.
 - Sessão restrita: enviar seu token em qualquer outra rota responde `401 AUTH_UNAUTHENTICATED`.
+- **Mudança durante o login (BE-06, 2026-11-03):** a senha é verificada fora da transação; antes de abrir a sessão, a linha do usuário é travada e relida com o hash verificado. Se nesse intervalo a senha foi substituída (convite reemitido, redefinição administrativa) ou a conta foi inativada, a resposta é o mesmo `401 AUTH_INVALID_CREDENTIALS` e nenhuma sessão é criada. Uma revogação posterior sempre alcança a sessão aberta.
 
 ## Origem e validação
 
