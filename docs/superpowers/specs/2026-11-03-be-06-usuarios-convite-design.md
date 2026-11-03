@@ -133,7 +133,7 @@ redefinição administrativa.
 
 `id`, `name`, `email`, `cpf` (11 dígitos), `phone` (ou `null`), `status`,
 `profile { code, name }`, `invitation` (seção 4), `lastAccessAt`, `createdAt`,
-`updatedAt`, `deactivatedAt` (`deleted_at`). Na **listagem** o CPF sai
+`updatedAt`, `deletedAt` (`deleted_at`; nome alinhado ao `OrganizationDto` na implementação). Na **listagem** o CPF sai
 mascarado (`***.456.789-**`); no detalhe e nas respostas de escrita sai inteiro
 (chamada do agente: minimização na lista, o admin precisa do valor para
 corrigir). Nunca sai hash, prazo bruto fora de `invitation` ou flags internas.
@@ -239,6 +239,7 @@ A reemissão não consome vaga: o pendente já está contado.
 | `USER_ALREADY_ACTIVE` | 409 | reativar quem não está inativo |
 | `USER_INVITATION_ALREADY_ACCEPTED` | 409 | reemitir convite de usuário ativo |
 | `USER_INACTIVE` | 409 | reemitir convite de usuário inativo |
+| `USER_NOTHING_TO_UPDATE` | 422 | `PATCH` sem nenhum dos quatro campos (espelha `ORGANIZATION_NOTHING_TO_UPDATE`) |
 
 Mais os existentes: `USER_NOT_FOUND` (404), `AUTH_UNAUTHENTICATED` (401),
 `AUTH_FORBIDDEN` (403), `VALIDATION_FAILED` (422).

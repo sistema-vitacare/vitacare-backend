@@ -1,7 +1,7 @@
 ---
 title: Redefinição administrativa de senha
 status: atual
-updated: 2026-10-29
+updated: 2026-11-03
 method: POST
 path: /api/v1/auth/users/{userId}/temporary-password
 source: src/modules/Auth/auth.controller.ts
@@ -60,7 +60,7 @@ curl -i -X POST \
 | `meta.requestId` | texto | sim | Correlação. |
 | `meta.timestamp` | texto ISO 8601 | sim | Momento da resposta. |
 
-Efeitos, na mesma transação: grava o hash da senha provisória, marca `must_change_password = true`, limpa `password_changed_at`, grava `temporary_password_expires_at`, revoga **todas** as sessões do alvo, **apaga o link de recuperação pendente** do alvo, se houver, e escreve auditoria `auth.admin_password_reset` com o administrador como ator e o alvo como entidade. No próximo login, dentro do prazo, o alvo recebe a sessão restrita e passa pelo [primeiro acesso](auth-primeiro-acesso.md); concluída a troca, o prazo é limpo.
+Efeitos, na mesma transação: grava o hash da senha provisória, marca `must_change_password = true`, limpa `password_changed_at`, grava `temporary_password_expires_at`, revoga **todas** as sessões do alvo, **apaga o link de recuperação pendente** do alvo, se houver, e escreve auditoria `auth.admin_password_reset` com o administrador como ator e o alvo como entidade. No próximo login, dentro do prazo, o alvo recebe a sessão restrita e passa pelo [primeiro acesso](auth-primeiro-acesso.md); concluída a troca, o prazo é limpo. É também o caminho para dar senha a um usuário [reativado](users-reativar.md) que foi inativado ainda pendente (o convite dele venceu na inativação).
 
 ## Erros
 
@@ -68,7 +68,7 @@ Efeitos, na mesma transação: grava o hash da senha provisória, marca `must_ch
 | --- | --- | --- |
 | `401` | `AUTH_UNAUTHENTICATED` | Bearer ausente, inválido, expirado, restrito ou revogado. |
 | `403` | `AUTH_FORBIDDEN` | Sessão sem a permissão `users:reset_password`. |
-| `404` | `AUTH_USER_NOT_FOUND` | Alvo inexistente, inativo, excluído **ou de outra organização**. |
+| `404` | `AUTH_USER_NOT_FOUND` | Alvo inexistente, inativo, excluído, **pendente** (convidado que ainda não concluiu o primeiro acesso: use a [reemissão do convite](users-reemitir-convite.md)) **ou de outra organização**. |
 | `409` | `AUTH_INVALID_STATE` | O alvo é a própria conta autenticada. |
 | `422` | `VALIDATION_FAILED` | `userId` não é um UUID. |
 

@@ -1,7 +1,7 @@
 ---
 title: Manual de integração da API VitaCare
 status: atual
-updated: 2026-10-30
+updated: 2026-11-03
 ---
 
 # Manual de integração da API VitaCare
@@ -37,6 +37,13 @@ O corpo das rotas de negócio é JSON quando aplicável. Autenticação usa Bear
 | `POST /api/v1/organizations/:organizationId/deactivate` | Inativa organização (plataforma) | [organizations-inativar.md](endpoints/organizations-inativar.md) |
 | `POST /api/v1/organizations/:organizationId/reactivate` | Reativa organização (plataforma) | [organizations-reativar.md](endpoints/organizations-reativar.md) |
 | `GET /api/v1/access-profiles` | Lista os perfis de acesso da organização e suas permissões | [access-profiles-listar.md](endpoints/access-profiles-listar.md) |
+| `POST /api/v1/users` | Cadastra usuário pendente e devolve a senha provisória do convite | [users-criar.md](endpoints/users-criar.md) |
+| `GET /api/v1/users` | Lista os usuários da organização | [users-listar.md](endpoints/users-listar.md) |
+| `GET /api/v1/users/:userId` | Consulta um usuário da organização | [users-consultar.md](endpoints/users-consultar.md) |
+| `PATCH /api/v1/users/:userId` | Edita nome, e-mail, CPF ou telefone | [users-atualizar.md](endpoints/users-atualizar.md) |
+| `POST /api/v1/users/:userId/deactivate` | Inativa o usuário e revoga o acesso | [users-inativar.md](endpoints/users-inativar.md) |
+| `POST /api/v1/users/:userId/reactivate` | Reativa o usuário, respeitando o limite do plano | [users-reativar.md](endpoints/users-reativar.md) |
+| `POST /api/v1/users/:userId/invitation` | Reemite o convite de usuário pendente | [users-reemitir-convite.md](endpoints/users-reemitir-convite.md) |
 | `PATCH /api/v1/users/:userId/profile` | Troca o perfil de acesso de um usuário da organização | [users-alterar-perfil.md](endpoints/users-alterar-perfil.md) |
 
 Os caminhos de Swagger usam `SWAGGER_PATH=docs` e só existem com `SWAGGER_ENABLED=true`. O documento OpenAPI é gerado em runtime; consulte a rota JSON do ambiente para conferir a versão publicada. `/health/live` é excluída do OpenAPI de propósito, mas permanece documentada aqui.
@@ -59,6 +66,10 @@ Cada requisição recompõe o contexto no banco, então revogação, expiração
 Cada requisição aceita renova a janela de inatividade da sessão normal; o prazo absoluto não é renovado. A organização efetiva **sempre** vem da sessão: nenhuma rota aceita `organizationId` do cliente como prova de autorização. Autorização por permissão nomeada usa o formato `recurso:acao`; falta de permissão responde `403 AUTH_FORBIDDEN`.
 
 Todo usuário de organização cliente tem um de quatro **perfis fixos**: `admin`, `professional`, `caregiver` e `family`. O catálogo de permissões e a matriz de cada perfil são consultados em [GET /access-profiles](endpoints/access-profiles-listar.md); o administrador troca o perfil de um usuário por [PATCH /users/:userId/profile](endpoints/users-alterar-perfil.md). As permissões são relidas do banco a cada requisição, então a troca vale na chamada seguinte do usuário, sem revogar a sessão.
+
+### Usuários e convite sem e-mail
+
+O administrador da organização gerencia os usuários do próprio tenant pelas rotas `/api/v1/users` (BE-06, 2026-11-03). Como não há SMTP, o **convite** é uma senha provisória devolvida uma única vez no [cadastro](endpoints/users-criar.md): o administrador a entrega fora da API, o usuário nasce `pending`, entra só pela sessão restrita e vira `active` ao concluir o [primeiro acesso](endpoints/auth-primeiro-acesso.md). A senha vale 24 horas; vencida ou perdida, o administrador a [reemite](endpoints/users-reemitir-convite.md), e a anterior para de valer. Usuários `pending` e `active` — o primeiro administrador incluído — contam no limite de usuários do plano (`usage_plans.user_limit`), verificado no cadastro e na reativação. [Inativar](endpoints/users-inativar.md) revoga sessões, links de recuperação e convite na hora, sem apagar histórico; não existe exclusão.
 
 Rotas públicas de autenticação: login, solicitação de recuperação e redefinição por token. Todo o resto exige Bearer, e o OpenAPI marca isso no esquema `bearer`.
 

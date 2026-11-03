@@ -1,7 +1,7 @@
 ---
 title: Primeiro acesso
 status: atual
-updated: 2026-09-22
+updated: 2026-11-03
 method: POST
 path: /api/v1/auth/password/first-access
 source: src/modules/Auth/auth.controller.ts
@@ -15,7 +15,7 @@ Define a senha definitiva de quem entrou com senha provisória (RF001, UC01). S�
 
 Autenticação: `Authorization: Bearer <token da sessão restrita>`. Não exige permissão nomeada: o alvo é sempre a própria conta, derivada da sessão. Sessão normal nesta rota responde `401`.
 
-Uma chamada bem-sucedida, em uma única transação: grava o novo hash, limpa a troca obrigatória, marca `password_changed_at`, revoga o desafio e escreve auditoria (`auth.first_access_completed`). O usuário precisa fazer login de novo — o token restrito morre junto.
+Uma chamada bem-sucedida, em uma única transação: grava o novo hash, limpa a troca obrigatória e o prazo da senha provisória, marca `password_changed_at`, revoga o desafio e escreve auditoria (`auth.first_access_completed`). Para o usuário **convidado** (`pending`, cadastrado por [POST /users](users-criar.md)), é este passo que **aceita o convite**: o status passa a `active` na mesma transação (BE-06, 2026-11-03). O usuário precisa fazer login de novo — o token restrito morre junto.
 
 ## Request
 
@@ -62,7 +62,7 @@ curl -i -X POST 'https://api.example.com/api/v1/auth/password/first-access' \
 
 | Status | `error.code` | Quando |
 | --- | --- | --- |
-| `401` | `AUTH_UNAUTHENTICATED` | Bearer ausente ou malformado; sessão expirada, revogada ou de tipo normal; desafio já consumido por outra submissão; conta deixou de estar ativa durante a operação. |
+| `401` | `AUTH_UNAUTHENTICATED` | Bearer ausente ou malformado; sessão expirada, revogada ou de tipo normal; desafio já consumido por outra submissão; conta foi inativada durante a operação (a inativação revoga a sessão restrita; o convite reemitido também). |
 | `422` | `VALIDATION_FAILED` | `newPassword` ausente, com menos de 8 ou mais de 128 caracteres, ou propriedade desconhecida. |
 | `422` | `AUTH_PASSWORD_REUSE` | A nova senha é igual à provisória. |
 
@@ -92,4 +92,4 @@ curl -i -X POST 'https://api.example.com/api/v1/auth/password/first-access' \
 
 ## Origem e validação
 
-Controller `src/modules/Auth/auth.controller.ts`; DTO `src/modules/Auth/CompleteFirstAccess/completeFirstAccess.dto.ts`; caso de uso `completeFirstAccess.useCase.ts`; transação `src/modules/Auth/repositories/authTransaction.repository.ts`. Testes: `tests/modules/Auth/completeFirstAccess.useCase.spec.ts`, `tests/modules/Auth/auth.e2e-spec.ts` (status 200, `data: null`, 401 sem Bearer) e `tests/modules/Auth/authSchema.e2e-spec.ts` (desafio de uso único e reuso recusado, em PostgreSQL real). Conferido contra o OpenAPI gerado em 2026-09-22. Vault: [[2026-09-21-autenticacao-sessoes-recuperacao]].
+Controller `src/modules/Auth/auth.controller.ts`; DTO `src/modules/Auth/CompleteFirstAccess/completeFirstAccess.dto.ts`; caso de uso `completeFirstAccess.useCase.ts`; transação `src/modules/Auth/repositories/authTransaction.repository.ts`. Testes: `tests/modules/Auth/completeFirstAccess.useCase.spec.ts`, `tests/modules/Auth/auth.e2e-spec.ts` (status 200, `data: null`, 401 sem Bearer) e `tests/modules/Auth/authSchema.e2e-spec.ts` (desafio de uso único e reuso recusado, em PostgreSQL real). Aceite do convite (`pending` → `active`) e sessão restrita derrubada por inativação ou reemissão: `tests/modules/User/userManagement.e2e-spec.ts` (PostgreSQL real). Conferido contra o OpenAPI gerado em 2026-09-22; aceite do convite revisto em 2026-11-03. Vault: [[2026-09-21-autenticacao-sessoes-recuperacao]], [[2026-11-03-usuarios-e-convite-por-senha-provisoria]].

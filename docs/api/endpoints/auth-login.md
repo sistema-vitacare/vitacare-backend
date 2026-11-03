@@ -1,7 +1,7 @@
 ---
 title: Login em uma organização
 status: atual
-updated: 2026-10-29
+updated: 2026-11-03
 method: POST
 path: /api/v1/auth/login
 source: src/modules/Auth/auth.controller.ts
@@ -16,7 +16,7 @@ Autentica um usuário dentro de **uma** organização e devolve o token de sess�
 A resposta diz em qual estado a sessão nasceu:
 
 - `authenticated`: sessão normal, válida por 12 horas absolutas e 30 minutos sem atividade. Cada requisição aceita renova a janela de inatividade.
-- `password_change_required`: sessão **restrita**, válida por 10 minutos, que só alcança [primeiro acesso](auth-primeiro-acesso.md) e [logout](auth-logout.md). Ela aparece quando o usuário tem troca obrigatória pendente (master criado por `npm run seed:platform`, administrador criado com a organização ou senha redefinida por administrador).
+- `password_change_required`: sessão **restrita**, válida por 10 minutos, que só alcança [primeiro acesso](auth-primeiro-acesso.md) e [logout](auth-logout.md). Ela aparece quando o usuário tem troca obrigatória pendente (master criado por `npm run seed:platform`, administrador criado com a organização, senha redefinida por administrador ou **usuário convidado**). O convidado cadastrado por [POST /users](users-criar.md) tem status `pending` e entra **só** por esta sessão, com a senha provisória do convite dentro de 24 h; ele nunca recebe sessão normal antes de concluir o [primeiro acesso](auth-primeiro-acesso.md) (BE-06, 2026-11-03).
 
 O token é opaco: o servidor guarda apenas o SHA-256 dele. Não decodifique, não confie em nada escrito nele e não o persista em armazenamento compartilhado.
 
@@ -85,7 +85,7 @@ A tentativa **recusada** também é auditada, como `auth.login_failed`, desde qu
 
 | Status | `error.code` | Quando |
 | --- | --- | --- |
-| `401` | `AUTH_INVALID_CREDENTIALS` | Organização inexistente ou inativa, conta inexistente, pendente, inativa ou excluída, conta sem senha definida, senha errada, **senha temporária de redefinição administrativa vencida** (24 h). **Todos** respondem igual. |
+| `401` | `AUTH_INVALID_CREDENTIALS` | Organização inexistente ou inativa, conta inexistente, inativa ou excluída, conta sem senha definida, senha errada, **senha temporária de redefinição administrativa ou de convite vencida** (24 h), senha provisória substituída por reemissão do convite. **Todos** respondem igual. |
 | `422` | `VALIDATION_FAILED` | Campo ausente, fora do formato ou fora dos limites; propriedade desconhecida no corpo. |
 | `429` | `AUTH_TEMPORARILY_BLOCKED` | Cinco falhas na mesma combinação organização/e-mail ou no mesmo IP dentro de 15 minutos. O bloqueio dura 15 minutos e não altera `users.status`. |
 | `503` | `AUTH_DEPENDENCY_UNAVAILABLE` | Redis indisponível: sem o contador de abuso a tentativa é recusada, nunca liberada. |
@@ -139,4 +139,4 @@ A tentativa **recusada** também é auditada, como `auth.login_failed`, desde qu
 
 ## Origem e validação
 
-Controller `src/modules/Auth/auth.controller.ts`; DTO `src/modules/Auth/Login/login.dto.ts`; caso de uso `src/modules/Auth/Login/login.useCase.ts`; catálogo `src/modules/Auth/auth.errors.ts`; prazos em `src/config/auth.config.ts`; migration `src/database/migrations/1790000000000-CreateAuthSchema.ts`. Testes: `tests/modules/Auth/login.useCase.spec.ts`, `tests/modules/Auth/auth.e2e-spec.ts` (envelope, `no-store`, 401 uniforme, 422, `X-Forwarded-For`) e `tests/modules/Auth/authSchema.e2e-spec.ts` (duas organizações com o mesmo e-mail e os três desfechos de auditoria da tentativa falha, em PostgreSQL real). Conferido contra o OpenAPI gerado em 2026-09-22. Vault: [[2026-09-21-autenticacao-sessoes-recuperacao]], [[2026-09-22-auditoria-de-acesso]].
+Controller `src/modules/Auth/auth.controller.ts`; DTO `src/modules/Auth/Login/login.dto.ts`; caso de uso `src/modules/Auth/Login/login.useCase.ts`; catálogo `src/modules/Auth/auth.errors.ts`; prazos em `src/config/auth.config.ts`; migration `src/database/migrations/1790000000000-CreateAuthSchema.ts`. Testes: `tests/modules/Auth/login.useCase.spec.ts`, `tests/modules/Auth/auth.e2e-spec.ts` (envelope, `no-store`, 401 uniforme, 422, `X-Forwarded-For`) e `tests/modules/Auth/authSchema.e2e-spec.ts` (duas organizações com o mesmo e-mail e os três desfechos de auditoria da tentativa falha, em PostgreSQL real). Login do convidado pendente: `tests/modules/Auth/login.useCase.spec.ts` (pendente dentro do prazo → sessão `password_change`; vencido → 401) e `tests/modules/User/userManagement.e2e-spec.ts` (PostgreSQL real). Conferido contra o OpenAPI gerado em 2026-09-22; texto de convidado revisto em 2026-11-03. Vault: [[2026-09-21-autenticacao-sessoes-recuperacao]], [[2026-09-22-auditoria-de-acesso]], [[2026-11-03-usuarios-e-convite-por-senha-provisoria]].
