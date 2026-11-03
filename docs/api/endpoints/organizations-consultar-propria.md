@@ -13,7 +13,7 @@ source: src/modules/Organization/organization.controller.ts
 
 Devolve os dados cadastrais da organização à qual o usuário autenticado pertence (RF003, UC03 passo 2: "visualiza os dados da organização"). Serve tanto ao administrador de uma organização cliente quanto ao administrador master, que vê a organização de plataforma.
 
-Autenticação: `Authorization: Bearer <token>` de sessão **normal**, com a permissão `organization:read`. A organização vem **sempre** da sessão; a rota não recebe identificador. Hoje só o perfil `admin` de cada organização e o `platform_admin` recebem a permissão; a matriz dos demais perfis é da tarefa 4 (RF005/RF016).
+Autenticação: `Authorization: Bearer <token>` de sessão **normal**, com a permissão `organization:read`. A organização vem **sempre** da sessão; a rota não recebe identificador. Pela matriz de perfis do BE-05 (RF005/RF016), só o perfil `admin` de cada organização e o `platform_admin` recebem a permissão.
 
 ## Request
 

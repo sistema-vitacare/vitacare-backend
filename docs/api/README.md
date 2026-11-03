@@ -1,7 +1,7 @@
 ---
 title: Manual de integração da API VitaCare
 status: atual
-updated: 2026-10-29
+updated: 2026-10-30
 ---
 
 # Manual de integração da API VitaCare
@@ -36,6 +36,8 @@ O corpo das rotas de negócio é JSON quando aplicável. Autenticação usa Bear
 | `PATCH /api/v1/organizations/:organizationId` | Atualiza qualquer organização (plataforma) | [organizations-atualizar.md](endpoints/organizations-atualizar.md) |
 | `POST /api/v1/organizations/:organizationId/deactivate` | Inativa organização (plataforma) | [organizations-inativar.md](endpoints/organizations-inativar.md) |
 | `POST /api/v1/organizations/:organizationId/reactivate` | Reativa organização (plataforma) | [organizations-reativar.md](endpoints/organizations-reativar.md) |
+| `GET /api/v1/access-profiles` | Lista os perfis de acesso da organização e suas permissões | [access-profiles-listar.md](endpoints/access-profiles-listar.md) |
+| `PATCH /api/v1/users/:userId/profile` | Troca o perfil de acesso de um usuário da organização | [users-alterar-perfil.md](endpoints/users-alterar-perfil.md) |
 
 Os caminhos de Swagger usam `SWAGGER_PATH=docs` e só existem com `SWAGGER_ENABLED=true`. O documento OpenAPI é gerado em runtime; consulte a rota JSON do ambiente para conferir a versão publicada. `/health/live` é excluída do OpenAPI de propósito, mas permanece documentada aqui.
 
@@ -55,6 +57,8 @@ Cada requisição recompõe o contexto no banco, então revogação, expiração
 | `password_change` | Login de conta com troca obrigatória | 10 minutos absolutos | Apenas [primeiro acesso](endpoints/auth-primeiro-acesso.md) e [logout](endpoints/auth-logout.md) |
 
 Cada requisição aceita renova a janela de inatividade da sessão normal; o prazo absoluto não é renovado. A organização efetiva **sempre** vem da sessão: nenhuma rota aceita `organizationId` do cliente como prova de autorização. Autorização por permissão nomeada usa o formato `recurso:acao`; falta de permissão responde `403 AUTH_FORBIDDEN`.
+
+Todo usuário de organização cliente tem um de quatro **perfis fixos**: `admin`, `professional`, `caregiver` e `family`. O catálogo de permissões e a matriz de cada perfil são consultados em [GET /access-profiles](endpoints/access-profiles-listar.md); o administrador troca o perfil de um usuário por [PATCH /users/:userId/profile](endpoints/users-alterar-perfil.md). As permissões são relidas do banco a cada requisição, então a troca vale na chamada seguinte do usuário, sem revogar a sessão.
 
 Rotas públicas de autenticação: login, solicitação de recuperação e redefinição por token. Todo o resto exige Bearer, e o OpenAPI marca isso no esquema `bearer`.
 

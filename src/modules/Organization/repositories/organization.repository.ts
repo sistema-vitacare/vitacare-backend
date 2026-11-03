@@ -4,8 +4,7 @@ import { DataSource, type EntityManager } from 'typeorm';
 import type { RequestContext } from '@/common/context/requestContext.type';
 import { DomainException } from '@/common/errors/domain.exception';
 import { translatePgError } from '@/common/errors/pgError.translator';
-import { TENANT_ADMIN_PERMISSIONS } from '@/modules/Access/access.permissions';
-import { grantPermissions } from '@/modules/Access/repositories/permissionGrant.repository';
+import { provisionTenantProfiles } from '@/modules/Access/repositories/tenantProfileProvisioning.repository';
 import { insertAuditEvent } from '@/modules/Audit/repositories/auditEvent.repository';
 
 import {
@@ -133,19 +132,7 @@ export class OrganizationRepository {
           ],
         );
 
-        const [{ id: profileId }] = await manager.query<Array<{ id: string }>>(
-          `INSERT INTO access_profiles (organization_id, code, name, description)
-           VALUES ($1, 'admin', 'Administrador', 'Perfil inicial criado com a organizacao')
-           RETURNING id`,
-          [organizationId],
-        );
-
-        await grantPermissions(
-          manager,
-          organizationId,
-          profileId,
-          TENANT_ADMIN_PERMISSIONS,
-        );
+        const profiles = await provisionTenantProfiles(manager, organizationId);
 
         const { administrator } = record;
 
@@ -158,7 +145,7 @@ export class OrganizationRepository {
            RETURNING id`,
           [
             organizationId,
-            profileId,
+            profiles.admin,
             administrator.name,
             administrator.email,
             administrator.cpf,

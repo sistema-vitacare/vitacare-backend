@@ -1,11 +1,8 @@
 import { DataSource, EntityManager } from 'typeorm';
 
-import {
-  PLATFORM_ADMIN_PERMISSIONS,
-  type PermissionName,
-  TENANT_ADMIN_PERMISSIONS,
-} from '@/modules/Access/access.permissions';
+import { PLATFORM_ADMIN_PERMISSIONS } from '@/modules/Access/access.permissions';
 import { grantPermissions } from '@/modules/Access/repositories/permissionGrant.repository';
+import { provisionTenantProfiles } from '@/modules/Access/repositories/tenantProfileProvisioning.repository';
 import { PasswordHasher } from '@/modules/Auth/security/passwordHasher';
 
 /**
@@ -14,9 +11,11 @@ import { PasswordHasher } from '@/modules/Auth/security/passwordHasher';
  * senha conhecida. Serve para exercitar a API e, principalmente,
  * para testar **isolamento entre organizacoes** — por isso duas, e nao uma.
  *
- * Nada aqui e catalogo comercial nem matriz de permissao aprovada: planos
- * (P05/P06) e permissoes por perfil (RF005/RF016) continuam pendentes de
- * decisao de produto. O seed e **idempotente**: rodar de novo nao duplica.
+ * Os planos nao sao catalogo comercial: P05/P06 continuam pendentes de
+ * decisao de produto. Os quatro perfis de cada organizacao cliente seguem a
+ * matriz decidida em 2026-10-29 (BE-05, RF005/RF016), aplicada por
+ * `provisionTenantProfiles`, como no cadastro de organizacao. O seed e
+ * **idempotente**: rodar de novo nao duplica.
  */
 
 /** Senha unica dos usuarios de desenvolvimento. Nunca usar fora daqui. */
@@ -90,25 +89,6 @@ export const DEV_ORGANIZATIONS: DevOrganization[] = [
 export const DEV_PLATFORM = {
   code: 'vitacare',
   tradeName: 'VitaCare Plataforma',
-};
-
-/**
- * Perfis por organizacao cliente. Os quatro codigos vem de `ProfileCode`; a
- * matriz de acao, campo e vinculo de cada um ainda nao foi decidida.
- */
-export const DEV_PROFILES = [
-  { code: 'admin', name: 'Administrador' },
-  { code: 'professional', name: 'Profissional de saude' },
-  { code: 'caregiver', name: 'Cuidador' },
-  { code: 'family', name: 'Familiar' },
-];
-
-/** Apenas o perfil administrador recebe permissoes; o resto da matriz e da tarefa 4. */
-const PERMISSIONS_BY_PROFILE: Readonly<
-  Record<string, readonly PermissionName[]>
-> = {
-  platform_admin: PLATFORM_ADMIN_PERMISSIONS,
-  admin: TENANT_ADMIN_PERMISSIONS,
 };
 
 export const DEV_USERS: DevUser[] = [
@@ -282,36 +262,49 @@ export const runDevSeed = async (
 
     const profileIds = new Map<string, string>();
 
-    for (const [code, organizationId] of organizationIds) {
-      const profiles =
-        code === DEV_PLATFORM.code
-          ? [{ code: 'platform_admin', name: 'Administrador master' }]
-          : DEV_PROFILES;
+    const platformProfile = await upsertId(
+      manager,
+      {
+        sql: `INSERT INTO access_profiles (organization_id, code, name, description)
+              VALUES ($1, 'platform_admin', 'Administrador master', 'Perfil criado pelo seed de desenvolvimento')
+              ON CONFLICT DO NOTHING
+              RETURNING id`,
+        parameters: [platform.id],
+      },
+      {
+        sql: `SELECT id FROM access_profiles WHERE organization_id = $1 AND code = 'platform_admin'`,
+        parameters: [platform.id],
+      },
+    );
 
-      for (const profile of profiles) {
-        const { id, created } = await upsertId(
-          manager,
-          {
-            sql: `INSERT INTO access_profiles (organization_id, code, name, description)
-                  VALUES ($1, $2, $3, 'Perfil criado pelo seed de desenvolvimento')
-                  ON CONFLICT DO NOTHING
-                  RETURNING id`,
-            parameters: [organizationId, profile.code, profile.name],
-          },
-          {
-            sql: `SELECT id FROM access_profiles WHERE organization_id = $1 AND code = $2`,
-            parameters: [organizationId, profile.code],
-          },
-        );
+    profileIds.set(`${DEV_PLATFORM.code}:platform_admin`, platformProfile.id);
+    result.profiles += platformProfile.created ? 1 : 0;
 
-        profileIds.set(`${code}:${profile.code}`, id);
-        result.profiles += created ? 1 : 0;
+    await grantPermissions(
+      manager,
+      platform.id,
+      platformProfile.id,
+      PLATFORM_ADMIN_PERMISSIONS,
+    );
 
-        const permissions = PERMISSIONS_BY_PROFILE[profile.code];
+    const profileCountOf = async (organizationId: string): Promise<number> => {
+      const rows = await manager.query<Array<{ total: string }>>(
+        `SELECT count(*)::text AS total FROM access_profiles WHERE organization_id = $1`,
+        [organizationId],
+      );
 
-        if (permissions) {
-          await grantPermissions(manager, organizationId, id, permissions);
-        }
+      return Number(rows[0].total);
+    };
+
+    for (const organization of DEV_ORGANIZATIONS) {
+      const organizationId = organizationIds.get(organization.code)!;
+      const before = await profileCountOf(organizationId);
+      const profiles = await provisionTenantProfiles(manager, organizationId);
+
+      result.profiles += (await profileCountOf(organizationId)) - before;
+
+      for (const [profileCode, id] of Object.entries(profiles)) {
+        profileIds.set(`${organization.code}:${profileCode}`, id);
       }
     }
 
