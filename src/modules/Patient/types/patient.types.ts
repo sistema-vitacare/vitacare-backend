@@ -2,8 +2,13 @@ export type PatientStatus = 'active' | 'inactive';
 
 export type PatientSex = 'female' | 'male' | 'other';
 
-/** Papel do vinculo usuario-paciente; o BE-10 amplia o conjunto. */
-export type PatientLinkRole = 'responsible_professional';
+/** Papeis de vinculo de cuidado (BE-10), derivados do perfil do usuario. */
+export const CARE_LINK_ROLES = ['caregiver', 'family'] as const;
+
+export type CareLinkRole = (typeof CARE_LINK_ROLES)[number];
+
+/** Papel do vinculo usuario-paciente (`papel` do MER). */
+export type PatientLinkRole = 'responsible_professional' | CareLinkRole;
 
 /** Dados cadastrais gravados no paciente (sem status nem responsavel). */
 export interface PatientFields {

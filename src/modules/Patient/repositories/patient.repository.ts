@@ -8,6 +8,7 @@ import { insertAuditEvent } from '@/modules/Audit/repositories/auditEvent.reposi
 import { checkPlanSeat } from '@/modules/Plan/repositories/planSeat.query';
 
 import { PatientErrors } from '../patient.errors';
+import { PATIENT_SCOPE_WHERE } from './patientScope.query';
 import type {
   CreatePatientCommand,
   CreatePatientOutcome,
@@ -93,17 +94,6 @@ const PATIENT_SELECT = `
       ON r.id = link.user_id
      AND r.organization_id = link.organization_id`;
 
-const SCOPE_WHERE = `
-   WHERE p.organization_id = $1
-     AND ($2::uuid IS NULL OR EXISTS (
-           SELECT 1
-             FROM user_patients viewer
-            WHERE viewer.organization_id = p.organization_id
-              AND viewer.patient_id = p.id
-              AND viewer.user_id = $2
-              AND viewer.role = ANY($3::varchar[])
-              AND viewer.deleted_at IS NULL))`;
-
 /** `%`, `_` e `\` digitados na busca sao texto, nao curinga do ILIKE. */
 const escapeLike = (value: string): string => value.replace(/[\\%_]/g, '\\$&');
 
@@ -145,7 +135,7 @@ export class PatientRepository {
     scope: PatientScope,
     filter: ListPatientsFilter,
   ): Promise<[PatientRow[], number]> {
-    const where = `${SCOPE_WHERE}
+    const where = `${PATIENT_SCOPE_WHERE}
        AND p.status = $4
        AND ($5::text IS NULL
             OR p.name ILIKE $5 ESCAPE '\\'
@@ -422,7 +412,7 @@ export class PatientRepository {
     options: { forUpdate?: boolean } = {},
   ): Promise<PatientRow | null> {
     const [row] = await manager.query<PatientRow[]>(
-      `${PATIENT_SELECT} ${SCOPE_WHERE}
+      `${PATIENT_SELECT} ${PATIENT_SCOPE_WHERE}
           AND p.id = $4
         ${options.forUpdate ? 'FOR NO KEY UPDATE OF p' : ''}`,
       [

@@ -15,13 +15,16 @@ describe('patientScope', () => {
     },
   );
 
-  it.each([ProfileCode.CAREGIVER, ProfileCode.FAMILY] as const)(
-    '%s so alcanca vinculados, e o vinculo de responsavel nao conta',
-    (profile) => {
+  it.each([
+    [ProfileCode.CAREGIVER, 'caregiver'],
+    [ProfileCode.FAMILY, 'family'],
+  ] as const)(
+    '%s so alcanca vinculados no papel do proprio perfil, nunca pelo de responsavel',
+    (profile, role) => {
       expect(patientScope(sessionOf(profile))).toEqual({
         organizationId: ORGANIZATION_ID,
         viewerUserId: ACTOR_ID,
-        viewerLinkRoles: [],
+        viewerLinkRoles: [role],
       });
     },
   );
