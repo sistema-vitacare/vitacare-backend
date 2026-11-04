@@ -33,7 +33,7 @@ Body:
 | Propriedade JSON | Tipo / formato | Obrigatória | Null | Limites | Significado |
 | --- | --- | --- | --- | --- | --- |
 | `name` | texto | sim | não | 1 a 180 após aparar espaços | Nome completo. |
-| `birthDate` | texto `YYYY-MM-DD` | sim | não | data existente entre 1900-01-01 e hoje (UTC) | Data de nascimento. |
+| `birthDate` | texto `YYYY-MM-DD` | sim | não | data existente entre 1900-01-01 e hoje (fuso de Brasília) | Data de nascimento. |
 | `responsibleUserId` | texto, UUID | sim | não | — | Profissional responsável: usuário `pending` ou `active` da organização da sessão com perfil `professional` ou `admin`.  |
 | `sex` | texto, enum | não | sim | `female`, `male`, `other` | Sexo. |
 | `cpf` | texto | não | sim | 11 dígitos com dígitos verificadores válidos; aceita pontuação | Gravado só com dígitos. Único na organização, **inclusive entre pacientes inativos**; a mesma pessoa pode ser paciente em outra organização. |

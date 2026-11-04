@@ -81,7 +81,13 @@ const isCalendarDate = (value: string): boolean => {
   );
 };
 
-/** `YYYY-MM-DD` existente, entre 1900-01-01 e hoje (UTC). */
+/** Hoje no fuso de Brasilia, como `YYYY-MM-DD`. */
+const todayInBrazil = (): string =>
+  new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(
+    new Date(),
+  );
+
+/** `YYYY-MM-DD` existente, entre 1900-01-01 e hoje (fuso de Brasilia). */
 export const IsBirthDate =
   (options?: ValidationOptions): PropertyDecorator =>
   (target: object, propertyName: string | symbol) =>
@@ -96,6 +102,6 @@ export const IsBirthDate =
           /^\d{4}-\d{2}-\d{2}$/.test(value) &&
           isCalendarDate(value) &&
           value >= MIN_BIRTH_DATE &&
-          value <= new Date().toISOString().slice(0, 10),
+          value <= todayInBrazil(),
       },
     });

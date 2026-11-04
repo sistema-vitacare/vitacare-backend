@@ -41,11 +41,12 @@ export interface PatientRow extends PatientFields {
 
 /**
  * Alcance de leitura. `viewerUserId` nulo = toda a organizacao; preenchido =
- * so pacientes com vinculo vigente desse usuario.
+ * so pacientes com vinculo vigente desse usuario num dos `viewerLinkRoles`.
  */
 export interface PatientScope {
   organizationId: string;
   viewerUserId: string | null;
+  viewerLinkRoles: readonly PatientLinkRole[];
 }
 
 /** Organizacao, ator e requestId vem sempre da sessao, nunca do corpo. */

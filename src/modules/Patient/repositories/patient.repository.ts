@@ -55,7 +55,7 @@ const RESPONSIBLE_ROLE = 'responsible_professional';
 /** Perfis aceitos como profissional responsavel (admin herda o profissional). */
 const RESPONSIBLE_PROFILES = [ProfileCode.PROFESSIONAL, ProfileCode.ADMIN];
 
-/** Pacientes do tenant `$1`; com `$2`, so os vinculados a esse usuario. */
+/** Pacientes do tenant `$1`; com `$2`, so os vinculados a ele num papel de `$3`. */
 const PATIENT_SELECT = `
   SELECT p.id,
          p.name,
@@ -99,6 +99,7 @@ const SCOPE_WHERE = `
             WHERE viewer.organization_id = p.organization_id
               AND viewer.patient_id = p.id
               AND viewer.user_id = $2
+              AND viewer.role = ANY($3::varchar[])
               AND viewer.deleted_at IS NULL))`;
 
 /** `%`, `_` e `\` digitados na busca sao texto, nao curinga do ILIKE. */
@@ -130,7 +131,9 @@ const isPostgresError = (error: unknown): error is PostgresError =>
  *
  * Cadastro e reativacao ocupam vaga: tomam a trava `FOR NO KEY UPDATE` da
  * organizacao (mesma de usuarios) antes de `checkPlanSeat`, o que serializa as
- * escritas concorrentes do tenant. Edicao e inativacao travam so o paciente.
+ * escritas concorrentes do tenant. A troca de responsavel toma a mesma trava,
+ * para nao correr com a troca de perfil do usuario (BE-05), que tambem a usa.
+ * Edicao sem troca e inativacao travam so o paciente.
  */
 @Injectable()
 export class PatientRepository {
@@ -141,19 +144,20 @@ export class PatientRepository {
     filter: ListPatientsFilter,
   ): Promise<[PatientRow[], number]> {
     const where = `${SCOPE_WHERE}
-       AND p.status = $3
-       AND ($4::text IS NULL
-            OR p.name ILIKE $4 ESCAPE '\\'
-            OR ($5::text IS NOT NULL AND p.cpf LIKE $5))
-       AND ($6::text IS NULL
-            OR p.main_condition ILIKE $6 ESCAPE '\\'
+       AND p.status = $4
+       AND ($5::text IS NULL
+            OR p.name ILIKE $5 ESCAPE '\\'
+            OR ($6::text IS NOT NULL AND p.cpf LIKE $6))
+       AND ($7::text IS NULL
+            OR p.main_condition ILIKE $7 ESCAPE '\\'
             OR EXISTS (
                  SELECT 1 FROM unnest(p.secondary_conditions) AS condition
-                  WHERE condition ILIKE $6 ESCAPE '\\'))`;
+                  WHERE condition ILIKE $7 ESCAPE '\\'))`;
     const cpfDigits = filter.search ? cpfDigitsOf(filter.search) : null;
     const parameters = [
       scope.organizationId,
       scope.viewerUserId,
+      scope.viewerLinkRoles,
       filter.status,
       filter.search ? `%${escapeLike(filter.search)}%` : null,
       cpfDigits ? `%${cpfDigits}%` : null,
@@ -165,7 +169,7 @@ export class PatientRepository {
         this.dataSource.query<PatientRow[]>(
           `${PATIENT_SELECT} ${where}
             ORDER BY p.name, p.id
-            LIMIT $7 OFFSET $8`,
+            LIMIT $8 OFFSET $9`,
           [...parameters, filter.take, filter.skip],
         ),
         this.dataSource.query<Array<{ total: number }>>(
@@ -238,6 +242,10 @@ export class PatientRepository {
   /** Grava so o que mudou; nada mudou nao grava nem audita. */
   async update(command: UpdatePatientCommand): Promise<UpdatePatientOutcome> {
     return this.write(async (manager) => {
+      if (command.responsibleUserId !== undefined) {
+        await this.lockOrganization(manager, command.organizationId);
+      }
+
       const current = await this.findIn(manager, command, command.patientId, {
         forUpdate: true,
       });
@@ -413,9 +421,14 @@ export class PatientRepository {
   ): Promise<PatientRow | null> {
     const [row] = await manager.query<PatientRow[]>(
       `${PATIENT_SELECT} ${SCOPE_WHERE}
-          AND p.id = $3
-        ${options.forUpdate ? 'FOR UPDATE OF p' : ''}`,
-      [scope.organizationId, scope.viewerUserId, patientId],
+          AND p.id = $4
+        ${options.forUpdate ? 'FOR NO KEY UPDATE OF p' : ''}`,
+      [
+        scope.organizationId,
+        scope.viewerUserId,
+        scope.viewerLinkRoles,
+        patientId,
+      ],
     );
 
     return row ?? null;

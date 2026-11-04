@@ -13,7 +13,7 @@ source: src/modules/Patient/patient.controller.ts
 
 Edição do UC07 (RF006): altera dados cadastrais e clínicos básicos e, com `responsibleUserId`, **troca o profissional responsável**. Só paciente `active` é editado: inativo precisa ser [reativado](patients-reativar.md) antes (decisão de Mateus em 2026-11-04).
 
-Autenticação: `Authorization: Bearer <token>` de sessão normal com `patients:update` — `professional` e `admin`. A organização vem **sempre** da sessão. `admin` e `professional` alcançam todos os pacientes da organização; `caregiver` e `family` só os pacientes a que estão vinculados (vínculo vigente em `user_patients`) — no BE-09 só existe o vínculo de profissional responsável, então cuidador e familiar ainda não alcançam nenhum paciente (BE-10 amplia os vínculos). Paciente de outra organização ou fora do alcance responde `404 PATIENT_NOT_FOUND`, igual a um inexistente. O master (`platform_admin`) não tem `patients:*` e recebe `403`.
+Autenticação: `Authorization: Bearer <token>` de sessão normal com `patients:update` — `professional` e `admin`. A organização vem **sempre** da sessão. `admin` e `professional` alcançam todos os pacientes da organização; `caregiver` e `family` só os pacientes a que estão vinculados por um papel de vínculo que conceda leitura ao perfil. O vínculo de profissional responsável **não** conta (um profissional rebaixado a cuidador ou familiar deixa de ver os pacientes de que era responsável), e o BE-09 não cria outros papéis: cuidador e familiar ainda não alcançam nenhum paciente (BE-10 amplia os vínculos). Paciente de outra organização ou fora do alcance responde `404 PATIENT_NOT_FOUND`, igual a um inexistente. O master (`platform_admin`) não tem `patients:*` e recebe `403`.
 
 ## Request
 
@@ -39,7 +39,7 @@ Body: as mesmas propriedades do [cadastro](patients-criar.md), **todas opcionais
 | Propriedade JSON | Tipo / formato | Obrigatória | Null | Limites | Significado |
 | --- | --- | --- | --- | --- | --- |
 | `name` | texto | não | não | 1 a 180 após aparar espaços | Nome completo. |
-| `birthDate` | texto `YYYY-MM-DD` | não | não | data existente entre 1900-01-01 e hoje (UTC) | Data de nascimento. |
+| `birthDate` | texto `YYYY-MM-DD` | não | não | data existente entre 1900-01-01 e hoje (fuso de Brasília) | Data de nascimento. |
 | `responsibleUserId` | texto, UUID | não | não | — | Profissional responsável: usuário `pending` ou `active` da organização da sessão com perfil `professional` ou `admin`. Diferente do atual: encerra o vínculo vigente (`deleted_at`) e abre outro; o histórico de quem foi responsável fica. |
 | `sex` | texto, enum | não | sim | `female`, `male`, `other` | Sexo. |
 | `cpf` | texto | não | sim | 11 dígitos com dígitos verificadores válidos; aceita pontuação | Gravado só com dígitos. Único na organização, **inclusive entre pacientes inativos**; a mesma pessoa pode ser paciente em outra organização. |
@@ -147,8 +147,8 @@ Nunca saem `organization_id`, identificadores de vínculo nem situação clínic
 ## Regras, na ordem
 
 1. Validação → `422 VALIDATION_FAILED`; corpo sem nenhum campo → `422 PATIENT_NOTHING_TO_UPDATE`.
-2. Transação com trava do paciente; fora do alcance → `404`; inativo → `409 PATIENT_INACTIVE`.
-3. Compara com o atual (e-mail sem diferenciar maiúsculas); responsável igual ao vigente não conta como mudança.
+2. Transação com trava do paciente (e, se o corpo traz `responsibleUserId`, antes dela a trava `FOR NO KEY UPDATE` da organização, que serializa a troca com a mudança de perfil de usuário); fora do alcance → `404`; inativo → `409 PATIENT_INACTIVE`.
+3. Compara com o atual (e-mail e UUID do responsável sem diferenciar maiúsculas); responsável igual ao vigente não conta como mudança.
 4. Novo responsável inválido → `422 PATIENT_INVALID_RESPONSIBLE`.
 5. Grava os campos mudados (CPF repetido → `409 PATIENT_DUPLICATE_CPF`) e audita `patient.updated` com `after_values.fields` = **nomes** dos campos (`city`, `phone`…), nunca valores.
 6. Troca de responsável: encerra o vínculo vigente, abre o novo e audita `patient.responsible_changed` com `fromUserId` e `toUserId`.

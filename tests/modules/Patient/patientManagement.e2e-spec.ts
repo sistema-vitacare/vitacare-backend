@@ -158,6 +158,7 @@ describeWithDatabase('gestao de pacientes em PostgreSQL (e2e)', () => {
   let migrated = 0;
   let passwords: PasswordHasher;
   let login: LoginUseCase;
+  let repository: PatientRepository;
 
   let cpfSequence = 0;
   const tenants: Record<TenantKey, Tenant> = {} as never;
@@ -348,6 +349,7 @@ describeWithDatabase('gestao de pacientes em PostgreSQL (e2e)', () => {
 
     passwords = moduleRef.get(PasswordHasher);
     login = moduleRef.get(LoginUseCase);
+    repository = moduleRef.get(PatientRepository);
     const hash = await passwords.hash(KNOWN_PASSWORD);
 
     const plan = async (patientLimit: number) =>
@@ -744,6 +746,84 @@ describeWithDatabase('gestao de pacientes em PostgreSQL (e2e)', () => {
       }
     });
 
+    it('profissional rebaixado a familiar perde a leitura dos pacientes de que era responsavel', async () => {
+      const A = tenants.A;
+      const userId = (await scalar(
+        `INSERT INTO users
+           (organization_id, profile_id, name, email, cpf, status, password_hash,
+            must_change_password)
+         SELECT $1, id, 'Profissional Rebaixado', 'rebaixado@a.test', $2,
+                'active', password_hash, false
+           FROM access_profiles,
+                (SELECT password_hash FROM users WHERE id = $3) AS known
+          WHERE organization_id = $1 AND code = 'professional'
+         RETURNING id AS value`,
+        [A.id, nextCpf(), A.users.professional],
+      ))!;
+      const token = await loginAs(A.code, 'rebaixado@a.test');
+      const patient = await created(A, { responsibleUserId: userId });
+
+      expect(
+        (await http('get', `/api/v1/patients/${patient.id}`, token)).status,
+      ).toBe(200);
+
+      await dataSource.query(
+        `UPDATE users
+            SET profile_id = (SELECT id FROM access_profiles
+                               WHERE organization_id = $1 AND code = 'family')
+          WHERE id = $2`,
+        [A.id, userId],
+      );
+
+      expect(
+        (await http('get', `/api/v1/patients/${patient.id}`, token)).status,
+      ).toBe(404);
+      expect((await listPatients(token)).meta.pagination.total).toBe(0);
+    });
+
+    it('o escopo por vinculo alcanca exatamente os pacientes do papel concedido', async () => {
+      const A = tenants.A;
+      const mine = await created(A);
+      const scope = {
+        organizationId: A.id,
+        viewerUserId: A.users.professional,
+        viewerLinkRoles: ['responsible_professional'] as const,
+      };
+      const [rows, total] = await repository.list(scope, {
+        status: 'active',
+        skip: 0,
+        take: 100,
+      });
+      const expected = Number(
+        await scalar(
+          `SELECT count(*)::text AS value
+             FROM patients p
+             JOIN user_patients link ON link.patient_id = p.id
+            WHERE p.organization_id = $1 AND p.status = 'active'
+              AND link.user_id = $2 AND link.deleted_at IS NULL`,
+          [A.id, A.users.professional],
+        ),
+      );
+
+      expect(total).toBe(expected);
+      expect(rows.map((row) => row.id)).toContain(mine.id);
+      expect(
+        rows.every((row) => row.responsibleId === A.users.professional),
+      ).toBe(true);
+      await expect(repository.findById(scope, mine.id)).resolves.toMatchObject({
+        id: mine.id,
+      });
+      await expect(
+        repository.findById(
+          { ...scope, viewerUserId: A.users.caregiver },
+          mine.id,
+        ),
+      ).resolves.toBeNull();
+      await expect(
+        repository.findById({ ...scope, viewerLinkRoles: [] }, mine.id),
+      ).resolves.toBeNull();
+    });
+
     it('paciente de outra organizacao se comporta como inexistente', async () => {
       const patient = await created(tenants.A);
       const token = tenants.B.tokens.admin;
@@ -842,7 +922,7 @@ describeWithDatabase('gestao de pacientes em PostgreSQL (e2e)', () => {
       const token = tenants.A.tokens.professional;
 
       const same = await http('patch', path, token, {
-        responsibleUserId: tenants.A.users.professional,
+        responsibleUserId: tenants.A.users.professional.toUpperCase(),
       });
 
       expect(same.status).toBe(200);

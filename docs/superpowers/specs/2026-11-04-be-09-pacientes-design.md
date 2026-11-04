@@ -140,7 +140,11 @@ recusado pelo banco.
   `GET /organizations/:id/plan` passa a usar `PLAN_SEAT_COUNT.patients`.
 - **Leitura:** perfil da sessão `admin` ou `professional` → toda a organização;
   qualquer outro perfil com `patients:read` → só pacientes com vínculo vigente
-  (`user_patients.deleted_at IS NULL`) do próprio usuário. Paciente fora do
+  (`user_patients.deleted_at IS NULL`) do próprio usuário num papel que o perfil
+  lê. O papel `responsible_professional` não conta (revisão de código: um
+  profissional rebaixado a cuidador/familiar não herda os pacientes); no BE-09
+  nenhum papel concede leitura a cuidador ou familiar. A troca de responsável
+  toma a trava da organização, como a troca de perfil. Paciente fora do
   alcance → `404 PATIENT_NOT_FOUND`.
 - **Edição:** PATCH parcial; campo opcional aceita `null` para limpar; grava só
   o que mudou; nada mudou → devolve o paciente sem gravar nem auditar; corpo

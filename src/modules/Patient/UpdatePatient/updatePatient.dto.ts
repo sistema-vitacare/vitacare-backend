@@ -1,6 +1,8 @@
 import { ApiPropertyOptional, OmitType, PartialType } from '@nestjs/swagger';
 import { IsUUID, ValidateIf } from 'class-validator';
 
+import { LowerTrim } from '@/modules/User/dtos/userFields';
+
 import { CreatePatientDto } from '../CreatePatient/createPatient.dto';
 import { IsBirthDate, PatientText } from '../dtos/patientFields';
 
@@ -36,6 +38,7 @@ export class UpdatePatientDto extends PartialType(
       'Novo profissional responsavel; encerra o vinculo vigente e abre outro.',
   })
   @ValidateIf(present)
+  @LowerTrim()
   @IsUUID('all', {
     message: 'Informe o identificador do profissional responsavel.',
   })

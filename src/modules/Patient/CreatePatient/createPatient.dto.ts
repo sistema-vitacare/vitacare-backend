@@ -46,6 +46,7 @@ export class CreatePatientDto {
     description:
       'Profissional responsavel: usuario `pending` ou `active` da organizacao com perfil `professional` ou `admin`.',
   })
+  @LowerTrim()
   @IsUUID('all', {
     message: 'Informe o identificador do profissional responsavel.',
   })
