@@ -1,7 +1,7 @@
 ---
 title: Cadastrar organização
 status: atual
-updated: 2026-10-29
+updated: 2026-11-03
 method: POST
 path: /api/v1/organizations
 source: src/modules/Organization/organization.controller.ts
@@ -110,7 +110,7 @@ curl -i -X POST 'https://api.example.com/api/v1/organizations' \
 Efeitos, em **uma** transação — falha em qualquer passo não deixa nada gravado:
 
 1. confere o plano (existente, `status = true`, sem `deleted_at`);
-2. cria a organização com `kind = 'tenant'` e `status = 'active'`;
+2. cria a organização com `kind = 'tenant'` e `status = 'active'` e abre o termo de vigência inicial do plano (`organization_plan_terms`, `origin = initial`, sem vencimento e com os limites do catálogo; BE-07, 2026-11-03);
 3. cria os quatro perfis fixos (`admin`, `professional`, `caregiver`, `family`) com nome, descrição e concessões exatamente iguais à matriz de `src/modules/Access/access.permissions.ts` (BE-05, decidida em 2026-10-29); o primeiro administrador recebe o perfil `admin`;
 4. cria o usuário `active`, com `must_change_password = true` e `temporary_password_expires_at = NULL` (senha provisória **sem prazo**);
 5. grava auditoria `organization.created` e `user.created` (motivo `first_administrator`) na nova organização como evento de sistema, com `platformActorUserId` em `after_values`, e `organization.created` na organização de plataforma com o master como autor.
@@ -200,7 +200,7 @@ O administrador entra com `code`, e-mail e a senha provisória, recebe a sessão
 
 ## Limitações vigentes
 
-- O limite de usuários do plano **não** é verificado aqui: contagem, vigência e bloqueio são da tarefa 5 (RF018, P05/P06).
+- O limite de usuários do plano **não** é verificado aqui. A vigência começa sem fim; o master define vencimento e limites personalizados por [PUT /organizations/{organizationId}/plan](plans-atribuir.md) (BE-07).
 - Os quatro perfis são fixos: a rota não cria perfil personalizado nem aceita outra matriz.
 - Repetir a chamada com o mesmo `code` responde `409`: a rota não é idempotente e não reemite senha.
 - A senha provisória **não vence**, ao contrário da emitida pela [redefinição administrativa](auth-redefinir-senha-usuario.md) (24 h). Decisão de Mateus em 2026-10-29: hoje ninguém alcança o primeiro administrador para reemitir a senha (o master não redefine senha de usuário de outra organização), então um prazo trancaria a organização. Prazo, convite e reemissão pelo master ficam para a gestão de usuários (BE-06). Por isso a resposta **não** traz `expiresAt`.

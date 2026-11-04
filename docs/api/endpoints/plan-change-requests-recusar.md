@@ -1,0 +1,104 @@
+---
+title: Recusar solicitação de mudança de plano (plataforma)
+status: atual
+updated: 2026-11-03
+method: POST
+path: /api/v1/plan-change-requests/{requestId}/reject
+source: src/modules/Plan/plan.controller.ts
+---
+
+# POST /api/v1/plan-change-requests/{requestId}/reject — recusa a solicitação com justificativa
+
+## Propósito e acesso
+
+O administrador master recusa a solicitação `pending`. O plano, os limites e a vigência da organização **não mudam**. A justificativa é obrigatória e fica visível para a organização em `decisionNote`.
+
+Autenticação: sessão **normal** da plataforma com `platform_organizations:update`. Perfis de organização cliente → `403 AUTH_FORBIDDEN`.
+
+## Request
+
+| Header | Obrigatório | Significado |
+| --- | --- | --- |
+| `Authorization: Bearer <token>` | sim | Sessão normal com `platform_organizations:update`. |
+| `Content-Type: application/json` | sim | Corpo JSON. |
+| `X-Request-Id` | não | Correlação; gravado na auditoria. |
+
+| Parâmetro de path | Tipo | Obrigatório | Significado |
+| --- | --- | --- | --- |
+| `requestId` | UUID | sim | Solicitação. Não UUID → `422 VALIDATION_FAILED` com `fields[0].field = "requestId"`. |
+
+Query: nenhum.
+
+| Propriedade JSON | Tipo / formato | Obrigatória | Null | Limites | Significado |
+| --- | --- | --- | --- | --- | --- |
+| `decisionNote` | texto | sim | não | 1 a 500, aparado | Justificativa da recusa. |
+
+```bash
+curl -i -X POST 'https://api.example.com/api/v1/plan-change-requests/3333333a-0000-4000-8000-00000000000a/reject' \
+  -H 'Accept: application/json' \
+  -H 'Authorization: Bearer M4st3r...Tk1' \
+  -H 'Content-Type: application/json' \
+  -d '{"decisionNote":"Sem contrato assinado."}'
+```
+
+## Resposta de sucesso
+
+`200 OK`, com a solicitação atualizada na estrutura de [criar solicitação](plan-change-requests-criar.md).
+
+```json
+{
+  "data": {
+    "id": "3333333a-0000-4000-8000-00000000000a",
+    "organizationId": "0f1e2d3c-4b5a-4968-8776-655443322110",
+    "currentPlan": { "id": "6a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d", "code": "basic", "name": "Basic" },
+    "requestedPlan": { "id": "7b2c3d4e-5f6a-4b7c-8d9e-0f1a2b3c4d5e", "code": "enterprise", "name": "Enterprise" },
+    "notes": "Precisamos de mais vagas.",
+    "status": "rejected",
+    "requestedByUserId": "1111111a-0000-4000-8000-00000000000a",
+    "decidedByUserId": "5555555a-0000-4000-8000-00000000000a",
+    "decidedAt": "2026-11-03T12:30:00.000Z",
+    "decisionNote": "Sem contrato assinado.",
+    "createdAt": "2026-11-03T12:00:00.000Z"
+  },
+  "meta": {
+    "requestId": "a3f5b7c9-1d2e-4f60-8a9b-0c1d2e3f4a5b",
+    "timestamp": "2026-11-03T12:30:00.000Z"
+  }
+}
+```
+
+## Efeitos
+
+Grava `status = rejected`, `decided_at`, `decided_by_user_id` = master e `decision_note`; auditoria `plan_change_request.rejected` na organização alvo (sistema) e na plataforma (autoria).
+
+## Erros
+
+| Status | `error.code` | Quando |
+| --- | --- | --- |
+| `401` | `AUTH_UNAUTHENTICATED` | Bearer ausente, inválido, expirado ou revogado. |
+| `403` | `AUTH_FORBIDDEN` | Sessão sem `platform_organizations:update`. |
+| `404` | `PLAN_CHANGE_REQUEST_NOT_FOUND` | Solicitação inexistente. |
+| `409` | `PLAN_CHANGE_REQUEST_NOT_PENDING` | A solicitação já foi aprovada, recusada ou cancelada (repetir a chamada também cai aqui). |
+| `422` | `VALIDATION_FAILED` | `requestId` não UUID; `decisionNote` ausente, vazio ou com mais de 500. |
+
+```json
+{
+  "error": {
+    "code": "PLAN_CHANGE_REQUEST_NOT_PENDING",
+    "message": "A solicitação já foi decidida ou cancelada.",
+    "detail": "Só solicitação pendente pode ser decidida ou cancelada.",
+    "fields": null
+  },
+  "meta": {
+    "requestId": "a3f5b7c9-1d2e-4f60-8a9b-0c1d2e3f4a5b",
+    "timestamp": "2026-11-03T12:30:00.000Z",
+    "path": "/api/v1/plan-change-requests/3333333a-0000-4000-8000-00000000000a/reject",
+    "method": "POST",
+    "status": 409
+  }
+}
+```
+
+## Origem e validação
+
+Controller `src/modules/Plan/plan.controller.ts`; caso de uso `src/modules/Plan/RejectPlanChangeRequest/`; resultado comum em `src/modules/Plan/policies/planChangeRequest.policy.ts`; repositório `src/modules/Plan/repositories/plan.repository.ts` (trava organização e solicitação, nessa ordem, e exige `pending`). Testes `tests/modules/Plan/plan.e2e-spec.ts` (permissões, validação e OpenAPI) e `tests/modules/Plan/planManagement.e2e-spec.ts` (recusa sem justificativa `422`, com justificativa `rejected` e plano preservado). Conferido contra `/api/docs-json` em 2026-11-03. Vault: [[2026-10-29-be-07-plans]] e [[2026-11-03-planos-vigencia-e-solicitacao]].
