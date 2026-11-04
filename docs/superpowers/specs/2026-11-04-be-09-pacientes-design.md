@@ -30,7 +30,8 @@ dados pessoais ou clínicos.
 1. **Atributos = MER + Figura 35.** Nome, data de nascimento, sexo, telefone,
    observações e status (MER) mais CPF, e-mail, endereço (CEP, logradouro,
    número, bairro, cidade, UF), condição principal, condições secundárias e
-   plano de saúde (Figura 35). O plano de saúde é texto livre do paciente, sem
+   plano de saúde (Figura 35), mais o **complemento** do endereço (Mateus,
+   2026-11-04, em revisão do desenho). O plano de saúde é texto livre do paciente, sem
    relação com o plano comercial (`usage_plans`).
 2. **Obrigatórios: nome completo e data de nascimento.** Os demais são
    opcionais.
@@ -38,7 +39,8 @@ dados pessoais ou clínicos.
    é único na organização, **inclusive contra pacientes inativos**. Repetido →
    `409 PATIENT_DUPLICATE_CPF`, com mensagem que sugere buscar (e reativar). A
    mesma pessoa pode ser paciente em outra organização.
-4. **Ciclo de vida.** Inativar libera a vaga e tira o paciente da listagem
+4. **Ciclo de vida.** Inativar é a exclusão lógica: grava `status = inactive` e
+   `deleted_at` juntos (constraint), sem apagar linha. Inativar libera a vaga e tira o paciente da listagem
    padrão; o filtro `status=inactive` o mostra; o detalhe continua legível.
    Paciente inativo não é editado (`409 PATIENT_INACTIVE`). Reativar volta a
    `active` passando pela vaga e pela vigência do plano (mesma política de
@@ -88,6 +90,7 @@ dado clínico em auditoria, log ou `detail` de erro.
 | `zip_code` | varchar(8) | sim | CHECK `^[0-9]{8}$` |
 | `street` | varchar(180) | sim | |
 | `address_number` | varchar(20) | sim | |
+| `address_complement` | varchar(120) | sim | |
 | `district` | varchar(120) | sim | |
 | `city` | varchar(120) | sim | |
 | `state` | varchar(2) | sim | CHECK `^[A-Z]{2}$`; DTO aceita só as 27 UFs |
@@ -175,7 +178,7 @@ recusado pelo banco.
 
 Corpo de criação: `name`, `birthDate` (`YYYY-MM-DD`), `responsibleUserId`
 obrigatórios; `sex`, `cpf` (com ou sem pontuação, gravado com 11 dígitos),
-`phone`, `email`, `address { zipCode, street, number, district, city, state }`
+`phone`, `email`, `address { zipCode, street, number, complement, district, city, state }`
 (cada parte opcional), `mainCondition`, `secondaryConditions[]`, `healthPlan`,
 `notes` opcionais. Edição: os mesmos, todos opcionais.
 
@@ -184,7 +187,7 @@ Listagem: `page`, `limit` (padrão do projeto), `status` (`active` padrão,
 da condição principal ou de uma secundária). Ordem: nome, id.
 
 `PatientDto`: `id`, `name`, `birthDate`, `sex`, `cpf`, `phone`, `email`,
-`address` (objeto com as seis partes, cada uma `string | null`),
+`address` (objeto com as sete partes, cada uma `string | null`),
 `mainCondition`, `secondaryConditions`, `healthPlan`, `notes`, `status`,
 `responsible { id, name, status } | null`, `createdAt`, `updatedAt`,
 `deletedAt`. Sem situação clínica. Na listagem o CPF sai mascarado

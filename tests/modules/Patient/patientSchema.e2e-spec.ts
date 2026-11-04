@@ -150,7 +150,7 @@ describeWithDatabase('schema de pacientes em PostgreSQL descartavel', () => {
     await dataSource.destroy();
   }, 60000);
 
-  it('status cadastral anda junto com deleted_at', async () => {
+  it('status cadastral e exclusao logica (deleted_at) andam juntos nos dois sentidos', async () => {
     expect(await insertPatient(org.A.id, 'status', ['inactive'])).toBe(
       'patients_deactivation_check',
     );
@@ -161,6 +161,14 @@ describeWithDatabase('schema de pacientes em PostgreSQL descartavel', () => {
         [org.A.patient],
       ),
     ).toBeNull();
+    expect(
+      await violation(
+        dataSource,
+        `INSERT INTO patients (organization_id, name, birth_date, deleted_at)
+         VALUES ($1, 'Paciente', '1950-01-01', now())`,
+        [org.A.id],
+      ),
+    ).toBe('patients_deactivation_check');
     expect(await insertPatient(org.A.id, 'status', ['critical'])).toBe(
       'patients_status_check',
     );

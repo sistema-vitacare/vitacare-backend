@@ -49,6 +49,7 @@ Body: as mesmas propriedades do [cadastro](patients-criar.md), **todas opcionais
 | `address.zipCode` | texto | não | sim | 8 dígitos; aceita hífen | CEP. |
 | `address.street` | texto | não | sim | 1 a 180 | Logradouro. |
 | `address.number` | texto | não | sim | 1 a 20 | Número. |
+| `address.complement` | texto | não | sim | 1 a 120 | Complemento (apartamento, bloco, casa). |
 | `address.district` | texto | não | sim | 1 a 120 | Bairro. |
 | `address.city` | texto | não | sim | 1 a 120 | Cidade. |
 | `address.state` | texto | não | sim | uma das 27 UFs, sem diferenciar maiúsculas | UF; gravada em maiúsculas. |
@@ -85,6 +86,7 @@ curl -i -X PATCH 'https://api.example.com/api/v1/patients/3c9e2a4b-1f6d-4e8a-9b7
       "zipCode": "01310100",
       "street": "Avenida Exemplo",
       "number": "100",
+      "complement": "Apto 12",
       "district": "Centro",
       "city": "Santos",
       "state": "SP"
@@ -122,10 +124,11 @@ curl -i -X PATCH 'https://api.example.com/api/v1/patients/3c9e2a4b-1f6d-4e8a-9b7
 | `data.cpf` | texto, 11 dígitos | sim | CPF sem pontuação; `null` quando não informado. **Na listagem** sai mascarado (`***.982.247-**`). |
 | `data.phone` | texto, até 32 | sim | Telefone de contato. |
 | `data.email` | texto, até 254 | sim | E-mail de contato, em minúsculas; sem unicidade. |
-| `data.address` | objeto | não | Endereço da Figura 35; sempre presente, com cada parte `null` quando não informada. |
+| `data.address` | objeto | não | Endereço da Figura 35 mais o complemento; sempre presente, com cada parte `null` quando não informada. |
 | `data.address.zipCode` | texto, 8 dígitos | sim | CEP sem hífen. |
 | `data.address.street` | texto, até 180 | sim | Logradouro. |
 | `data.address.number` | texto, até 20 | sim | Número. |
+| `data.address.complement` | texto, até 120 | sim | Complemento (apartamento, bloco, casa). |
 | `data.address.district` | texto, até 120 | sim | Bairro. |
 | `data.address.city` | texto, até 120 | sim | Cidade. |
 | `data.address.state` | texto, 2 letras | sim | Sigla da UF em maiúsculas. |

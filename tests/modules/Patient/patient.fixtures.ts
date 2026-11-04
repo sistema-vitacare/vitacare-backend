@@ -41,6 +41,7 @@ export const patientRow = (
   zipCode: '01310100',
   street: 'Avenida Exemplo',
   addressNumber: '100',
+  addressComplement: null,
   district: 'Centro',
   city: 'Sao Paulo',
   state: 'SP',

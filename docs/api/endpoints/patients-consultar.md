@@ -57,6 +57,7 @@ curl -i 'https://api.example.com/api/v1/patients/3c9e2a4b-1f6d-4e8a-9b7c-5d4e3f2
       "zipCode": "01310100",
       "street": "Avenida Exemplo",
       "number": "100",
+      "complement": "Apto 12",
       "district": "Centro",
       "city": "Sao Paulo",
       "state": "SP"
@@ -93,10 +94,11 @@ curl -i 'https://api.example.com/api/v1/patients/3c9e2a4b-1f6d-4e8a-9b7c-5d4e3f2
 | `data.cpf` | texto, 11 dígitos | sim | CPF sem pontuação; `null` quando não informado. **Na listagem** sai mascarado (`***.982.247-**`). |
 | `data.phone` | texto, até 32 | sim | Telefone de contato. |
 | `data.email` | texto, até 254 | sim | E-mail de contato, em minúsculas; sem unicidade. |
-| `data.address` | objeto | não | Endereço da Figura 35; sempre presente, com cada parte `null` quando não informada. |
+| `data.address` | objeto | não | Endereço da Figura 35 mais o complemento; sempre presente, com cada parte `null` quando não informada. |
 | `data.address.zipCode` | texto, 8 dígitos | sim | CEP sem hífen. |
 | `data.address.street` | texto, até 180 | sim | Logradouro. |
 | `data.address.number` | texto, até 20 | sim | Número. |
+| `data.address.complement` | texto, até 120 | sim | Complemento (apartamento, bloco, casa). |
 | `data.address.district` | texto, até 120 | sim | Bairro. |
 | `data.address.city` | texto, até 120 | sim | Cidade. |
 | `data.address.state` | texto, 2 letras | sim | Sigla da UF em maiúsculas. |

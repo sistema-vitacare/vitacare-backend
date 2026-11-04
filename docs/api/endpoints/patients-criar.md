@@ -43,6 +43,7 @@ Body:
 | `address.zipCode` | texto | não | sim | 8 dígitos; aceita hífen | CEP. |
 | `address.street` | texto | não | sim | 1 a 180 | Logradouro. |
 | `address.number` | texto | não | sim | 1 a 20 | Número. |
+| `address.complement` | texto | não | sim | 1 a 120 | Complemento (apartamento, bloco, casa). |
 | `address.district` | texto | não | sim | 1 a 120 | Bairro. |
 | `address.city` | texto | não | sim | 1 a 120 | Cidade. |
 | `address.state` | texto | não | sim | uma das 27 UFs, sem diferenciar maiúsculas | UF; gravada em maiúsculas. |
@@ -58,7 +59,7 @@ curl -i -X POST 'https://api.example.com/api/v1/patients' \
   -H 'Accept: application/json' \
   -H 'Content-Type: application/json' \
   -H 'Authorization: Bearer F3dQ2p...Zc9' \
-  -d '{"name": "Paciente Exemplo", "birthDate": "1948-03-12", "responsibleUserId": "8f14e45f-ceea-4b7a-9f0b-1c2d3e4f5a6b", "sex": "female", "cpf": "529.982.247-25", "phone": "(11) 98765-4321", "email": "Paciente@Example.test", "address": {"zipCode": "01310-100", "street": "Avenida Exemplo", "number": "100", "district": "Centro", "city": "Sao Paulo", "state": "sp"}, "mainCondition": "Hipertensao arterial", "secondaryConditions": ["Diabetes tipo 2"], "healthPlan": "Plano de saude exemplo"}'
+  -d '{"name": "Paciente Exemplo", "birthDate": "1948-03-12", "responsibleUserId": "8f14e45f-ceea-4b7a-9f0b-1c2d3e4f5a6b", "sex": "female", "cpf": "529.982.247-25", "phone": "(11) 98765-4321", "email": "Paciente@Example.test", "address": {"zipCode": "01310-100", "street": "Avenida Exemplo", "number": "100", "complement": "Apto 12", "district": "Centro", "city": "Sao Paulo", "state": "sp"}, "mainCondition": "Hipertensao arterial", "secondaryConditions": ["Diabetes tipo 2"], "healthPlan": "Plano de saude exemplo"}'
 ```
 
 ## Resposta de sucesso
@@ -79,6 +80,7 @@ curl -i -X POST 'https://api.example.com/api/v1/patients' \
       "zipCode": "01310100",
       "street": "Avenida Exemplo",
       "number": "100",
+      "complement": "Apto 12",
       "district": "Centro",
       "city": "Sao Paulo",
       "state": "SP"
@@ -115,10 +117,11 @@ curl -i -X POST 'https://api.example.com/api/v1/patients' \
 | `data.cpf` | texto, 11 dígitos | sim | CPF sem pontuação; `null` quando não informado. **Na listagem** sai mascarado (`***.982.247-**`). |
 | `data.phone` | texto, até 32 | sim | Telefone de contato. |
 | `data.email` | texto, até 254 | sim | E-mail de contato, em minúsculas; sem unicidade. |
-| `data.address` | objeto | não | Endereço da Figura 35; sempre presente, com cada parte `null` quando não informada. |
+| `data.address` | objeto | não | Endereço da Figura 35 mais o complemento; sempre presente, com cada parte `null` quando não informada. |
 | `data.address.zipCode` | texto, 8 dígitos | sim | CEP sem hífen. |
 | `data.address.street` | texto, até 180 | sim | Logradouro. |
 | `data.address.number` | texto, até 20 | sim | Número. |
+| `data.address.complement` | texto, até 120 | sim | Complemento (apartamento, bloco, casa). |
 | `data.address.district` | texto, até 120 | sim | Bairro. |
 | `data.address.city` | texto, até 120 | sim | Cidade. |
 | `data.address.state` | texto, 2 letras | sim | Sigla da UF em maiúsculas. |

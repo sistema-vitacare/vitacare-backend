@@ -19,6 +19,9 @@ export class PatientAddressDto {
   @ApiProperty({ example: '100', nullable: true, type: String })
   number!: string | null;
 
+  @ApiProperty({ example: 'Apto 12', nullable: true, type: String })
+  complement!: string | null;
+
   @ApiProperty({ example: 'Centro', nullable: true, type: String })
   district!: string | null;
 

@@ -30,6 +30,7 @@ export class CreatePatients1790700000000 implements MigrationInterface {
         zip_code varchar(8),
         street varchar(180),
         address_number varchar(20),
+        address_complement varchar(120),
         district varchar(120),
         city varchar(120),
         state varchar(2),

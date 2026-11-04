@@ -11,7 +11,7 @@ source: src/modules/Patient/patient.controller.ts
 
 ## Propósito e acesso
 
-Inativação do UC07 (fluxo alternativo; RF006): o paciente sai da listagem principal, libera a vaga do limite de pacientes ativos e **preserva tudo**: dados, vínculo com o responsável, auditoria e, nos módulos futuros, registros e histórico. A confirmação pedida pelo UC07 é do frontend. Não existe exclusão de paciente.
+Inativação do UC07 (fluxo alternativo; RF006), feita como **exclusão lógica**: o paciente sai da listagem principal, libera a vaga do limite de pacientes ativos e **preserva tudo**: dados, vínculo com o responsável, auditoria e, nos módulos futuros, registros e histórico. A confirmação pedida pelo UC07 é do frontend. Não existe exclusão de paciente.
 
 Autenticação: `Authorization: Bearer <token>` de sessão normal com `patients:deactivate` (rótulo "Inativar e reativar pacientes") — `professional` e `admin`. A organização vem **sempre** da sessão. `admin` e `professional` alcançam todos os pacientes da organização; `caregiver` e `family` só os pacientes a que estão vinculados por um papel de vínculo que conceda leitura ao perfil. O vínculo de profissional responsável **não** conta (um profissional rebaixado a cuidador ou familiar deixa de ver os pacientes de que era responsável), e o BE-09 não cria outros papéis: cuidador e familiar ainda não alcançam nenhum paciente (BE-10 amplia os vínculos). Paciente de outra organização ou fora do alcance responde `404 PATIENT_NOT_FOUND`, igual a um inexistente. O master (`platform_admin`) não tem `patients:*` e recebe `403`.
 
@@ -57,6 +57,7 @@ curl -i -X POST 'https://api.example.com/api/v1/patients/3c9e2a4b-1f6d-4e8a-9b7c
       "zipCode": "01310100",
       "street": "Avenida Exemplo",
       "number": "100",
+      "complement": "Apto 12",
       "district": "Centro",
       "city": "Sao Paulo",
       "state": "SP"
@@ -93,10 +94,11 @@ curl -i -X POST 'https://api.example.com/api/v1/patients/3c9e2a4b-1f6d-4e8a-9b7c
 | `data.cpf` | texto, 11 dígitos | sim | CPF sem pontuação; `null` quando não informado. **Na listagem** sai mascarado (`***.982.247-**`). |
 | `data.phone` | texto, até 32 | sim | Telefone de contato. |
 | `data.email` | texto, até 254 | sim | E-mail de contato, em minúsculas; sem unicidade. |
-| `data.address` | objeto | não | Endereço da Figura 35; sempre presente, com cada parte `null` quando não informada. |
+| `data.address` | objeto | não | Endereço da Figura 35 mais o complemento; sempre presente, com cada parte `null` quando não informada. |
 | `data.address.zipCode` | texto, 8 dígitos | sim | CEP sem hífen. |
 | `data.address.street` | texto, até 180 | sim | Logradouro. |
 | `data.address.number` | texto, até 20 | sim | Número. |
+| `data.address.complement` | texto, até 120 | sim | Complemento (apartamento, bloco, casa). |
 | `data.address.district` | texto, até 120 | sim | Bairro. |
 | `data.address.city` | texto, até 120 | sim | Cidade. |
 | `data.address.state` | texto, 2 letras | sim | Sigla da UF em maiúsculas. |
@@ -119,7 +121,7 @@ Nunca saem `organization_id`, identificadores de vínculo nem situação clínic
 
 1. Transação com trava do paciente; fora do alcance → `404`.
 2. Já inativo → `409 PATIENT_ALREADY_INACTIVE`.
-3. Grava `status = inactive` e `deleted_at = now()`; nada é apagado e o vínculo continua vigente.
+3. **Exclusão lógica (soft delete):** grava `status = inactive` **e** `deleted_at = now()` na mesma linha; a constraint `patients_deactivation_check` impede um sem o outro. Nenhuma linha é apagada (não existe `DELETE` de paciente) e o vínculo continua vigente.
 4. Audita `patient.deactivated` (sem `after_values`).
 
 A inativação **não** é bloqueada por plano vencido. Paciente inativo continua legível no [detalhe](patients-consultar.md) e em `GET /patients?status=inactive`, não é editado e só volta pela [reativação](patients-reativar.md). Os módulos futuros de registros, formulários e medicamentos devem recusar novos registros para paciente inativo (decisão de 2026-11-04).

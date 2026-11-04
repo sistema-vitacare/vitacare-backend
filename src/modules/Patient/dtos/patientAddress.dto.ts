@@ -5,7 +5,10 @@ import { OnlyDigits } from '@/modules/User/dtos/userFields';
 
 import { BRAZILIAN_STATES, PatientText, UpperTrim } from './patientFields';
 
-/** Endereco da Figura 35. Parte ausente nao muda; `null` limpa a parte. */
+/**
+ * Endereco da Figura 35 mais o complemento (decisao de Mateus em 2026-11-04).
+ * Parte ausente nao muda; `null` limpa a parte.
+ */
 export class PatientAddressInputDto {
   @ApiPropertyOptional({
     example: '01310-100',
@@ -37,6 +40,16 @@ export class PatientAddressInputDto {
   @IsOptional()
   @PatientText('O numero', 20)
   number?: string | null;
+
+  @ApiPropertyOptional({
+    example: 'Apto 12',
+    maxLength: 120,
+    nullable: true,
+    type: String,
+  })
+  @IsOptional()
+  @PatientText('O complemento', 120)
+  complement?: string | null;
 
   @ApiPropertyOptional({
     example: 'Centro',

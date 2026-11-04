@@ -16,6 +16,7 @@ export interface PatientFields {
   zipCode: string | null;
   street: string | null;
   addressNumber: string | null;
+  addressComplement: string | null;
   district: string | null;
   city: string | null;
   state: string | null;

@@ -471,6 +471,7 @@ describeWithDatabase('gestao de pacientes em PostgreSQL (e2e)', () => {
           zipCode: '01310-100',
           street: 'Avenida Exemplo',
           number: '1578',
+          complement: '  Apto 12  ',
           district: 'Centro',
           city: 'Sao Paulo',
           state: 'sp',
@@ -491,6 +492,7 @@ describeWithDatabase('gestao de pacientes em PostgreSQL (e2e)', () => {
           zipCode: '01310100',
           street: 'Avenida Exemplo',
           number: '1578',
+          complement: 'Apto 12',
           district: 'Centro',
           city: 'Sao Paulo',
           state: 'SP',
@@ -513,7 +515,7 @@ describeWithDatabase('gestao de pacientes em PostgreSQL (e2e)', () => {
         },
       ]);
       expect(JSON.stringify(audit)).not.toMatch(
-        new RegExp(`Maria|${cpf}|Hipertensao|Exemplo`),
+        new RegExp(`Maria|${cpf}|Hipertensao|Exemplo|Apto`),
       );
     });
 
@@ -529,6 +531,7 @@ describeWithDatabase('gestao de pacientes em PostgreSQL (e2e)', () => {
           zipCode: null,
           street: null,
           number: null,
+          complement: null,
           district: null,
           city: null,
           state: null,
@@ -869,7 +872,7 @@ describeWithDatabase('gestao de pacientes em PostgreSQL (e2e)', () => {
       const response = await http('patch', path, token, {
         name: 'Nome Editado',
         phone: null,
-        address: { city: 'Santos' },
+        address: { city: 'Santos', complement: 'Casa 2' },
         secondaryConditions: null,
         birthDate: '1948-03-12',
       });
@@ -878,7 +881,7 @@ describeWithDatabase('gestao de pacientes em PostgreSQL (e2e)', () => {
       expect((response.body as { data: PatientBody }).data).toMatchObject({
         name: 'Nome Editado',
         phone: null,
-        address: { city: 'Santos', state: 'SP' },
+        address: { city: 'Santos', complement: 'Casa 2', state: 'SP' },
         secondaryConditions: [],
       });
 
@@ -891,7 +894,15 @@ describeWithDatabase('gestao de pacientes em PostgreSQL (e2e)', () => {
         (await auditOf(patient.id)).map((event) => event.afterValues),
       ).toEqual([
         { responsibleUserId: tenants.A.users.professional },
-        { fields: ['name', 'phone', 'city', 'secondaryConditions'] },
+        {
+          fields: [
+            'name',
+            'phone',
+            'addressComplement',
+            'city',
+            'secondaryConditions',
+          ],
+        },
       ]);
     });
 
@@ -1002,6 +1013,21 @@ describeWithDatabase('gestao de pacientes em PostgreSQL (e2e)', () => {
         ),
       ).toBe('1');
 
+      const softDeleted = async () =>
+        (
+          await dataSource.query<Array<{ status: string; deleted: boolean }>>(
+            `SELECT status, deleted_at IS NOT NULL AS deleted
+               FROM patients WHERE id = $1`,
+            [patient.id],
+          )
+        )[0];
+
+      // Exclusao logica: a linha fica, com status e deleted_at juntos.
+      expect(await softDeleted()).toEqual({
+        status: 'inactive',
+        deleted: true,
+      });
+
       const reactivated = await patientAction(
         tenants.A,
         patient.id,
@@ -1013,6 +1039,7 @@ describeWithDatabase('gestao de pacientes em PostgreSQL (e2e)', () => {
         status: 'active',
         deletedAt: null,
       });
+      expect(await softDeleted()).toEqual({ status: 'active', deleted: false });
       expect(
         errorOf(await patientAction(tenants.A, patient.id, 'reactivate')).code,
       ).toBe('PATIENT_ALREADY_ACTIVE');

@@ -25,6 +25,7 @@ describe('patient.parser', () => {
       zipCode: null,
       street: null,
       addressNumber: null,
+      addressComplement: null,
       district: null,
       city: 'Santos',
       state: null,
@@ -36,9 +37,15 @@ describe('patient.parser', () => {
   });
 
   it('edicao: so o que veio; null limpa; address null limpa todas as partes', () => {
-    expect(toPatientPatch({ phone: null, address: { number: '10' } })).toEqual({
+    expect(
+      toPatientPatch({
+        phone: null,
+        address: { number: '10', complement: 'Casa 2' },
+      }),
+    ).toEqual({
       phone: null,
       addressNumber: '10',
+      addressComplement: 'Casa 2',
     });
     expect(toPatientPatch({ secondaryConditions: null })).toEqual({
       secondaryConditions: [],
@@ -47,6 +54,7 @@ describe('patient.parser', () => {
       zipCode: null,
       street: null,
       addressNumber: null,
+      addressComplement: null,
       district: null,
       city: null,
       state: null,

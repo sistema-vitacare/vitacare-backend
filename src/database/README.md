@@ -232,8 +232,9 @@ de `.env` nem em producao.**
 `birth_date` (`date`) sao obrigatorios; `cpf` e opcional, com 11 digitos e
 indice unico parcial `patients_org_cpf_unique (organization_id, cpf) WHERE cpf
 IS NOT NULL`, que tambem vale para pacientes inativos. `status` e so cadastral
-(`active`/`inactive`), ligado a `deleted_at` por `patients_deactivation_check`;
-endereco, condicoes (`secondary_conditions text[]`) e plano de saude
+(`active`/`inactive`) e a inativacao e a exclusao logica: `deleted_at` e
+preenchido junto, e `patients_deactivation_check` recusa um sem o outro;
+endereco (com `address_complement`), condicoes (`secondary_conditions text[]`) e plano de saude
 (`health_plan`, texto livre, sem relacao com `usage_plans`) sao anulaveis.
 
 `user_patients` guarda o profissional responsavel (`role =

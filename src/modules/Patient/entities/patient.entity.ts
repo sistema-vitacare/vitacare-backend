@@ -69,6 +69,9 @@ export class Patient {
   addressNumber!: string | null;
 
   @Column({ type: 'varchar', length: 120, nullable: true })
+  addressComplement!: string | null;
+
+  @Column({ type: 'varchar', length: 120, nullable: true })
   district!: string | null;
 
   @Column({ type: 'varchar', length: 120, nullable: true })
