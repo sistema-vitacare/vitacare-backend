@@ -827,5 +827,355 @@ describeWithDatabase(
         ).toBe(404);
       });
     });
+
+    describe('rascunho, publicacao e ciclo de vida', () => {
+      const action = (
+        form: { id: string },
+        path: string,
+        body?: object,
+        token = tenants.A.tokens.professional,
+      ) => http('post', `/api/v1/forms/${form.id}/${path}`, token, body);
+
+      const saveDraft = (
+        form: { id: string },
+        fields: object[],
+        token = tenants.A.tokens.professional,
+      ) => http('put', `/api/v1/forms/${form.id}/draft`, token, { fields });
+
+      /** Campos da versao em formato de entrada, mantendo a chave. */
+      const asInput = (fields: FieldBody[]) =>
+        fields.map(({ id: _id, position: _position, ...field }) => field);
+
+      const published = async () => {
+        const form = await newForm(tenants.A);
+        const response = await action(form, 'publish');
+
+        expect(response.status).toBe(200);
+
+        return dataOf(response);
+      };
+
+      it('primeira publicacao gera v1 e ativa sem pedir confirmacao', async () => {
+        const form = await published();
+
+        expect(form).toEqual(
+          expect.objectContaining({
+            status: 'active',
+            hasDraft: false,
+            draft: null,
+            currentVersion: expect.objectContaining({
+              number: 1,
+              fieldCount: 4,
+            }) as unknown,
+          }),
+        );
+        expect((await auditOf(form.id)).at(-1)).toEqual({
+          action: 'form.published',
+          afterValues: { versionNumber: 1, impactConfirmed: false },
+        });
+      });
+
+      it('nova versao exige confirmacao e preserva a anterior intacta', async () => {
+        const v1 = await published();
+        const v1Fields = v1.currentVersion!.fields!;
+        const edited = asInput(v1Fields).map((field) =>
+          field.name === 'Pressao arterial sistolica'
+            ? { ...field, unit: 'cmHg' }
+            : field,
+        );
+
+        expect((await saveDraft(v1, edited)).status).toBe(200);
+
+        for (const body of [undefined, { confirmImpact: false }]) {
+          const refused = await action(v1, 'publish', body);
+
+          expect(refused.status).toBe(409);
+          expect(errorOf(refused).code).toBe(
+            'FORM_IMPACT_CONFIRMATION_REQUIRED',
+          );
+        }
+
+        const v2 = dataOf(await action(v1, 'publish', { confirmImpact: true }));
+
+        expect(v2.currentVersion!.number).toBe(2);
+        expect(v2.currentVersion!.fields!.map((f) => f.fieldKey)).toEqual(
+          v1Fields.map((f) => f.fieldKey),
+        );
+        expect(v2.currentVersion!.fields![0].unit).toBe('cmHg');
+        expect(v2.currentVersion!.fields![0].id).not.toBe(v1Fields[0].id);
+        expect(
+          await scalar(
+            'SELECT unit AS value FROM follow_up_form_fields WHERE id = $1',
+            [v1Fields[0].id],
+          ),
+        ).toBe('mmHg');
+        expect((await auditOf(v1.id)).at(-1)).toEqual({
+          action: 'form.published',
+          afterValues: { versionNumber: 2, impactConfirmed: true },
+        });
+      });
+
+      it('rascunho so com campos desabilitados salva mas nao publica', async () => {
+        const form = await published();
+        const disabled = asInput(form.currentVersion!.fields!).map((field) => ({
+          ...field,
+          requirement: 'disabled',
+        }));
+
+        expect((await saveDraft(form, disabled)).status).toBe(200);
+
+        const response = await action(form, 'publish', { confirmImpact: true });
+
+        expect(response.status).toBe(422);
+        expect(errorOf(response).code).toBe('FORM_EMPTY');
+      });
+
+      it('chave com outro tipo ou de outro formulario e FORM_INVALID_FIELDS', async () => {
+        const form = await published();
+        const other = await published();
+        const [systolic] = asInput(form.currentVersion!.fields!);
+        const retyped = await saveDraft(form, [
+          { ...systolic, fieldType: 'text', unit: null, decimalPlaces: null },
+        ]);
+        const foreign = await saveDraft(form, [
+          {
+            ...VITAL_SIGNS[0],
+            fieldKey: other.currentVersion!.fields![0].fieldKey,
+          },
+        ]);
+
+        expect(errorOf(retyped)).toEqual(
+          expect.objectContaining({
+            code: 'FORM_INVALID_FIELDS',
+            fields: [{ field: 'fields[0].fieldType', code: 'TYPE_LOCKED' }],
+          }),
+        );
+        expect(errorOf(foreign).fields).toEqual([
+          { field: 'fields[0].fieldKey', code: 'UNKNOWN' },
+        ]);
+      });
+
+      it('rascunho nunca publicado mantem as chaves ao ser salvo de novo', async () => {
+        const form = await newForm(tenants.A);
+        const keys = form.draft!.fields.map((field) => field.fieldKey);
+        const again = dataOf(
+          await saveDraft(form, asInput(form.draft!.fields).reverse()),
+        );
+
+        expect(again.draft!.fields.map((field) => field.fieldKey)).toEqual(
+          [...keys].reverse(),
+        );
+        expect(again.status).toBe('draft');
+
+        const discard = await action(form, 'draft/discard');
+
+        expect(discard.status).toBe(409);
+        expect(errorOf(discard).code).toBe('FORM_NOT_PUBLISHED');
+      });
+
+      it('descarta o rascunho de um publicado; sem rascunho e FORM_NO_DRAFT', async () => {
+        const form = await published();
+
+        for (const path of ['draft/discard', 'publish']) {
+          const response = await action(form, path, { confirmImpact: true });
+
+          expect(response.status).toBe(409);
+          expect(errorOf(response).code).toBe('FORM_NO_DRAFT');
+        }
+
+        const draft = dataOf(
+          await saveDraft(form, asInput(form.currentVersion!.fields!)),
+        ).draft!;
+        const discarded = await action(form, 'draft/discard');
+
+        expect(discarded.status).toBe(200);
+        expect(dataOf(discarded)).toEqual(
+          expect.objectContaining({ draft: null, hasDraft: false }),
+        );
+        expect(
+          await scalar(
+            `SELECT (deleted_at IS NOT NULL)::text AS value
+             FROM follow_up_form_versions WHERE id = $1`,
+            [draft.id],
+          ),
+        ).toBe('true');
+      });
+
+      it('dois rascunhos simultaneos deixam um so rascunho vivo', async () => {
+        const form = await published();
+        const fields = asInput(form.currentVersion!.fields!);
+        const responses = await Promise.all([
+          saveDraft(form, fields),
+          saveDraft(form, fields),
+        ]);
+
+        expect(responses.map((response) => response.status)).toEqual([
+          200, 200,
+        ]);
+        expect(
+          await scalar(
+            `SELECT count(*)::text AS value FROM follow_up_form_versions
+            WHERE form_id = $1 AND status = 'draft' AND deleted_at IS NULL`,
+            [form.id],
+          ),
+        ).toBe('1');
+      });
+
+      it('desativa preservando tudo, bloqueia escrita e reativa', async () => {
+        const patient = await newPatient(tenants.A);
+        const form = dataOf(
+          await action(
+            await newForm(tenants.A, {
+              audience: 'patients',
+              patientIds: [patient],
+            }),
+            'publish',
+          ),
+        );
+        const deactivated = await action(form, 'deactivate');
+
+        expect(deactivated.status).toBe(200);
+        expect(dataOf(deactivated)).toEqual(
+          expect.objectContaining({
+            status: 'inactive',
+            patientIds: [patient],
+            currentVersion: expect.objectContaining({ number: 1 }) as unknown,
+          }),
+        );
+        expect(dataOf(deactivated).deactivatedAt).not.toBeNull();
+
+        const again = await action(form, 'deactivate');
+
+        expect(again.status).toBe(409);
+        expect(errorOf(again).code).toBe('FORM_ALREADY_INACTIVE');
+
+        for (const response of [
+          await saveDraft(form, VITAL_SIGNS),
+          await action(form, 'publish', { confirmImpact: true }),
+          await action(form, 'draft/discard'),
+          await http(
+            'patch',
+            `/api/v1/forms/${form.id}`,
+            tenants.A.tokens.professional,
+            { name: 'Inativo' },
+          ),
+        ]) {
+          expect(response.status).toBe(409);
+          expect(errorOf(response).code).toBe('FORM_INACTIVE');
+        }
+
+        const reactivated = await action(form, 'reactivate');
+
+        expect(dataOf(reactivated)).toEqual(
+          expect.objectContaining({ status: 'active', deactivatedAt: null }),
+        );
+        expect(errorOf(await action(form, 'reactivate')).code).toBe(
+          'FORM_ALREADY_ACTIVE',
+        );
+        expect(
+          (await auditOf(form.id)).map((event) => event.action).slice(-2),
+        ).toEqual(['form.deactivated', 'form.reactivated']);
+      });
+
+      it('reativar formulario nunca publicado volta a rascunho', async () => {
+        const form = await newForm(tenants.A);
+
+        await action(form, 'deactivate');
+
+        expect(dataOf(await action(form, 'reactivate')).status).toBe('draft');
+      });
+
+      it('cuidador le so ativos aplicaveis aos seus pacientes, sem rascunho', async () => {
+        const linkedPatient = await newPatient(tenants.A);
+        const otherPatient = await newPatient(tenants.A);
+
+        await linkCaregiver(tenants.A, linkedPatient);
+
+        const mine = dataOf(
+          await action(
+            await newForm(tenants.A, {
+              audience: 'patients',
+              patientIds: [linkedPatient, otherPatient],
+            }),
+            'publish',
+          ),
+        );
+        const forOther = dataOf(
+          await action(
+            await newForm(tenants.A, {
+              audience: 'patients',
+              patientIds: [otherPatient],
+            }),
+            'publish',
+          ),
+        );
+
+        await saveDraft(mine, asInput(mine.currentVersion!.fields!));
+
+        const read = await http(
+          'get',
+          `/api/v1/forms/${mine.id}`,
+          tenants.A.tokens.caregiver,
+        );
+
+        expect(read.status).toBe(200);
+        expect(dataOf(read).patientIds).toEqual([linkedPatient]);
+        expect(dataOf(read).hasDraft).toBe(false);
+        expect(dataOf(read)).not.toHaveProperty('draft');
+        expect(
+          (
+            await http(
+              'get',
+              `/api/v1/forms/${forOther.id}`,
+              tenants.A.tokens.caregiver,
+            )
+          ).status,
+        ).toBe(404);
+
+        const forPatient = await listForms(
+          tenants.A.tokens.caregiver,
+          `?patientId=${linkedPatient}`,
+        );
+        const listed = forPatient.data.map((form) => form.id);
+
+        expect(listed).toContain(mine.id);
+        expect(listed).not.toContain(forOther.id);
+
+        await action(mine, 'deactivate');
+
+        expect(
+          (
+            await http(
+              'get',
+              `/api/v1/forms/${mine.id}`,
+              tenants.A.tokens.caregiver,
+            )
+          ).status,
+        ).toBe(404);
+      });
+
+      it('cuidador nao publica; outra organizacao e 404', async () => {
+        const form = await newForm(tenants.A);
+
+        expect(
+          (await action(form, 'publish', undefined, tenants.A.tokens.caregiver))
+            .status,
+        ).toBe(403);
+
+        for (const response of [
+          await action(
+            form,
+            'publish',
+            undefined,
+            tenants.B.tokens.professional,
+          ),
+          await saveDraft(form, VITAL_SIGNS, tenants.B.tokens.professional),
+          await action(form, 'deactivate', undefined, tenants.B.tokens.admin),
+        ]) {
+          expect(response.status).toBe(404);
+          expect(errorOf(response).code).toBe('FORM_NOT_FOUND');
+        }
+      });
+    });
   },
 );

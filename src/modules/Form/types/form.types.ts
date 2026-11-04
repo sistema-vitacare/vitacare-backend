@@ -143,3 +143,39 @@ export type CreateFormOutcome =
 export type UpdateFormOutcome =
   | { kind: 'not_found' | 'inactive' | 'invalid_patients' }
   | { kind: 'unchanged' | 'updated'; form: FormDetail };
+
+export interface SaveFormDraftCommand extends TargetFormCommand {
+  fields: FormFieldConfig[];
+}
+
+export interface PublishFormCommand extends TargetFormCommand {
+  confirmImpact: boolean;
+}
+
+export type SaveFormDraftOutcome =
+  | { kind: 'not_found' | 'inactive' }
+  | { kind: 'invalid_fields'; errors: FieldError[] }
+  | { kind: 'saved'; form: FormDetail };
+
+export type DiscardFormDraftOutcome =
+  | { kind: 'not_found' | 'inactive' | 'no_draft' | 'not_published' }
+  | { kind: 'discarded'; form: FormDetail };
+
+export type PublishFormOutcome =
+  | {
+      kind:
+        | 'not_found'
+        | 'inactive'
+        | 'no_draft'
+        | 'empty'
+        | 'confirmation_required';
+    }
+  | { kind: 'published'; form: FormDetail };
+
+export type DeactivateFormOutcome =
+  | { kind: 'not_found' | 'already_inactive' }
+  | { kind: 'deactivated'; form: FormDetail };
+
+export type ReactivateFormOutcome =
+  | { kind: 'not_found' | 'already_active' }
+  | { kind: 'reactivated'; form: FormDetail };

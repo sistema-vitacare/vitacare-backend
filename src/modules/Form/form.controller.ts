@@ -2,10 +2,12 @@ import {
   Body,
   Controller,
   Get,
+  HttpCode,
   HttpStatus,
   Param,
   Patch,
   Post,
+  Put,
   Query,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
@@ -22,10 +24,17 @@ import { RequirePermissions } from '@/modules/Auth/guards/requiredPermissions.de
 
 import { CreateFormDto } from './CreateForm/createForm.dto';
 import { CreateFormUseCase } from './CreateForm/createForm.useCase';
+import { DeactivateFormUseCase } from './DeactivateForm/deactivateForm.useCase';
+import { DiscardFormDraftUseCase } from './DiscardFormDraft/discardFormDraft.useCase';
 import { FormDto, FormSummaryDto } from './dtos/form.dto';
 import { GetFormUseCase } from './GetForm/getForm.useCase';
 import { ListFormsQueryDto } from './ListForms/listForms.dto';
 import { ListFormsUseCase } from './ListForms/listForms.useCase';
+import { PublishFormDto } from './PublishForm/publishForm.dto';
+import { PublishFormUseCase } from './PublishForm/publishForm.useCase';
+import { ReactivateFormUseCase } from './ReactivateForm/reactivateForm.useCase';
+import { SaveFormDraftDto } from './SaveFormDraft/saveFormDraft.dto';
+import { SaveFormDraftUseCase } from './SaveFormDraft/saveFormDraft.useCase';
 import { UpdateFormDto } from './UpdateForm/updateForm.dto';
 import { UpdateFormUseCase } from './UpdateForm/updateForm.useCase';
 
@@ -33,6 +42,7 @@ const UNAUTHENTICATED = { status: 401, codes: ['AUTH_UNAUTHENTICATED'] };
 const FORBIDDEN = { status: 403, codes: ['AUTH_FORBIDDEN'] };
 const NOT_FOUND = { status: 404, codes: ['FORM_NOT_FOUND'] };
 const VALIDATION = { status: 422, codes: ['VALIDATION_FAILED'] };
+const INACTIVE = 'FORM_INACTIVE';
 
 @ApiTags('forms')
 @ApiBearerAuth(BEARER_SECURITY_SCHEME)
@@ -43,6 +53,11 @@ export class FormController {
     private readonly listForms: ListFormsUseCase,
     private readonly getForm: GetFormUseCase,
     private readonly updateForm: UpdateFormUseCase,
+    private readonly saveFormDraft: SaveFormDraftUseCase,
+    private readonly discardFormDraft: DiscardFormDraftUseCase,
+    private readonly publishForm: PublishFormUseCase,
+    private readonly deactivateForm: DeactivateFormUseCase,
+    private readonly reactivateForm: ReactivateFormUseCase,
   ) {}
 
   @Post()
@@ -114,7 +129,7 @@ export class FormController {
     UNAUTHENTICATED,
     FORBIDDEN,
     NOT_FOUND,
-    { status: 409, codes: ['FORM_INACTIVE'] },
+    { status: 409, codes: [INACTIVE] },
     {
       status: 422,
       codes: [
@@ -130,5 +145,125 @@ export class FormController {
     @CurrentContext() ctx: RequestContext,
   ): Promise<FormDto> {
     return this.updateForm.execute(formId, body, ctx);
+  }
+
+  @Put(':formId/draft')
+  @RequirePermissions(Permissions.FORMS_UPDATE)
+  @ApiOperation({
+    summary:
+      'Cria ou substitui o rascunho da proxima versao; a versao vigente nao muda.',
+  })
+  @ApiEnvelope(FormDto)
+  @ApiErrors(
+    UNAUTHENTICATED,
+    FORBIDDEN,
+    NOT_FOUND,
+    { status: 409, codes: [INACTIVE] },
+    {
+      status: 422,
+      codes: ['VALIDATION_FAILED', 'FORM_EMPTY', 'FORM_INVALID_FIELDS'],
+    },
+  )
+  async saveDraft(
+    @Param('formId', UuidParam('formId')) formId: string,
+    @Body() body: SaveFormDraftDto,
+    @CurrentContext() ctx: RequestContext,
+  ): Promise<FormDto> {
+    return this.saveFormDraft.execute(formId, body, ctx);
+  }
+
+  @Post(':formId/draft/discard')
+  @HttpCode(HttpStatus.OK)
+  @RequirePermissions(Permissions.FORMS_UPDATE)
+  @ApiOperation({
+    summary:
+      'Descarta o rascunho de um formulario publicado; a versao vigente continua.',
+  })
+  @ApiEnvelope(FormDto)
+  @ApiErrors(
+    UNAUTHENTICATED,
+    FORBIDDEN,
+    NOT_FOUND,
+    {
+      status: 409,
+      codes: [INACTIVE, 'FORM_NO_DRAFT', 'FORM_NOT_PUBLISHED'],
+    },
+    VALIDATION,
+  )
+  async discardDraft(
+    @Param('formId', UuidParam('formId')) formId: string,
+    @CurrentContext() ctx: RequestContext,
+  ): Promise<FormDto> {
+    return this.discardFormDraft.execute(formId, ctx);
+  }
+
+  @Post(':formId/publish')
+  @HttpCode(HttpStatus.OK)
+  @RequirePermissions(Permissions.FORMS_UPDATE)
+  @ApiOperation({
+    summary:
+      'Publica o rascunho como nova versao vigente; sobre versao vigente exige confirmImpact.',
+  })
+  @ApiEnvelope(FormDto)
+  @ApiErrors(
+    UNAUTHENTICATED,
+    FORBIDDEN,
+    NOT_FOUND,
+    {
+      status: 409,
+      codes: [INACTIVE, 'FORM_NO_DRAFT', 'FORM_IMPACT_CONFIRMATION_REQUIRED'],
+    },
+    { status: 422, codes: ['VALIDATION_FAILED', 'FORM_EMPTY'] },
+  )
+  async publish(
+    @Param('formId', UuidParam('formId')) formId: string,
+    @Body() body: PublishFormDto,
+    @CurrentContext() ctx: RequestContext,
+  ): Promise<FormDto> {
+    return this.publishForm.execute(formId, body, ctx);
+  }
+
+  @Post(':formId/deactivate')
+  @HttpCode(HttpStatus.OK)
+  @RequirePermissions(Permissions.FORMS_DEACTIVATE)
+  @ApiOperation({
+    summary:
+      'Desativa o formulario: sai do preenchimento, preservando versoes, campos e registros.',
+  })
+  @ApiEnvelope(FormDto)
+  @ApiErrors(
+    UNAUTHENTICATED,
+    FORBIDDEN,
+    NOT_FOUND,
+    { status: 409, codes: ['FORM_ALREADY_INACTIVE'] },
+    VALIDATION,
+  )
+  async deactivate(
+    @Param('formId', UuidParam('formId')) formId: string,
+    @CurrentContext() ctx: RequestContext,
+  ): Promise<FormDto> {
+    return this.deactivateForm.execute(formId, ctx);
+  }
+
+  @Post(':formId/reactivate')
+  @HttpCode(HttpStatus.OK)
+  @RequirePermissions(Permissions.FORMS_DEACTIVATE)
+  @ApiOperation({
+    summary:
+      'Reativa o formulario desativado: volta a ativo, ou a rascunho se nunca foi publicado.',
+  })
+  @ApiEnvelope(FormDto)
+  @ApiErrors(
+    UNAUTHENTICATED,
+    FORBIDDEN,
+    NOT_FOUND,
+    { status: 409, codes: ['FORM_ALREADY_ACTIVE'] },
+    VALIDATION,
+  )
+  async reactivate(
+    @Param('formId', UuidParam('formId')) formId: string,
+    @CurrentContext() ctx: RequestContext,
+  ): Promise<FormDto> {
+    return this.reactivateForm.execute(formId, ctx);
   }
 }

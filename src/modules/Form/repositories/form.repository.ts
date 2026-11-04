@@ -12,6 +12,9 @@ import { checkFieldKeys } from '../policies/formFields.policy';
 import type {
   CreateFormCommand,
   CreateFormOutcome,
+  DeactivateFormOutcome,
+  DiscardFormDraftOutcome,
+  FieldType,
   FormActor,
   FormDetail,
   FormFieldConfig,
@@ -20,6 +23,12 @@ import type {
   FormScope,
   FormSummaryRow,
   ListFormsFilter,
+  PublishFormCommand,
+  PublishFormOutcome,
+  ReactivateFormOutcome,
+  SaveFormDraftCommand,
+  SaveFormDraftOutcome,
+  TargetFormCommand,
   UpdateFormCommand,
   UpdateFormOutcome,
 } from '../types/form.types';
@@ -355,6 +364,234 @@ export class FormRepository {
     });
   }
 
+  /**
+   * Cria o rascunho da proxima versao ou substitui os campos do rascunho
+   * vivo. Campos de rascunho nunca sao referenciados, por isso sao apagados.
+   */
+  async saveDraft(
+    command: SaveFormDraftCommand,
+  ): Promise<SaveFormDraftOutcome> {
+    return this.write(async (manager) => {
+      const current = await this.lockForm(manager, command, command.formId);
+
+      if (!current) return { kind: 'not_found' };
+      if (current.status === 'inactive') return { kind: 'inactive' };
+
+      const errors = checkFieldKeys(
+        command.fields,
+        await this.loadKnownKeys(
+          manager,
+          command.organizationId,
+          command.formId,
+        ),
+      );
+
+      if (errors.length > 0) return { kind: 'invalid_fields', errors };
+
+      let draftId = current.draft?.id;
+
+      if (draftId) {
+        await manager.query(
+          `DELETE FROM follow_up_form_fields
+            WHERE organization_id = $1
+              AND version_id = $2`,
+          [command.organizationId, draftId],
+        );
+        await manager.query(
+          `UPDATE follow_up_form_versions
+              SET updated_at = now()
+            WHERE organization_id = $1
+              AND id = $2`,
+          [command.organizationId, draftId],
+        );
+      } else {
+        [{ id: draftId }] = await manager.query<Array<{ id: string }>>(
+          `INSERT INTO follow_up_form_versions (organization_id, form_id, status)
+           VALUES ($1, $2, 'draft')
+           RETURNING id`,
+          [command.organizationId, command.formId],
+        );
+      }
+
+      await this.insertFields(
+        manager,
+        command,
+        command.formId,
+        draftId,
+        command.fields,
+      );
+      await this.audit(manager, command, command.formId, 'form.draft_saved', {
+        fieldCount: command.fields.length,
+      });
+
+      return {
+        kind: 'saved',
+        form: (await this.findIn(manager, command, command.formId))!,
+      };
+    });
+  }
+
+  /** "Descartar alteracoes": so ha o que descartar se houver versao vigente. */
+  async discardDraft(
+    command: TargetFormCommand,
+  ): Promise<DiscardFormDraftOutcome> {
+    return this.write(async (manager) => {
+      const current = await this.lockForm(manager, command, command.formId);
+
+      if (!current) return { kind: 'not_found' };
+      if (current.status === 'inactive') return { kind: 'inactive' };
+      if (!current.draft) return { kind: 'no_draft' };
+      if (!current.currentVersionId) return { kind: 'not_published' };
+
+      await manager.query(
+        `UPDATE follow_up_form_versions
+            SET deleted_at = now(),
+                updated_at = now()
+          WHERE organization_id = $1
+            AND id = $2`,
+        [command.organizationId, current.draft.id],
+      );
+      await this.audit(
+        manager,
+        command,
+        command.formId,
+        'form.draft_discarded',
+        null,
+      );
+
+      return {
+        kind: 'discarded',
+        form: (await this.findIn(manager, command, command.formId))!,
+      };
+    });
+  }
+
+  /**
+   * Congela o rascunho como a proxima versao. Sobre uma versao vigente exige
+   * a confirmacao de impacto do UC09.
+   */
+  async publish(command: PublishFormCommand): Promise<PublishFormOutcome> {
+    return this.write(async (manager) => {
+      const current = await this.lockForm(manager, command, command.formId);
+
+      if (!current) return { kind: 'not_found' };
+      if (current.status === 'inactive') return { kind: 'inactive' };
+      if (!current.draft) return { kind: 'no_draft' };
+      if (
+        !current.draft.fields.some((field) => field.requirement !== 'disabled')
+      ) {
+        return { kind: 'empty' };
+      }
+      if (current.currentVersionId && !command.confirmImpact) {
+        return { kind: 'confirmation_required' };
+      }
+
+      const versionNumber = (current.currentVersionNumber ?? 0) + 1;
+
+      await manager.query(
+        `UPDATE follow_up_form_versions
+            SET status = 'published',
+                version_number = $3,
+                published_at = now(),
+                published_by_user_id = $4,
+                updated_at = now()
+          WHERE organization_id = $1
+            AND id = $2`,
+        [
+          command.organizationId,
+          current.draft.id,
+          versionNumber,
+          command.actorUserId,
+        ],
+      );
+      await manager.query(
+        `UPDATE follow_up_forms
+            SET status = 'active',
+                updated_at = now()
+          WHERE organization_id = $1
+            AND id = $2`,
+        [command.organizationId, command.formId],
+      );
+      await this.audit(manager, command, command.formId, 'form.published', {
+        versionNumber,
+        impactConfirmed: command.confirmImpact,
+      });
+
+      return {
+        kind: 'published',
+        form: (await this.findIn(manager, command, command.formId))!,
+      };
+    });
+  }
+
+  /** Exclusao do UC09: desativa; versoes, campos, lista e respostas ficam. */
+  async deactivate(command: TargetFormCommand): Promise<DeactivateFormOutcome> {
+    return this.write(async (manager) => {
+      const current = await this.lockForm(manager, command, command.formId);
+
+      if (!current) return { kind: 'not_found' };
+      if (current.status === 'inactive') return { kind: 'already_inactive' };
+
+      await manager.query(
+        `UPDATE follow_up_forms
+            SET status = 'inactive',
+                deleted_at = now(),
+                updated_at = now()
+          WHERE organization_id = $1
+            AND id = $2`,
+        [command.organizationId, command.formId],
+      );
+      await this.audit(
+        manager,
+        command,
+        command.formId,
+        'form.deactivated',
+        null,
+      );
+
+      return {
+        kind: 'deactivated',
+        form: (await this.findIn(manager, command, command.formId))!,
+      };
+    });
+  }
+
+  /** Volta a ativo, ou a rascunho se nunca foi publicado. */
+  async reactivate(command: TargetFormCommand): Promise<ReactivateFormOutcome> {
+    return this.write(async (manager) => {
+      const current = await this.lockForm(manager, command, command.formId);
+
+      if (!current) return { kind: 'not_found' };
+      if (current.status !== 'inactive') return { kind: 'already_active' };
+
+      await manager.query(
+        `UPDATE follow_up_forms
+            SET status = $3::varchar,
+                deleted_at = NULL,
+                updated_at = now()
+          WHERE organization_id = $1
+            AND id = $2`,
+        [
+          command.organizationId,
+          command.formId,
+          current.currentVersionId ? 'active' : 'draft',
+        ],
+      );
+      await this.audit(
+        manager,
+        command,
+        command.formId,
+        'form.reactivated',
+        null,
+      );
+
+      return {
+        kind: 'reactivated',
+        form: (await this.findIn(manager, command, command.formId))!,
+      };
+    });
+  }
+
   private async write<T>(
     work: (manager: EntityManager) => Promise<T>,
   ): Promise<T> {
@@ -438,6 +675,29 @@ export class FormRepository {
           }
         : null,
     };
+  }
+
+  /** Chave -> tipo das versoes publicadas e do rascunho vivo do formulario. */
+  private async loadKnownKeys(
+    manager: EntityManager,
+    organizationId: string,
+    formId: string,
+  ): Promise<Map<string, FieldType>> {
+    const rows = await manager.query<
+      Array<{ fieldKey: string; fieldType: FieldType }>
+    >(
+      `SELECT DISTINCT ff.field_key AS "fieldKey", ff.field_type AS "fieldType"
+         FROM follow_up_form_fields ff
+         JOIN follow_up_form_versions v
+           ON v.id = ff.version_id
+          AND v.organization_id = ff.organization_id
+        WHERE ff.organization_id = $1
+          AND ff.form_id = $2
+          AND v.deleted_at IS NULL`,
+      [organizationId, formId],
+    );
+
+    return new Map(rows.map((row) => [row.fieldKey, row.fieldType]));
   }
 
   /** Todos os campos numa so instrucao; a posicao e a ordem da lista. */
