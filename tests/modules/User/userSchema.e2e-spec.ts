@@ -8,6 +8,7 @@ import { AddOrganizationKind1790100000000 } from '@/database/migrations/17901000
 import { AddTemporaryPasswordExpiry1790200000000 } from '@/database/migrations/1790200000000-AddTemporaryPasswordExpiry';
 import { SyncTenantAccessProfiles1790300000000 } from '@/database/migrations/1790300000000-SyncTenantAccessProfiles';
 import { AddUserPendingCheck1790400000000 } from '@/database/migrations/1790400000000-AddUserPendingCheck';
+import { AddPlanTermsAndChangeRequests1790500000000 } from '@/database/migrations/1790500000000-AddPlanTermsAndChangeRequests';
 import { SnakeNamingStrategy } from '@/database/snakeNaming.strategy';
 import type { TenantProfileCode } from '@/modules/Access/access.permissions';
 import { provisionTenantProfiles } from '@/modules/Access/repositories/tenantProfileProvisioning.repository';
@@ -23,10 +24,11 @@ const MIGRATIONS = [
   AddTemporaryPasswordExpiry1790200000000,
   SyncTenantAccessProfiles1790300000000,
   AddUserPendingCheck1790400000000,
+  AddPlanTermsAndChangeRequests1790500000000,
 ];
 
 const TRUNCATE_ALL =
-  'TRUNCATE audit_events, auth_sessions, password_reset_tokens, users, profile_permissions, permissions, access_profiles, organizations, usage_plans';
+  'TRUNCATE organization_plan_terms, plan_change_requests, audit_events, auth_sessions, password_reset_tokens, users, profile_permissions, permissions, access_profiles, organizations, usage_plans';
 
 const databaseUrl = process.env.VITACARE_TEST_DATABASE_URL;
 const describeWithDatabase = databaseUrl ? describe : describe.skip;

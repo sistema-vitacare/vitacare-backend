@@ -10,6 +10,8 @@ import { CreateAuthSchema1790000000000 } from '@/database/migrations/17900000000
 import { AddOrganizationKind1790100000000 } from '@/database/migrations/1790100000000-AddOrganizationKind';
 import { AddTemporaryPasswordExpiry1790200000000 } from '@/database/migrations/1790200000000-AddTemporaryPasswordExpiry';
 import { SyncTenantAccessProfiles1790300000000 } from '@/database/migrations/1790300000000-SyncTenantAccessProfiles';
+import { AddUserPendingCheck1790400000000 } from '@/database/migrations/1790400000000-AddUserPendingCheck';
+import { AddPlanTermsAndChangeRequests1790500000000 } from '@/database/migrations/1790500000000-AddPlanTermsAndChangeRequests';
 import { runPlatformSeed } from '@/database/seeds/platformSeed';
 import {
   TENANT_PROFILE_CODES,
@@ -160,6 +162,8 @@ describeWithDatabase('organizacoes em PostgreSQL descartavel', () => {
         AddOrganizationKind1790100000000,
         AddTemporaryPasswordExpiry1790200000000,
         SyncTenantAccessProfiles1790300000000,
+        AddUserPendingCheck1790400000000,
+        AddPlanTermsAndChangeRequests1790500000000,
       ],
       namingStrategy: new SnakeNamingStrategy(),
       synchronize: false,
@@ -177,7 +181,7 @@ describeWithDatabase('organizacoes em PostgreSQL descartavel', () => {
     }
 
     migrated = (await dataSource.runMigrations()).length;
-    expect(migrated).toBe(5);
+    expect(migrated).toBe(7);
 
     passwords = new PasswordHasher();
     tokens = new TokenService();
@@ -229,7 +233,7 @@ describeWithDatabase('organizacoes em PostgreSQL descartavel', () => {
     }
 
     await dataSource.query(
-      'TRUNCATE audit_events, auth_sessions, password_reset_tokens, users, profile_permissions, permissions, access_profiles, organizations, usage_plans',
+      'TRUNCATE organization_plan_terms, plan_change_requests, audit_events, auth_sessions, password_reset_tokens, users, profile_permissions, permissions, access_profiles, organizations, usage_plans',
     );
 
     for (let index = 0; index < migrated; index += 1) {

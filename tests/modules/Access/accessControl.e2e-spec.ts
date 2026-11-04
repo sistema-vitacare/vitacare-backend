@@ -19,6 +19,7 @@ import { CreateAuthSchema1790000000000 } from '@/database/migrations/17900000000
 import { AddOrganizationKind1790100000000 } from '@/database/migrations/1790100000000-AddOrganizationKind';
 import { AddTemporaryPasswordExpiry1790200000000 } from '@/database/migrations/1790200000000-AddTemporaryPasswordExpiry';
 import { SyncTenantAccessProfiles1790300000000 } from '@/database/migrations/1790300000000-SyncTenantAccessProfiles';
+import { AddPlanTermsAndChangeRequests1790500000000 } from '@/database/migrations/1790500000000-AddPlanTermsAndChangeRequests';
 import { runPlatformSeed } from '@/database/seeds/platformSeed';
 import { SnakeNamingStrategy } from '@/database/snakeNaming.strategy';
 import { AccessController } from '@/modules/Access/access.controller';
@@ -73,10 +74,11 @@ const MIGRATIONS = [
   AddOrganizationKind1790100000000,
   AddTemporaryPasswordExpiry1790200000000,
   SyncTenantAccessProfiles1790300000000,
+  AddPlanTermsAndChangeRequests1790500000000,
 ];
 
 const TRUNCATE_ALL =
-  'TRUNCATE audit_events, auth_sessions, password_reset_tokens, users, profile_permissions, permissions, access_profiles, organizations, usage_plans';
+  'TRUNCATE organization_plan_terms, plan_change_requests, audit_events, auth_sessions, password_reset_tokens, users, profile_permissions, permissions, access_profiles, organizations, usage_plans';
 
 const SETTINGS: Record<string, number> = {
   'auth.sessionIdleSeconds': 1800,
