@@ -57,6 +57,15 @@ O corpo das rotas de negócio é JSON quando aplicável. Autenticação usa Bear
 | `GET /api/v1/patient-links/:linkId` | Consulta um vínculo, vigente ou revogado | [patient-links-consultar.md](endpoints/patient-links-consultar.md) |
 | `PATCH /api/v1/patient-links/:linkId` | Altera tipo e observação de vínculo de cuidado | [patient-links-atualizar.md](endpoints/patient-links-atualizar.md) |
 | `POST /api/v1/patient-links/:linkId/revoke` | Revoga vínculo de cuidado; o acesso cai na requisição seguinte | [patient-links-revogar.md](endpoints/patient-links-revogar.md) |
+| `POST /api/v1/forms` | Cria formulário de acompanhamento em rascunho, com campos, público e frequência | [forms-criar.md](endpoints/forms-criar.md) |
+| `GET /api/v1/forms` | Lista formulários ao alcance da sessão (status, busca, paciente) | [forms-listar.md](endpoints/forms-listar.md) |
+| `GET /api/v1/forms/:formId` | Consulta formulário com versão vigente e, para quem configura, o rascunho | [forms-consultar.md](endpoints/forms-consultar.md) |
+| `PATCH /api/v1/forms/:formId` | Edita nome, descrição, tipo, frequência e público, sem nova versão | [forms-atualizar.md](endpoints/forms-atualizar.md) |
+| `PUT /api/v1/forms/:formId/draft` | Cria ou substitui o rascunho da próxima versão | [forms-salvar-rascunho.md](endpoints/forms-salvar-rascunho.md) |
+| `POST /api/v1/forms/:formId/draft/discard` | Descarta o rascunho de formulário publicado | [forms-descartar-rascunho.md](endpoints/forms-descartar-rascunho.md) |
+| `POST /api/v1/forms/:formId/publish` | Publica o rascunho como nova versão vigente (confirmação sobre versão vigente) | [forms-publicar.md](endpoints/forms-publicar.md) |
+| `POST /api/v1/forms/:formId/deactivate` | Desativa o formulário, preservando versões e histórico | [forms-desativar.md](endpoints/forms-desativar.md) |
+| `POST /api/v1/forms/:formId/reactivate` | Reativa o formulário (volta a ativo ou a rascunho) | [forms-reativar.md](endpoints/forms-reativar.md) |
 | `GET /api/v1/plans` | Catálogo de planos ativos (admin ou master) | [plans-listar.md](endpoints/plans-listar.md) |
 | `GET /api/v1/organizations/me/plan` | Plano, vigência, limites e uso da organização da sessão | [plans-consultar-proprio.md](endpoints/plans-consultar-proprio.md) |
 | `GET /api/v1/organizations/:organizationId/plan` | Plano de qualquer organização (plataforma) | [plans-consultar.md](endpoints/plans-consultar.md) |
@@ -110,6 +119,10 @@ Profissionais e administradores mantêm o cadastro dos pacientes pelas rotas `/a
 
 Administradores e profissionais vinculam cuidadores e familiares a pacientes pelas rotas `/api/v1/patient-links` (BE-10, 2026-11-04; RF005/RF016; UC03/UC07/UC14; decisões de Mateus). O papel vem do perfil do usuário (`caregiver` ou `family`); um paciente tem quantos cuidadores e familiares precisar, com um vínculo vigente por par usuário–paciente. O vínculo vale até ser revogado, sem data de término; revogar grava `deleted_at`, preserva a linha e corta o acesso na requisição seguinte. A listagem inclui o vínculo de responsável, que só muda na edição do paciente. Trocar o perfil de um usuário revoga os vínculos de cuidado que não cabem no novo perfil; inativar o usuário não revoga. Cuidador e familiar vinculados leem o cadastro completo do paciente até o BE-19 e não escrevem. O seletor [GET /patient-links/eligible-users](endpoints/patient-links-usuarios-elegiveis.md) devolve só id, nome, perfil e status, para o profissional escolher responsável, cuidador ou familiar sem `users:read`. Auditoria `patient_link.created|updated|revoked`, sem o conteúdo de tipo e observação.
 
+### Formulários de acompanhamento
+
+Profissionais e administradores montam os formulários que o cuidador preencherá nas visitas pelas rotas `/api/v1/forms` (BE-11, 2026-11-04; RF008, RF013 na parte de formulário; UC09; decisões de Mateus). O formulário é **versionado**: nasce em rascunho, e [publicar](endpoints/forms-publicar.md) congela o rascunho como a versão N+1 vigente; versões publicadas e seus campos nunca mudam, e as respostas (BE-12) ficarão presas à versão que responderam. Editar um publicado é [salvar um rascunho](endpoints/forms-salvar-rascunho.md) da próxima versão repetindo a `fieldKey` dos campos que continuam (a chave fixa o tipo do campo); publicar sobre uma versão vigente exige `confirmImpact: true` (`409 FORM_IMPACT_CONFIRMATION_REQUIRED`). O público é a organização inteira ou uma lista de pacientes ativos (`audience` `organization`/`patients`, sem entidade de grupo); a frequência esperada é opcional (`interval` de 1 a 365 em `hours`, `days` ou `weeks`) e não gera cálculo de ausência neste card. Há seis tipos de campo — `number` (casas decimais 0–3, unidade opcional, sem mínimo/máximo clínico), `scale` (inteiros de mínimo a máximo), `boolean`, `text`, `single_choice` e `multiple_choice` —, cada um obrigatório, opcional ou desabilitado; a **pressão arterial são dois campos `number`** (sistólica e diastólica, mmHg). Formulário sem campos é recusado (`422 FORM_EMPTY`), e rascunho só com campos desabilitados não é publicado. Nome, descrição, tipo de acompanhamento, frequência e público mudam por [PATCH](endpoints/forms-atualizar.md), sem nova versão. [Desativar](endpoints/forms-desativar.md) é a exclusão do UC09: preserva versões, campos, rascunho e lista de pacientes e bloqueia escrita (`409 FORM_INACTIVE`) até a [reativação](endpoints/forms-reativar.md). **Alcance:** `admin` e `professional` leem e configuram todos os formulários da organização; o `caregiver` só lê formulários ativos da organização inteira ou que listem paciente vinculado a ele, sem rascunho; o `family` recebe `403`. Para o BE-12, `parseFieldAnswer` (`src/modules/Form/parsers/fieldAnswer.parser.ts`) já fixa o contrato de valor de cada tipo, em que `0` e `false` são valores e não ausência; nenhuma rota recebe respostas ainda, e regras de alerta por campo são do BE-15. Auditoria `form.created|updated|draft_saved|draft_discarded|published|deactivated|reactivated`, sem conteúdo de campo nem dado de paciente além do id.
+
 ### Administração da plataforma
 
 Existe uma única **organização de plataforma** (`kind = platform`), sem plano e sempre ativa. Os usuários dela com perfil `platform_admin` são os **administradores master**: cadastram, listam, consultam, editam, inativam e reativam as organizações clientes pelas rotas `/api/v1/organizations`. O master faz login como qualquer usuário, com o código da organização de plataforma. A primeira conta nasce de `npm run seed:platform`.
@@ -142,6 +155,13 @@ Todo evento de acesso é gravado em `audit_events`, sempre dentro de uma organiz
 | `patient.responsible_changed` | Responsável trocado; `after_values` com `fromUserId` e `toUserId`. |
 | `patient.deactivated` | Paciente inativado. |
 | `patient.reactivated` | Paciente reativado. |
+| `form.created` | Formulário criado em rascunho; `entity_type = follow_up_form`, `after_values` com `audience` e `fieldCount`. |
+| `form.updated` | Dados ou público alterados; `after_values.fields` lista só os **nomes** das propriedades, mais `patientsAdded`/`patientsRemoved` (ids) quando a lista mudou. |
+| `form.draft_saved` | Rascunho da próxima versão salvo; `after_values.fieldCount`. |
+| `form.draft_discarded` | Rascunho descartado. |
+| `form.published` | Rascunho publicado; `after_values` com `versionNumber` e `impactConfirmed`. |
+| `form.deactivated` | Formulário desativado. |
+| `form.reactivated` | Formulário reativado. |
 | `plan_change_request.created` | Solicitação registrada pelo administrador; `after_values.requestedPlanId`. |
 | `plan_change_request.cancelled` | Solicitação cancelada pelo administrador. |
 | `plan_change_request.approved` | Solicitação aprovada pelo master. |

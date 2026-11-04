@@ -10,6 +10,7 @@ import { AddUserPendingCheck1790400000000 } from '@/database/migrations/17904000
 import { AddPlanTermsAndChangeRequests1790500000000 } from '@/database/migrations/1790500000000-AddPlanTermsAndChangeRequests';
 import { ApplyPlanCatalogRules1790600000000 } from '@/database/migrations/1790600000000-ApplyPlanCatalogRules';
 import { CreatePatients1790700000000 } from '@/database/migrations/1790700000000-CreatePatients';
+import { CreateFollowUpForms1790900000000 } from '@/database/migrations/1790900000000-CreateFollowUpForms';
 import { SnakeNamingStrategy } from '@/database/snakeNaming.strategy';
 import { ChangePasswordUseCase } from '@/modules/Auth/ChangePassword/changePassword.useCase';
 import { CompleteFirstAccessUseCase } from '@/modules/Auth/CompleteFirstAccess/completeFirstAccess.useCase';
@@ -242,6 +243,7 @@ describeWithDatabase('autenticacao em PostgreSQL descartavel', () => {
         AddPlanTermsAndChangeRequests1790500000000,
         ApplyPlanCatalogRules1790600000000,
         CreatePatients1790700000000,
+        CreateFollowUpForms1790900000000,
       ],
       namingStrategy: new SnakeNamingStrategy(),
       synchronize: false,
@@ -260,7 +262,7 @@ describeWithDatabase('autenticacao em PostgreSQL descartavel', () => {
     }
 
     migrated = (await dataSource.runMigrations()).length;
-    expect(migrated).toBe(9);
+    expect(migrated).toBe(10);
 
     passwords = new PasswordHasher();
     tokens = new TokenService();
@@ -1031,13 +1033,17 @@ describeWithDatabase('autenticacao em PostgreSQL descartavel', () => {
   });
 
   describe('schema completo', () => {
-    it('mapeia as treze tabelas nas entidades TypeORM', () => {
+    it('mapeia as dezessete tabelas nas entidades TypeORM', () => {
       expect(
         dataSource.entityMetadatas.map((metadata) => metadata.tableName).sort(),
       ).toEqual([
         'access_profiles',
         'audit_events',
         'auth_sessions',
+        'follow_up_form_fields',
+        'follow_up_form_patients',
+        'follow_up_form_versions',
+        'follow_up_forms',
         'organization_plan_terms',
         'organizations',
         'password_reset_tokens',

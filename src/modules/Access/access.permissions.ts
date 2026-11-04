@@ -61,7 +61,7 @@ export const PERMISSION_LABELS: Readonly<Record<PermissionName, string>> = {
   'forms:read': 'Consultar formularios',
   'forms:create': 'Criar formularios',
   'forms:update': 'Editar formularios',
-  'forms:deactivate': 'Desativar formularios',
+  'forms:deactivate': 'Desativar e reativar formularios',
   'alert_rules:manage': 'Configurar regras de alerta',
   'follow_ups:create': 'Registrar acompanhamento',
   'medications:read': 'Consultar medicamentos',
