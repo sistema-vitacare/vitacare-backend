@@ -22,11 +22,13 @@ import { PasswordHasher } from '@/modules/Auth/security/passwordHasher';
 export const DEV_PASSWORD = '12345678';
 
 export interface DevPlan {
+  code: string;
   name: string;
   description: string;
   userLimit: number;
   patientLimit: number;
-  monthlyPrice: string;
+  monthlyPrice: string | null;
+  features: string[];
 }
 
 export interface DevOrganization {
@@ -48,20 +50,42 @@ export interface DevUser {
   profileCode: string;
 }
 
+/**
+ * Espelho do catalogo da migration `1790500000000` (BE-07): o seed reaproveita
+ * a linha pelo `code` e so insere quando o catalogo foi apagado (testes).
+ */
+const BASIC_FEATURES = [
+  'patient_management',
+  'health_records',
+  'patient_history',
+  'automatic_alerts',
+  'responsive_access',
+];
+
 export const DEV_PLANS: DevPlan[] = [
   {
+    code: 'basic',
     name: 'Basic',
-    description: 'Plano de desenvolvimento; catalogo comercial pendente (P05).',
+    description: 'Catalogo do TCC (secao 3.3); sem preco publicado.',
     userLimit: 10,
-    patientLimit: 100,
-    monthlyPrice: '199.90',
+    patientLimit: 200,
+    monthlyPrice: null,
+    features: BASIC_FEATURES,
   },
   {
+    code: 'enterprise',
     name: 'Enterprise',
-    description: 'Plano de desenvolvimento; catalogo comercial pendente (P05).',
-    userLimit: 100,
-    patientLimit: 2000,
-    monthlyPrice: '1499.90',
+    description: 'Catalogo do TCC (secao 3.3); sem preco publicado.',
+    userLimit: 50,
+    patientLimit: 1000,
+    monthlyPrice: null,
+    features: [
+      ...BASIC_FEATURES,
+      'extended_registration',
+      'management_reports',
+      'operational_dashboard',
+      'custom_deployment',
+    ],
   },
 ];
 
@@ -73,7 +97,7 @@ export const DEV_ORGANIZATIONS: DevOrganization[] = [
     document: '11222333000181',
     phone: '1130001000',
     email: 'contato@clinicavida.test',
-    plan: 'Enterprise',
+    plan: 'enterprise',
   },
   {
     code: 'casa-bem-estar',
@@ -82,7 +106,7 @@ export const DEV_ORGANIZATIONS: DevOrganization[] = [
     document: '44555666000172',
     phone: '1130002000',
     email: 'contato@casabemestar.test',
-    plan: 'Basic',
+    plan: 'basic',
   },
 ];
 
@@ -140,9 +164,9 @@ interface IdRow {
 /**
  * Insere ou reaproveita a linha, sempre pela chave natural. A consulta vem
  * **antes** do insert porque nem toda tabela tem restricao de unicidade que
- * sirva de chave natural: `usage_plans` nao tem, e um `ON CONFLICT` la nunca
- * conflitaria — o seed duplicaria os planos a cada execucao. O `ON CONFLICT DO
- * NOTHING` do insert cobre apenas a corrida entre duas execucoes simultaneas.
+ * sirva de chave natural, e um `ON CONFLICT` sem ela nunca conflitaria. O
+ * `ON CONFLICT DO NOTHING` do insert cobre apenas a corrida entre duas
+ * execucoes simultaneas.
  */
 const upsertId = async (
   manager: EntityManager,
@@ -189,25 +213,27 @@ export const runDevSeed = async (
       const { id, created } = await upsertId(
         manager,
         {
-          sql: `INSERT INTO usage_plans (name, description, user_limit, patient_limit, monthly_price)
-                VALUES ($1, $2, $3, $4, $5)
+          sql: `INSERT INTO usage_plans (code, name, description, user_limit, patient_limit, monthly_price, features)
+                VALUES ($1, $2, $3, $4, $5, $6, $7)
                 ON CONFLICT DO NOTHING
                 RETURNING id`,
           parameters: [
+            plan.code,
             plan.name,
             plan.description,
             plan.userLimit,
             plan.patientLimit,
             plan.monthlyPrice,
+            plan.features,
           ],
         },
         {
-          sql: `SELECT id FROM usage_plans WHERE name = $1 ORDER BY created_at LIMIT 1`,
-          parameters: [plan.name],
+          sql: `SELECT id FROM usage_plans WHERE code = $1`,
+          parameters: [plan.code],
         },
       );
 
-      planIds.set(plan.name, id);
+      planIds.set(plan.code, id);
       result.plans += created ? 1 : 0;
     }
 
@@ -258,6 +284,18 @@ export const runDevSeed = async (
 
       organizationIds.set(organization.code, id);
       result.organizations += created ? 1 : 0;
+
+      await manager.query(
+        `INSERT INTO organization_plan_terms (organization_id, usage_plan_id, origin)
+         SELECT o.id, o.usage_plan_id, 'initial'
+           FROM organizations o
+          WHERE o.id = $1
+            AND NOT EXISTS (
+              SELECT 1 FROM organization_plan_terms t
+               WHERE t.organization_id = o.id AND t.superseded_at IS NULL
+            )`,
+        [id],
+      );
     }
 
     const profileIds = new Map<string, string>();

@@ -79,7 +79,11 @@ export class UserController {
     FORBIDDEN,
     {
       status: 409,
-      codes: [...DUPLICATE.codes, 'USER_PLAN_LIMIT_REACHED'],
+      codes: [
+        ...DUPLICATE.codes,
+        'USER_PLAN_LIMIT_REACHED',
+        'USER_PLAN_EXPIRED',
+      ],
     },
     VALIDATION,
   )
@@ -179,6 +183,7 @@ export class UserController {
         'USER_SELF_STATUS_CHANGE',
         'USER_ALREADY_ACTIVE',
         'USER_PLAN_LIMIT_REACHED',
+        'USER_PLAN_EXPIRED',
       ],
     },
     VALIDATION,

@@ -32,3 +32,45 @@ export const insertAuditEvent = async (
     ],
   );
 };
+
+export interface AuditActor {
+  userId: string;
+  organizationId: string;
+  requestId: string;
+}
+
+/**
+ * O evento fica na organizacao alvo e, quando quem age e a plataforma, tambem
+ * na organizacao do ator: a FK de autoria nao aceita autor de outro tenant,
+ * entao no alvo ele entra como evento de sistema.
+ */
+export const insertAuditEventForTarget = async (
+  manager: EntityManager,
+  actor: AuditActor,
+  event: Pick<AuditEventInput, 'action' | 'entityType' | 'entityId'> & {
+    organizationId: string;
+    afterValues?: Record<string, unknown> | null;
+  },
+): Promise<void> => {
+  const sameOrganization = actor.organizationId === event.organizationId;
+  const afterValues = event.afterValues ?? null;
+
+  await insertAuditEvent(manager, {
+    ...event,
+    actorUserId: sameOrganization ? actor.userId : null,
+    afterValues: sameOrganization
+      ? afterValues
+      : { ...afterValues, platformActorUserId: actor.userId },
+    requestId: actor.requestId,
+  });
+
+  if (!sameOrganization) {
+    await insertAuditEvent(manager, {
+      ...event,
+      organizationId: actor.organizationId,
+      actorUserId: actor.userId,
+      afterValues,
+      requestId: actor.requestId,
+    });
+  }
+};

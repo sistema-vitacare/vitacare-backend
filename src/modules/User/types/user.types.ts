@@ -67,8 +67,7 @@ export interface ReissueInvitationCommand extends TargetUserCommand {
 
 export type CreateUserOutcome =
   | { kind: 'created'; user: UserRow }
-  | { kind: 'limit_reached' }
-  | { kind: 'actor_forbidden' };
+  | { kind: 'limit_reached' | 'plan_expired' | 'actor_forbidden' };
 
 export type UpdateUserOutcome =
   { kind: 'updated' | 'unchanged'; user: UserRow } | { kind: 'not_found' };
@@ -81,7 +80,11 @@ export type ReactivateUserOutcome =
   | { kind: 'reactivated'; user: UserRow }
   | {
       kind:
-        'not_found' | 'already_active' | 'limit_reached' | 'actor_forbidden';
+        | 'not_found'
+        | 'already_active'
+        | 'limit_reached'
+        | 'plan_expired'
+        | 'actor_forbidden';
     };
 
 export type ReissueInvitationOutcome =

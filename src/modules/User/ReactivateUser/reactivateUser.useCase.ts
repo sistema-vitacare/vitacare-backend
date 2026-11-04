@@ -37,6 +37,12 @@ export class ReactivateUserUseCase {
           detail: 'Só usuário inativo pode ser reativado.',
         });
 
+      case 'plan_expired':
+        throw new DomainException({
+          ...UserErrors.PLAN_EXPIRED,
+          detail: 'O termo corrente do plano da organização está vencido.',
+        });
+
       case 'limit_reached':
         throw new DomainException({
           ...UserErrors.PLAN_LIMIT_REACHED,

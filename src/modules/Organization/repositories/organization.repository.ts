@@ -5,7 +5,11 @@ import type { RequestContext } from '@/common/context/requestContext.type';
 import { DomainException } from '@/common/errors/domain.exception';
 import { translatePgError } from '@/common/errors/pgError.translator';
 import { provisionTenantProfiles } from '@/modules/Access/repositories/tenantProfileProvisioning.repository';
-import { insertAuditEvent } from '@/modules/Audit/repositories/auditEvent.repository';
+import {
+  insertAuditEvent,
+  insertAuditEventForTarget,
+} from '@/modules/Audit/repositories/auditEvent.repository';
+import { insertPlanTerm } from '@/modules/Plan/repositories/planTerm.query';
 
 import {
   Organization,
@@ -131,6 +135,16 @@ export class OrganizationRepository {
             record.email,
           ],
         );
+
+        await insertPlanTerm(manager, {
+          organizationId,
+          usagePlanId: record.usagePlanId,
+          origin: 'initial',
+          changeRequestId: null,
+          reason: null,
+          assignedByUserId: actor.userId,
+          term: { endsAt: null, userLimit: null, patientLimit: null },
+        });
 
         const profiles = await provisionTenantProfiles(manager, organizationId);
 
@@ -313,11 +327,6 @@ export class OrganizationRepository {
     );
   }
 
-  /**
-   * O evento fica na organizacao alvo e, quando quem age e a plataforma, tambem
-   * na organizacao do ator: a FK de autoria nao aceita autor de outro tenant,
-   * entao no alvo ele entra como evento de sistema.
-   */
   private async audit(
     manager: EntityManager,
     actor: OrganizationActor,
@@ -325,31 +334,13 @@ export class OrganizationRepository {
     action: string,
     afterValues: Record<string, unknown> | null = null,
   ): Promise<void> {
-    const sameOrganization = actor.organizationId === organizationId;
-
-    await insertAuditEvent(manager, {
+    await insertAuditEventForTarget(manager, actor, {
       organizationId,
-      actorUserId: sameOrganization ? actor.userId : null,
       action,
       entityType: 'organization',
       entityId: organizationId,
-      afterValues: sameOrganization
-        ? afterValues
-        : { ...afterValues, platformActorUserId: actor.userId },
-      requestId: actor.requestId,
+      afterValues,
     });
-
-    if (!sameOrganization) {
-      await insertAuditEvent(manager, {
-        organizationId: actor.organizationId,
-        actorUserId: actor.userId,
-        action,
-        entityType: 'organization',
-        entityId: organizationId,
-        afterValues,
-        requestId: actor.requestId,
-      });
-    }
   }
 
   private translate(error: unknown): unknown {
