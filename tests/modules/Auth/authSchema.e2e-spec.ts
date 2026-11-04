@@ -11,6 +11,7 @@ import { AddPlanTermsAndChangeRequests1790500000000 } from '@/database/migration
 import { ApplyPlanCatalogRules1790600000000 } from '@/database/migrations/1790600000000-ApplyPlanCatalogRules';
 import { CreatePatients1790700000000 } from '@/database/migrations/1790700000000-CreatePatients';
 import { CreateFollowUpForms1790900000000 } from '@/database/migrations/1790900000000-CreateFollowUpForms';
+import { CreateFollowUpRecords1791000000000 } from '@/database/migrations/1791000000000-CreateFollowUpRecords';
 import { SnakeNamingStrategy } from '@/database/snakeNaming.strategy';
 import { ChangePasswordUseCase } from '@/modules/Auth/ChangePassword/changePassword.useCase';
 import { CompleteFirstAccessUseCase } from '@/modules/Auth/CompleteFirstAccess/completeFirstAccess.useCase';
@@ -244,6 +245,7 @@ describeWithDatabase('autenticacao em PostgreSQL descartavel', () => {
         ApplyPlanCatalogRules1790600000000,
         CreatePatients1790700000000,
         CreateFollowUpForms1790900000000,
+        CreateFollowUpRecords1791000000000,
       ],
       namingStrategy: new SnakeNamingStrategy(),
       synchronize: false,
@@ -262,7 +264,7 @@ describeWithDatabase('autenticacao em PostgreSQL descartavel', () => {
     }
 
     migrated = (await dataSource.runMigrations()).length;
-    expect(migrated).toBe(10);
+    expect(migrated).toBe(11);
 
     passwords = new PasswordHasher();
     tokens = new TokenService();
@@ -1033,7 +1035,7 @@ describeWithDatabase('autenticacao em PostgreSQL descartavel', () => {
   });
 
   describe('schema completo', () => {
-    it('mapeia as dezessete tabelas nas entidades TypeORM', () => {
+    it('mapeia as vinte tabelas nas entidades TypeORM', () => {
       expect(
         dataSource.entityMetadatas.map((metadata) => metadata.tableName).sort(),
       ).toEqual([
@@ -1044,6 +1046,9 @@ describeWithDatabase('autenticacao em PostgreSQL descartavel', () => {
         'follow_up_form_patients',
         'follow_up_form_versions',
         'follow_up_forms',
+        'follow_up_records',
+        'follow_up_response_items',
+        'follow_up_responses',
         'organization_plan_terms',
         'organizations',
         'password_reset_tokens',

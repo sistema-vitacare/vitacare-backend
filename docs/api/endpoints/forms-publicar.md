@@ -11,7 +11,7 @@ source: src/modules/Form/form.controller.ts
 
 ## Propósito e acesso
 
-"Salva e ativa" do UC09 passo 6 e "Publicar" da Figura 39 (RF008; BE-11). Congela o rascunho como a **versão N+1** e ela passa a ser a vigente: na primeira publicação o formulário vai de `draft` para `active` com a versão 1; depois, cada publicação cria a versão seguinte (2, 3… sem buracos). A versão anterior e seus campos ficam **intactos** — versões publicadas nunca mudam nem são apagadas —, e as respostas já dadas continuarão ligadas à versão que responderam; os registros novos (BE-12, ainda não implementado) passarão a usar a nova versão.
+"Salva e ativa" do UC09 passo 6 e "Publicar" da Figura 39 (RF008; BE-11). Congela o rascunho como a **versão N+1** e ela passa a ser a vigente: na primeira publicação o formulário vai de `draft` para `active` com a versão 1; depois, cada publicação cria a versão seguinte (2, 3… sem buracos). A versão anterior e seus campos ficam **intactos** — versões publicadas nunca mudam nem são apagadas —, e as respostas já dadas continuarão ligadas à versão que responderam; os registros novos ([POST /follow-ups](follow-ups-registrar.md), BE-12) passam a usar a nova versão e um envio preenchido sobre a versão anterior é recusado com `409 FOLLOW_UP_FORM_VERSION_OUTDATED`.
 
 **Confirmação de impacto (UC09, fluxo alternativo "edição de formulário com registros"):** quando já existe versão vigente, publicar exige `confirmImpact: true`; sem ela, `409 FORM_IMPACT_CONFIRMATION_REQUIRED` e nada muda. Como ainda não há respostas para contar, a confirmação é pedida **sempre** que há versão vigente (chamada do agente, pendente de confirmação). Na primeira publicação ela é dispensada.
 

@@ -19,11 +19,11 @@ const perms = (
 ) => TENANT_PROFILES[code].permissions as readonly string[];
 
 describe('matriz de permissoes dos perfis', () => {
-  it('catalogo de tenant tem 33 codigos validos e rotulados', () => {
-    expect(TENANT_PERMISSION_CODES).toHaveLength(33);
-    expect(new Set(TENANT_PERMISSION_CODES).size).toBe(33);
+  it('catalogo de tenant tem 34 codigos validos e rotulados', () => {
+    expect(TENANT_PERMISSION_CODES).toHaveLength(34);
+    expect(new Set(TENANT_PERMISSION_CODES).size).toBe(34);
     const all = Object.values(Permissions);
-    expect(all).toHaveLength(37);
+    expect(all).toHaveLength(38);
     for (const code of all) {
       expect(code).toMatch(/^[a-z][a-z0-9_]*:[a-z][a-z0-9_]*$/);
       expect(PERMISSION_LABELS[code]).toBeTruthy();
@@ -44,6 +44,13 @@ describe('matriz de permissoes dos perfis', () => {
       expect(perms(ProfileCode.ADMIN)).toContain(code);
     }
     expect(perms(ProfileCode.ADMIN)).not.toContain('follow_ups:create');
+  });
+
+  it('so admin e profissional anulam registro de qualquer autor', () => {
+    const holders = TENANT_PROFILE_CODES.filter((p) =>
+      perms(p).includes('follow_ups:annul'),
+    );
+    expect(holders).toEqual(['admin', 'professional']);
   });
 
   it('somente o cuidador registra acompanhamento', () => {
@@ -76,7 +83,7 @@ describe('matriz de permissoes dos perfis', () => {
     ]);
   });
 
-  it('profissional exatamente 17 codigos', () => {
+  it('profissional exatamente 19 codigos', () => {
     expect(sorted(perms(ProfileCode.PROFESSIONAL))).toEqual(
       sorted([
         'patients:read',
@@ -91,6 +98,7 @@ describe('matriz de permissoes dos perfis', () => {
         'forms:update',
         'forms:deactivate',
         'alert_rules:manage',
+        'follow_ups:annul',
         'medications:read',
         'medications:create',
         'medications:update',
@@ -99,7 +107,7 @@ describe('matriz de permissoes dos perfis', () => {
         'patient_links:manage',
       ]),
     );
-    expect(perms(ProfileCode.ADMIN)).toHaveLength(32);
+    expect(perms(ProfileCode.ADMIN)).toHaveLength(33);
     for (const code of [
       'organization:read',
       'organization:update',

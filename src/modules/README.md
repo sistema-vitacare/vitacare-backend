@@ -167,7 +167,8 @@ comportamento real.
 A matriz em `src/modules/Access/access.permissions.ts` e a fonte de verdade:
 catalogo de permissoes e os quatro perfis fixos de tenant (`admin`,
 `professional`, `caregiver`, `family`). A unica heranca e admin contem
-professional (Figura 28); `follow_ups:create` e so do cuidador; o familiar e
+professional (Figura 28); `follow_ups:create` e so do cuidador (`follow_ups:annul`,
+anular registro de qualquer autor, e do profissional e do admin); o familiar e
 somente leitura; `platform_admin` (master) nao muda. As organizacoes ganham os
 perfis por `provisionTenantProfiles` (criacao de organizacao e seed de
 desenvolvimento) e, para as ja existentes, pela migration

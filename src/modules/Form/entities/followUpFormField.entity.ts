@@ -39,6 +39,11 @@ import { FollowUpFormVersion } from './followUpFormVersion.entity';
   { name: 'follow_up_form_fields_version_tenant_fk', onDelete: 'RESTRICT' },
 )
 @Unique('follow_up_form_fields_id_org_unique', ['id', 'organizationId'])
+@Unique('follow_up_form_fields_id_version_org_unique', [
+  'id',
+  'versionId',
+  'organizationId',
+])
 @Unique('follow_up_form_fields_version_key_unique', ['versionId', 'fieldKey'])
 @Unique('follow_up_form_fields_version_position_unique', [
   'versionId',

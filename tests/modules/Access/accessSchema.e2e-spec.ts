@@ -682,26 +682,37 @@ describeWithDatabase('perfis de acesso em PostgreSQL descartavel', () => {
         ]),
       );
 
-      // Concessao acrescentada depois pela migration 1790800000000-AddPatientCareLinks.
+      // Concessoes acrescentadas depois pelas migrations
+      // 1790800000000-AddPatientCareLinks e 1791000000000-CreateFollowUpRecords.
       expect(current).toEqual({
         ...SNAPSHOT_PROFILES,
+        admin: {
+          ...SNAPSHOT_PROFILES.admin,
+          permissions: [
+            ...SNAPSHOT_PROFILES.admin.permissions,
+            'follow_ups:annul',
+          ].sort(),
+        },
         professional: {
           ...SNAPSHOT_PROFILES.professional,
           permissions: [
             ...SNAPSHOT_PROFILES.professional.permissions,
             'patient_links:manage',
+            'follow_ups:annul',
           ].sort(),
         },
       });
       // Rotulos trocados depois pelas migrations 1790700000000-CreatePatients
-      // e 1790900000000-CreateFollowUpForms.
+      // e 1790900000000-CreateFollowUpForms; codigo novo da
+      // 1791000000000-CreateFollowUpRecords.
       expect(PERMISSION_LABELS).toEqual({
         ...SNAPSHOT_LABELS,
         'patients:deactivate': 'Inativar e reativar pacientes',
         'forms:deactivate': 'Desativar e reativar formularios',
+        'follow_ups:annul': 'Anular registro de acompanhamento',
       });
       expect([...TENANT_PERMISSION_CODES].sort()).toEqual(
-        [...SNAPSHOT_TENANT_CODES].sort(),
+        [...SNAPSHOT_TENANT_CODES, 'follow_ups:annul'].sort(),
       );
     });
 

@@ -11,7 +11,7 @@ source: src/modules/Form/form.controller.ts
 
 ## Propósito e acesso
 
-"Exclusão de formulário" do UC09 (fluxo alternativo; RF008; BE-11): o formulário é **desativado**, nunca apagado. Versões, campos, rascunho, lista de pacientes e — quando existirem (BE-12) — registros e respostas ficam preservados. O formulário sai do alcance do cuidador e não aceita mais edição, rascunho, publicação nem descarte (`409 FORM_INACTIVE`) até ser [reativado](forms-reativar.md). A recusa de novo preenchimento de formulário desativado é regra do registro de acompanhamento (BE-12), ainda não implementado. Vale para formulários `draft` e `active`.
+"Exclusão de formulário" do UC09 (fluxo alternativo; RF008; BE-11): o formulário é **desativado**, nunca apagado. Versões, campos, rascunho, lista de pacientes e os registros e respostas já gravados (BE-12) ficam preservados. O formulário sai do alcance do cuidador e não aceita mais edição, rascunho, publicação nem descarte (`409 FORM_INACTIVE`) até ser [reativado](forms-reativar.md). Um novo registro sobre formulário desativado é recusado por [POST /follow-ups](follow-ups-registrar.md) com `409 FORM_INACTIVE` (BE-12). Vale para formulários `draft` e `active`.
 
 Autenticação: `Authorization: Bearer <token>` de sessão normal com `forms:deactivate` — perfis `admin` e `professional` (matriz do BE-05). `caregiver` (só tem `forms:read`), `family` (nenhuma permissão de formulário) e o master (`platform_admin`) recebem `403 AUTH_FORBIDDEN`. A organização vem **sempre** da sessão; formulário de outra organização se comporta como inexistente (`404 FORM_NOT_FOUND`).
 
