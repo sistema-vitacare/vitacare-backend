@@ -103,7 +103,8 @@ export class PlanLimitsDto {
 export class PlanUsageDto {
   @ApiProperty({
     minimum: 0,
-    description: 'Usuarios `pending` + `active` (mesma contagem do limite).',
+    description:
+      'Usuarios `pending` + `active` (mesma contagem do limite). Pode passar do limite apos rebaixamento de plano.',
   })
   users!: number;
 
@@ -112,7 +113,7 @@ export class PlanUsageDto {
     type: Number,
     example: null,
     description:
-      'Sempre `null` ate existir o cadastro de pacientes (BE-08/BE-09).',
+      'Sempre `null` ate o cadastro de pacientes (BE-09), quando conta os pacientes ativos.',
   })
   patients!: number | null;
 }
