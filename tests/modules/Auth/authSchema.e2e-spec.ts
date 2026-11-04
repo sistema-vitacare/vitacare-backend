@@ -8,6 +8,7 @@ import { AddTemporaryPasswordExpiry1790200000000 } from '@/database/migrations/1
 import { SyncTenantAccessProfiles1790300000000 } from '@/database/migrations/1790300000000-SyncTenantAccessProfiles';
 import { AddUserPendingCheck1790400000000 } from '@/database/migrations/1790400000000-AddUserPendingCheck';
 import { AddPlanTermsAndChangeRequests1790500000000 } from '@/database/migrations/1790500000000-AddPlanTermsAndChangeRequests';
+import { ApplyPlanCatalogRules1790600000000 } from '@/database/migrations/1790600000000-ApplyPlanCatalogRules';
 import { SnakeNamingStrategy } from '@/database/snakeNaming.strategy';
 import { ChangePasswordUseCase } from '@/modules/Auth/ChangePassword/changePassword.useCase';
 import { CompleteFirstAccessUseCase } from '@/modules/Auth/CompleteFirstAccess/completeFirstAccess.useCase';
@@ -238,6 +239,7 @@ describeWithDatabase('autenticacao em PostgreSQL descartavel', () => {
         SyncTenantAccessProfiles1790300000000,
         AddUserPendingCheck1790400000000,
         AddPlanTermsAndChangeRequests1790500000000,
+        ApplyPlanCatalogRules1790600000000,
       ],
       namingStrategy: new SnakeNamingStrategy(),
       synchronize: false,
@@ -256,7 +258,7 @@ describeWithDatabase('autenticacao em PostgreSQL descartavel', () => {
     }
 
     migrated = (await dataSource.runMigrations()).length;
-    expect(migrated).toBe(7);
+    expect(migrated).toBe(8);
 
     passwords = new PasswordHasher();
     tokens = new TokenService();

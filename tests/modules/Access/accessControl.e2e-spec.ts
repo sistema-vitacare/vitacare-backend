@@ -20,6 +20,7 @@ import { AddOrganizationKind1790100000000 } from '@/database/migrations/17901000
 import { AddTemporaryPasswordExpiry1790200000000 } from '@/database/migrations/1790200000000-AddTemporaryPasswordExpiry';
 import { SyncTenantAccessProfiles1790300000000 } from '@/database/migrations/1790300000000-SyncTenantAccessProfiles';
 import { AddPlanTermsAndChangeRequests1790500000000 } from '@/database/migrations/1790500000000-AddPlanTermsAndChangeRequests';
+import { ApplyPlanCatalogRules1790600000000 } from '@/database/migrations/1790600000000-ApplyPlanCatalogRules';
 import { runPlatformSeed } from '@/database/seeds/platformSeed';
 import { SnakeNamingStrategy } from '@/database/snakeNaming.strategy';
 import { AccessController } from '@/modules/Access/access.controller';
@@ -75,6 +76,7 @@ const MIGRATIONS = [
   AddTemporaryPasswordExpiry1790200000000,
   SyncTenantAccessProfiles1790300000000,
   AddPlanTermsAndChangeRequests1790500000000,
+  ApplyPlanCatalogRules1790600000000,
 ];
 
 const TRUNCATE_ALL =

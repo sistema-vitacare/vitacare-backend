@@ -28,6 +28,7 @@ export interface DevPlan {
   userLimit: number;
   patientLimit: number;
   monthlyPrice: string | null;
+  expandable: boolean;
   features: string[];
 }
 
@@ -51,7 +52,8 @@ export interface DevUser {
 }
 
 /**
- * Espelho do catalogo da migration `1790500000000` (BE-07): o seed reaproveita
+ * Espelho do catalogo das migrations `1790500000000` e `1790600000000` (BE-07,
+ * Quadro 2 do TCC): o seed reaproveita
  * a linha pelo `code` e so insere quando o catalogo foi apagado (testes).
  */
 const BASIC_FEATURES = [
@@ -66,19 +68,23 @@ export const DEV_PLANS: DevPlan[] = [
   {
     code: 'basic',
     name: 'Basic',
-    description: 'Catalogo do TCC (secao 3.3); sem preco publicado.',
+    description:
+      'Indicado para clínicas, consultórios e operações de pequeno porte que desejam organizar o acompanhamento de pacientes em uma estrutura inicial de uso.',
     userLimit: 10,
     patientLimit: 200,
-    monthlyPrice: null,
+    monthlyPrice: '499.00',
+    expandable: false,
     features: BASIC_FEATURES,
   },
   {
     code: 'enterprise',
     name: 'Enterprise',
-    description: 'Catalogo do TCC (secao 3.3); sem preco publicado.',
+    description:
+      'Indicado para clínicas maiores, empresas de home care e instituições com maior volume de profissionais, pacientes e necessidade de controle operacional.',
     userLimit: 50,
     patientLimit: 1000,
-    monthlyPrice: null,
+    monthlyPrice: '1990.00',
+    expandable: true,
     features: [
       ...BASIC_FEATURES,
       'extended_registration',
@@ -213,8 +219,8 @@ export const runDevSeed = async (
       const { id, created } = await upsertId(
         manager,
         {
-          sql: `INSERT INTO usage_plans (code, name, description, user_limit, patient_limit, monthly_price, features)
-                VALUES ($1, $2, $3, $4, $5, $6, $7)
+          sql: `INSERT INTO usage_plans (code, name, description, user_limit, patient_limit, monthly_price, expandable, features)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
                 ON CONFLICT DO NOTHING
                 RETURNING id`,
           parameters: [
@@ -224,6 +230,7 @@ export const runDevSeed = async (
             plan.userLimit,
             plan.patientLimit,
             plan.monthlyPrice,
+            plan.expandable,
             plan.features,
           ],
         },

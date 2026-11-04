@@ -8,6 +8,7 @@ import { AddTemporaryPasswordExpiry1790200000000 } from '@/database/migrations/1
 import { SyncTenantAccessProfiles1790300000000 } from '@/database/migrations/1790300000000-SyncTenantAccessProfiles';
 import { AddUserPendingCheck1790400000000 } from '@/database/migrations/1790400000000-AddUserPendingCheck';
 import { AddPlanTermsAndChangeRequests1790500000000 } from '@/database/migrations/1790500000000-AddPlanTermsAndChangeRequests';
+import { ApplyPlanCatalogRules1790600000000 } from '@/database/migrations/1790600000000-ApplyPlanCatalogRules';
 import {
   PLATFORM_ADMIN_PERMISSIONS,
   TENANT_PROFILES,
@@ -88,6 +89,7 @@ describeWithDatabase(
           SyncTenantAccessProfiles1790300000000,
           AddUserPendingCheck1790400000000,
           AddPlanTermsAndChangeRequests1790500000000,
+          ApplyPlanCatalogRules1790600000000,
         ],
         namingStrategy: new SnakeNamingStrategy(),
         synchronize: false,
@@ -106,7 +108,7 @@ describeWithDatabase(
       }
 
       migrated = (await dataSource.runMigrations()).length;
-      expect(migrated).toBe(7);
+      expect(migrated).toBe(8);
 
       const passwords = new PasswordHasher();
 

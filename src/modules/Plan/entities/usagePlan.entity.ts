@@ -35,6 +35,10 @@ export class UsagePlan {
   @Column({ type: 'numeric', precision: 12, scale: 2, nullable: true })
   monthlyPrice!: string | null;
 
+  /** Quadro 2 do TCC: so o Enterprise expande limites conforme contratacao. */
+  @Column({ type: 'boolean', default: false })
+  expandable!: boolean;
+
   @Column({ type: 'boolean', default: true })
   status!: boolean;
 

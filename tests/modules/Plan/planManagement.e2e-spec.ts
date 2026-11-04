@@ -20,6 +20,7 @@ import { AddTemporaryPasswordExpiry1790200000000 } from '@/database/migrations/1
 import { SyncTenantAccessProfiles1790300000000 } from '@/database/migrations/1790300000000-SyncTenantAccessProfiles';
 import { AddUserPendingCheck1790400000000 } from '@/database/migrations/1790400000000-AddUserPendingCheck';
 import { AddPlanTermsAndChangeRequests1790500000000 } from '@/database/migrations/1790500000000-AddPlanTermsAndChangeRequests';
+import { ApplyPlanCatalogRules1790600000000 } from '@/database/migrations/1790600000000-ApplyPlanCatalogRules';
 import { runPlatformSeed } from '@/database/seeds/platformSeed';
 import { SnakeNamingStrategy } from '@/database/snakeNaming.strategy';
 import { AuthGuard } from '@/modules/Auth/guards/auth.guard';
@@ -55,6 +56,7 @@ const MIGRATIONS = [
   SyncTenantAccessProfiles1790300000000,
   AddUserPendingCheck1790400000000,
   AddPlanTermsAndChangeRequests1790500000000,
+  ApplyPlanCatalogRules1790600000000,
 ];
 
 const TRUNCATE_ALL =
@@ -122,6 +124,9 @@ interface PlanBody {
   features: string[];
   monthlyPrice: string | null;
   userLimit: number;
+  patientLimit: number;
+  expandable: boolean;
+  description: string | null;
 }
 
 interface RequestBody {
@@ -444,7 +449,7 @@ describeWithDatabase('planos de uso em PostgreSQL (e2e)', () => {
   }, 60000);
 
   describe('catalogo e consulta do plano', () => {
-    it('lista o catalogo ativo do TCC, sem preco e sem o plano retirado', async () => {
+    it('lista o catalogo do Quadro 2 do TCC, com preco e sem o plano retirado', async () => {
       for (const token of [tenants.A.adminToken, masterToken]) {
         const response = await http('get', '/api/v1/plans', token);
 
@@ -456,7 +461,28 @@ describeWithDatabase('planos de uso em PostgreSQL (e2e)', () => {
           'basic',
           'enterprise',
         ]);
-        expect(catalog.every((plan) => plan.monthlyPrice === null)).toBe(true);
+        expect(catalog).toMatchObject([
+          {
+            code: 'basic',
+            userLimit: 10,
+            patientLimit: 200,
+            monthlyPrice: '499.00',
+            expandable: false,
+          },
+          {
+            code: 'enterprise',
+            userLimit: 50,
+            patientLimit: 1000,
+            monthlyPrice: '1990.00',
+            expandable: true,
+          },
+        ]);
+        expect(catalog[0].description).toMatch(
+          /^Indicado para clínicas, consultórios/,
+        );
+        expect(catalog[1].description).toMatch(
+          /^Indicado para clínicas maiores/,
+        );
         expect(catalog[0].features).not.toContain('management_reports');
         expect(catalog[1].features).toContain('management_reports');
       }
@@ -637,7 +663,7 @@ describeWithDatabase('planos de uso em PostgreSQL (e2e)', () => {
     it('aprova, aplica o plano pedido com limite personalizado e encerra o termo anterior', async () => {
       const previousTerm = await currentTermOf(tenants.A.id);
       const approved = await decide(requestA.id, 'approve', masterToken, {
-        userLimit: 20,
+        userLimit: 60,
         decisionNote: 'Contrato assinado.',
       });
 
@@ -653,8 +679,8 @@ describeWithDatabase('planos de uso em PostgreSQL (e2e)', () => {
       const plan = await ownPlan(tenants.A);
       expect(plan).toMatchObject({
         plan: { code: 'enterprise' },
-        term: { origin: 'change_request', userLimit: 20 },
-        limits: { users: 20, patients: 1000 },
+        term: { origin: 'change_request', userLimit: 60 },
+        limits: { users: 60, patients: 1000 },
         pendingChangeRequest: null,
       });
       expect(plan.pendingChangeRequest).toBeNull();
@@ -764,26 +790,83 @@ describeWithDatabase('planos de uso em PostgreSQL (e2e)', () => {
       expect(tenant.status).toBe(403);
     });
 
-    it('limite personalizado vale no cadastro de usuario', async () => {
-      const usage = (await ownPlan(tenants.B)).usage.users;
+    it('so o Enterprise expande limites, e so para cima', async () => {
+      const assign = (body: Record<string, unknown>) =>
+        http(
+          'put',
+          `/api/v1/organizations/${tenants.B.id}/plan`,
+          masterToken,
+          body,
+        );
+
+      const basic = await assign({ planId: plans.basic, userLimit: 20 });
+      expect(basic.status).toBe(422);
+      expect(errorCode(basic)).toBe('PLAN_LIMIT_NOT_EXPANDABLE');
+
+      const below = await assign({
+        planId: plans.enterprise,
+        patientLimit: 999,
+      });
+      expect(below.status).toBe(422);
+      expect(errorCode(below)).toBe('PLAN_LIMIT_BELOW_CATALOG');
+
+      const pending = (
+        (await requestChange(tenants.B, plans.enterprise)).body as {
+          data: RequestBody;
+        }
+      ).data;
+      const approveBelow = await decide(pending.id, 'approve', masterToken, {
+        userLimit: 10,
+      });
+      expect(approveBelow.status).toBe(422);
+      expect(errorCode(approveBelow)).toBe('PLAN_LIMIT_BELOW_CATALOG');
+      expect(
+        await scalar(
+          'SELECT status AS value FROM plan_change_requests WHERE id = $1',
+          [pending.id],
+        ),
+      ).toBe('pending');
+      await decide(pending.id, 'cancel', tenants.B.adminToken);
+
+      expect((await ownPlan(tenants.B)).plan.code).toBe('basic');
+    });
+
+    it('limite expandido vale no cadastro de usuario', async () => {
       const assigned = await http(
         'put',
         `/api/v1/organizations/${tenants.B.id}/plan`,
         masterToken,
-        { planId: plans.basic, userLimit: usage, reason: 'Teste de teto.' },
+        { planId: plans.enterprise, userLimit: 51, reason: 'Teste de teto.' },
       );
 
       expect(assigned.status).toBe(200);
       expect(
         (assigned.body as { data: OrganizationPlanBody }).data,
       ).toMatchObject({
-        term: { origin: 'assignment', userLimit: usage },
-        limits: { users: usage },
+        term: { origin: 'assignment', userLimit: 51 },
+        limits: { users: 51 },
       });
+
+      // Ocupa as vagas ate o teto expandido sem passar pela API.
+      await dataSource.query(
+        `INSERT INTO users (organization_id, profile_id, name, email, cpf, status)
+         SELECT $1, p.id, 'Ocupante ' || g, 'ocupante' || g || '@casa-planos-b.test',
+                lpad(g::text, 11, '9'), 'active'
+           FROM access_profiles p, generate_series(1, 51 - $2::int) g
+          WHERE p.organization_id = $1 AND p.code = 'caregiver'`,
+        [tenants.B.id, (await ownPlan(tenants.B)).usage.users],
+      );
+      expect((await ownPlan(tenants.B)).usage.users).toBe(51);
 
       const blocked = await createUser(tenants.B);
       expect(blocked.status).toBe(409);
       expect(errorCode(blocked)).toBe('USER_PLAN_LIMIT_REACHED');
+
+      await dataSource.query(
+        `UPDATE users SET status = 'inactive', deleted_at = now()
+          WHERE organization_id = $1 AND email LIKE 'ocupante%'`,
+        [tenants.B.id],
+      );
     });
 
     it('vencido bloqueia cadastro, preserva leitura e aceita pedido de renovacao', async () => {
@@ -834,7 +917,32 @@ describeWithDatabase('planos de uso em PostgreSQL (e2e)', () => {
   });
 
   describe('migration', () => {
+    it('reverte as regras do Quadro 2 sem perder planos nem termos', async () => {
+      await dataSource.undoLastMigration();
+
+      expect(
+        await scalar(
+          "SELECT count(*)::text AS value FROM information_schema.columns WHERE table_name = 'usage_plans' AND column_name = 'expandable'",
+        ),
+      ).toBe('0');
+      expect(
+        await scalar(
+          'SELECT count(*)::text AS value FROM usage_plans WHERE id = ANY($1) AND monthly_price IS NULL',
+          [[plans.basic, plans.enterprise]],
+        ),
+      ).toBe('2');
+
+      await dataSource.runMigrations();
+
+      expect(
+        await scalar(
+          "SELECT string_agg(code || ':' || monthly_price || ':' || expandable, ',' ORDER BY code) AS value FROM usage_plans WHERE code IN ('basic', 'enterprise')",
+        ),
+      ).toBe('basic:499.00:false,enterprise:1990.00:true');
+    });
+
     it('reverte e reaplica com dados, mantendo o plano do catalogo em uso', async () => {
+      await dataSource.undoLastMigration();
       await dataSource.undoLastMigration();
 
       expect(
@@ -859,9 +967,14 @@ describeWithDatabase('planos de uso em PostgreSQL (e2e)', () => {
       ).toBe('2');
       expect(
         await scalar(
-          "SELECT count(*)::text AS value FROM usage_plans WHERE code LIKE 'legacy-%'",
+          "SELECT count(*)::text AS value FROM usage_plans WHERE code LIKE 'legacy-%' AND NOT status",
         ),
       ).toBe('3');
+      expect(
+        await scalar(
+          "SELECT string_agg(code, ',' ORDER BY code) AS value FROM usage_plans WHERE status",
+        ),
+      ).toBe('basic,enterprise');
     });
   });
 });

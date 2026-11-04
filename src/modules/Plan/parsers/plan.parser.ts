@@ -24,6 +24,7 @@ export const toPlanResponse = (
     | 'patientLimit'
     | 'features'
     | 'monthlyPrice'
+    | 'expandable'
   >,
 ): PlanDto => ({
   id: plan.id,
@@ -34,6 +35,7 @@ export const toPlanResponse = (
   patientLimit: plan.patientLimit,
   features: plan.features,
   monthlyPrice: plan.monthlyPrice,
+  expandable: plan.expandable,
 });
 
 /** Quem decidiu fora do tenant e usuario da plataforma: so ela o ve. */
