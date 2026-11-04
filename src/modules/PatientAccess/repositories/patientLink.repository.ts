@@ -83,6 +83,49 @@ const isPostgresError = (error: unknown): error is PostgresError =>
   typeof (error as { code?: unknown }).code === 'string';
 
 /**
+ * Troca de perfil (BE-10): revoga, na transacao de quem chama, os vinculos de
+ * cuidado vigentes cujo papel nao corresponde ao novo perfil. Voltar ao perfil
+ * antigo nao os ressuscita. O vinculo de responsavel segue a regra do BE-09.
+ */
+export const revokeCareLinksOnProfileChange = async (
+  manager: EntityManager,
+  input: PatientLinkActor & { userId: string; newProfile: string },
+): Promise<void> => {
+  // UPDATE no TypeORM devolve [linhas do RETURNING, quantidade afetada].
+  const [revoked] = await manager.query<
+    [Array<{ id: string; patientId: string; role: CareLinkRole }>, number]
+  >(
+    `UPDATE user_patients
+        SET deleted_at = now(),
+            updated_at = now()
+      WHERE organization_id = $1
+        AND user_id = $2
+        AND role = ANY($3::varchar[])
+        AND role <> $4
+        AND deleted_at IS NULL
+      RETURNING id, patient_id AS "patientId", role`,
+    [input.organizationId, input.userId, CARE_LINK_ROLES, input.newProfile],
+  );
+
+  for (const link of revoked) {
+    await insertAuditEvent(manager, {
+      organizationId: input.organizationId,
+      actorUserId: input.actorUserId,
+      action: 'patient_link.revoked',
+      entityType: 'patient_link',
+      entityId: link.id,
+      afterValues: {
+        patientId: link.patientId,
+        userId: input.userId,
+        role: link.role,
+        reason: 'profile_changed',
+      },
+      requestId: input.requestId,
+    });
+  }
+};
+
+/**
  * Vinculos usuario-paciente da organizacao da sessao. Criar toma a trava
  * `FOR NO KEY UPDATE` da organizacao (a mesma de usuarios e do responsavel),
  * para o perfil lido na validacao nao mudar antes do INSERT; editar e revogar

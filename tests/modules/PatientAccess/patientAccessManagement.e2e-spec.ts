@@ -988,6 +988,79 @@ describeWithDatabase('vinculos de cuidado em PostgreSQL (e2e)', () => {
     });
   });
 
+  describe('troca de perfil', () => {
+    const changeProfile = (userId: string, profileCode: string) =>
+      http('patch', `/api/v1/users/${userId}/profile`, tenants.A.tokens.admin, {
+        profileCode,
+      });
+
+    it('revoga o vinculo de cuidado incompativel, audita e nao ressuscita ao voltar', async () => {
+      const userId = await insertUser(
+        tenants.A,
+        ProfileCode.CAREGIVER,
+        'cuidador-troca',
+      );
+      const token = await loginAs(
+        tenants.A.code,
+        `cuidador-troca@${tenants.A.code}.test`,
+      );
+      const patientId = await newPatient(tenants.A);
+      const link = await linked(tenants.A, patientId, userId);
+
+      expect((await readPatient(token, patientId)).status).toBe(200);
+      expect((await changeProfile(userId, 'family')).status).toBe(200);
+
+      const after = await http(
+        'get',
+        `/api/v1/patient-links/${link.id}`,
+        tenants.A.tokens.admin,
+      );
+
+      expect((after.body as { data: LinkBody }).data.status).toBe('revoked');
+      expect(await auditOf(link.id)).toContainEqual({
+        action: 'patient_link.revoked',
+        afterValues: {
+          patientId,
+          userId,
+          role: 'caregiver',
+          reason: 'profile_changed',
+        },
+      });
+      expect((await readPatient(token, patientId)).status).toBe(404);
+
+      expect((await changeProfile(userId, 'caregiver')).status).toBe(200);
+      expect((await readPatient(token, patientId)).status).toBe(404);
+    });
+
+    it('mantem o vinculo de responsavel do profissional rebaixado', async () => {
+      const userId = await insertUser(
+        tenants.A,
+        ProfileCode.PROFESSIONAL,
+        'profissional-troca',
+      );
+      const response = await http(
+        'post',
+        '/api/v1/patients',
+        tenants.A.tokens.professional,
+        {
+          name: 'Paciente Responsavel',
+          birthDate: '1950-01-01',
+          responsibleUserId: userId,
+        },
+      );
+      const patientId = (response.body as { data: { id: string } }).data.id;
+
+      expect((await changeProfile(userId, 'caregiver')).status).toBe(200);
+
+      const responsible = await listLinks(
+        tenants.A.tokens.admin,
+        `?patientId=${patientId}&role=responsible_professional`,
+      );
+
+      expect(responsible.data.map((link) => link.user.id)).toEqual([userId]);
+    });
+  });
+
   describe('usuarios elegiveis', () => {
     const eligible = async (token: string, query: string) => {
       const response = await http(
