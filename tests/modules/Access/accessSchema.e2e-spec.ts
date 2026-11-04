@@ -693,10 +693,12 @@ describeWithDatabase('perfis de acesso em PostgreSQL descartavel', () => {
           ].sort(),
         },
       });
-      // Rotulo trocado depois pela migration 1790700000000-CreatePatients.
+      // Rotulos trocados depois pelas migrations 1790700000000-CreatePatients
+      // e 1790900000000-CreateFollowUpForms.
       expect(PERMISSION_LABELS).toEqual({
         ...SNAPSHOT_LABELS,
         'patients:deactivate': 'Inativar e reativar pacientes',
+        'forms:deactivate': 'Desativar e reativar formularios',
       });
       expect([...TENANT_PERMISSION_CODES].sort()).toEqual(
         [...SNAPSHOT_TENANT_CODES].sort(),
