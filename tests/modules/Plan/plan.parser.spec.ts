@@ -52,7 +52,8 @@ const row = (
     userLimit: 10,
     patientLimit: 200,
     features: ['patient_management'],
-    monthlyPrice: null,
+    monthlyPrice: '499.00',
+    expandable: false,
   },
   term: {
     id: 't1',
@@ -84,6 +85,15 @@ describe('plan.parser', () => {
     expect(toOrganizationPlanResponse(row({}), null, tenant).limits).toEqual({
       users: 10,
       patients: 200,
+    });
+  });
+
+  it('expoe preco e possibilidade de expansao do plano', () => {
+    expect(
+      toOrganizationPlanResponse(row({}), null, tenant).plan,
+    ).toMatchObject({
+      monthlyPrice: '499.00',
+      expandable: false,
     });
   });
 

@@ -33,6 +33,7 @@ const REQUEST_ID = '3333333a-0000-4000-8000-00000000000a';
 
 interface SchemaObject {
   $ref?: string;
+  type?: string;
   enum?: string[];
   required?: string[];
   nullable?: boolean;
@@ -346,5 +347,21 @@ describe('Plan HTTP (e2e)', () => {
       'decisionNote',
     ]);
     expect(schemas.AssignOrganizationPlanDto.required).toEqual(['planId']);
+    expect(schemas.PlanDto.required).toContain('expandable');
+    expect(schemas.PlanDto.properties?.expandable.type).toBe('boolean');
+
+    for (const [path, method] of [
+      ['/api/v1/organizations/{organizationId}/plan', 'put'],
+      ['/api/v1/plan-change-requests/{requestId}/approve', 'post'],
+    ]) {
+      const description = (
+        document.paths[path][method].responses['422'] as {
+          description: string;
+        }
+      ).description;
+
+      expect(description).toContain('PLAN_LIMIT_NOT_EXPANDABLE');
+      expect(description).toContain('PLAN_LIMIT_BELOW_CATALOG');
+    }
   });
 });
