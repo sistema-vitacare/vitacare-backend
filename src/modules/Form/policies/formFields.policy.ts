@@ -1,5 +1,7 @@
+import { DomainException } from '@/common/errors/domain.exception';
 import type { FieldError } from '@/common/errors/domainError.type';
 
+import { FormErrors } from '../form.errors';
 import type { FieldType, FormFieldConfig } from '../types/form.types';
 
 type TypedProperty =
@@ -110,3 +112,24 @@ export const checkFieldKeys = (
       ? []
       : [{ field: `fields[${index}].fieldType`, code: 'TYPE_LOCKED' }];
   });
+
+/** Campos coerentes e nao vazios; vale para criar e para salvar rascunho. */
+export const assertFieldsConfigurable = (fields: FormFieldConfig[]): void => {
+  if (fields.length === 0) {
+    throw new DomainException({
+      ...FormErrors.EMPTY,
+      detail: 'Formulário sem campos (UC09).',
+      fields: [{ field: 'fields', code: 'EMPTY' }],
+    });
+  }
+
+  const errors = checkFormFields(fields);
+
+  if (errors.length > 0) {
+    throw new DomainException({
+      ...FormErrors.INVALID_FIELDS,
+      detail: 'Configuração incoerente com o tipo do campo ou repetida.',
+      fields: errors,
+    });
+  }
+};

@@ -1,3 +1,6 @@
+import type { FieldError } from '@/common/errors/domainError.type';
+import type { PatientScope } from '@/modules/Patient/types/patient.types';
+
 export const FIELD_TYPES = [
   'number',
   'scale',
@@ -52,3 +55,91 @@ export interface FormFieldRow extends FormFieldConfig {
   fieldKey: string;
   position: number;
 }
+
+/** Formulario como sai das consultas, ja recortado ao alcance de quem le. */
+export interface FormSummaryRow {
+  id: string;
+  name: string;
+  description: string | null;
+  trackingType: string | null;
+  status: FormStatus;
+  audience: FormAudience;
+  patientIds: string[];
+  frequencyInterval: number | null;
+  frequencyUnit: FrequencyUnit | null;
+  currentVersionId: string | null;
+  currentVersionNumber: number | null;
+  currentPublishedAt: Date | null;
+  /** Campos nao desabilitados da versao vigente. */
+  currentFieldCount: number;
+  hasDraft: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+  deletedAt: Date | null;
+}
+
+export interface FormDraft {
+  id: string;
+  updatedAt: Date;
+  fields: FormFieldRow[];
+}
+
+export interface FormDetail extends FormSummaryRow {
+  currentFields: FormFieldRow[];
+  /** Sempre `null` para quem so le. */
+  draft: FormDraft | null;
+}
+
+/** Dados do formulario que mudam sem nova versao. */
+export interface FormProperties {
+  name: string;
+  description: string | null;
+  trackingType: string | null;
+  frequency: FormFrequency | null;
+}
+
+export type FormPatch = Partial<FormProperties>;
+
+/** Mesmo alcance de pacientes: `viewerUserId` nulo e quem configura. */
+export type FormScope = PatientScope;
+
+/** Organizacao, ator e requestId vem sempre da sessao, nunca do corpo. */
+export interface FormActor extends FormScope {
+  actorUserId: string;
+  requestId: string;
+}
+
+export interface CreateFormCommand extends FormActor {
+  properties: FormProperties;
+  audience: FormAudience;
+  patientIds: string[];
+  fields: FormFieldConfig[];
+}
+
+export interface UpdateFormCommand extends FormActor {
+  formId: string;
+  patch: FormPatch;
+  audience?: FormAudience;
+  patientIds?: string[];
+}
+
+export interface TargetFormCommand extends FormActor {
+  formId: string;
+}
+
+export interface ListFormsFilter {
+  status?: FormStatus;
+  search?: string;
+  patientId?: string;
+  skip: number;
+  take: number;
+}
+
+export type CreateFormOutcome =
+  | { kind: 'created'; form: FormDetail }
+  | { kind: 'invalid_patients' }
+  | { kind: 'invalid_fields'; errors: FieldError[] };
+
+export type UpdateFormOutcome =
+  | { kind: 'not_found' | 'inactive' | 'invalid_patients' }
+  | { kind: 'unchanged' | 'updated'; form: FormDetail };
