@@ -45,7 +45,7 @@ export const checkFormFields = (fields: FormFieldConfig[]): FieldError[] => {
   const keys = new Set<string>();
 
   fields.forEach((field, index) => {
-    const path = (property: string) => `fields[${index}].${property}`;
+    const path = (property: string) => `fields.${index}.${property}`;
     const rules = TYPE_RULES[field.fieldType];
 
     for (const property of TYPED_PROPERTIES) {
@@ -105,12 +105,12 @@ export const checkFieldKeys = (
     const knownType = known.get(field.fieldKey);
 
     if (knownType === undefined) {
-      return [{ field: `fields[${index}].fieldKey`, code: 'UNKNOWN' }];
+      return [{ field: `fields.${index}.fieldKey`, code: 'UNKNOWN' }];
     }
 
     return knownType === field.fieldType
       ? []
-      : [{ field: `fields[${index}].fieldType`, code: 'TYPE_LOCKED' }];
+      : [{ field: `fields.${index}.fieldType`, code: 'TYPE_LOCKED' }];
   });
 
 /** Campos coerentes e nao vazios; vale para criar e para salvar rascunho. */

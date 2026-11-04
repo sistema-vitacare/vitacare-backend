@@ -85,7 +85,7 @@ describe('casos de uso de rascunho, publicacao e ciclo de vida', () => {
   });
 
   it('rascunho com chave alheia devolve os erros do repositorio', async () => {
-    const errors = [{ field: 'fields[0].fieldType', code: 'TYPE_LOCKED' }];
+    const errors = [{ field: 'fields.0.fieldType', code: 'TYPE_LOCKED' }];
 
     forms.saveDraft.mockResolvedValue({ kind: 'invalid_fields', errors });
 

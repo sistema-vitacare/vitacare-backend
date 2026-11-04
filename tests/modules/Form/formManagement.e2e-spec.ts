@@ -635,7 +635,7 @@ describeWithDatabase(
         expect(errorOf(response)).toEqual(
           expect.objectContaining({
             code: 'FORM_INVALID_FIELDS',
-            fields: [{ field: 'fields[0].fieldKey', code: 'UNKNOWN' }],
+            fields: [{ field: 'fields.0.fieldKey', code: 'UNKNOWN' }],
           }),
         );
       });
@@ -649,7 +649,7 @@ describeWithDatabase(
 
         expect(response.status).toBe(422);
         expect(errorOf(response).fields).toEqual([
-          { field: 'fields[0].unit', code: 'NOT_ALLOWED' },
+          { field: 'fields.0.unit', code: 'NOT_ALLOWED' },
         ]);
       });
 
@@ -947,11 +947,11 @@ describeWithDatabase(
         expect(errorOf(retyped)).toEqual(
           expect.objectContaining({
             code: 'FORM_INVALID_FIELDS',
-            fields: [{ field: 'fields[0].fieldType', code: 'TYPE_LOCKED' }],
+            fields: [{ field: 'fields.0.fieldType', code: 'TYPE_LOCKED' }],
           }),
         );
         expect(errorOf(foreign).fields).toEqual([
-          { field: 'fields[0].fieldKey', code: 'UNKNOWN' },
+          { field: 'fields.0.fieldKey', code: 'UNKNOWN' },
         ]);
       });
 

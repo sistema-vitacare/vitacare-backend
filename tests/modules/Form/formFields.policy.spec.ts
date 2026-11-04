@@ -69,19 +69,19 @@ describe('checkFormFields', () => {
 
   it('exige a configuracao propria de cada tipo', () => {
     expect(checkFormFields([field({ decimalPlaces: null })])).toEqual([
-      { field: 'fields[0].decimalPlaces', code: 'REQUIRED' },
+      { field: 'fields.0.decimalPlaces', code: 'REQUIRED' },
     ]);
     expect(checkFormFields([scale({ scaleMax: null })])).toEqual([
-      { field: 'fields[0].scaleMax', code: 'REQUIRED' },
+      { field: 'fields.0.scaleMax', code: 'REQUIRED' },
     ]);
     expect(checkFormFields([choice({ options: null })])).toEqual([
-      { field: 'fields[0].options', code: 'REQUIRED' },
+      { field: 'fields.0.options', code: 'REQUIRED' },
     ]);
   });
 
   it('recusa configuracao alheia ao tipo', () => {
     expect(checkFormFields([scale({ unit: 'pts' })])).toEqual([
-      { field: 'fields[0].unit', code: 'NOT_ALLOWED' },
+      { field: 'fields.0.unit', code: 'NOT_ALLOWED' },
     ]);
     expect(
       checkFormFields([
@@ -92,24 +92,24 @@ describe('checkFormFields', () => {
           options: ['A', 'B'],
         }),
       ]),
-    ).toEqual([{ field: 'fields[0].options', code: 'NOT_ALLOWED' }]);
+    ).toEqual([{ field: 'fields.0.options', code: 'NOT_ALLOWED' }]);
   });
 
   it('recusa escala com minimo maior ou igual ao maximo', () => {
     expect(checkFormFields([scale({ scaleMin: 5, scaleMax: 5 })])).toEqual([
-      { field: 'fields[0].scaleMax', code: 'INVALID_RANGE' },
+      { field: 'fields.0.scaleMax', code: 'INVALID_RANGE' },
     ]);
   });
 
   it('aponta nome repetido ignorando caixa e espacos, chave e opcao repetidas', () => {
     expect(checkFormFields([field(), field({ name: ' GLICEMIA ' })])).toEqual([
-      { field: 'fields[1].name', code: 'DUPLICATE' },
+      { field: 'fields.1.name', code: 'DUPLICATE' },
     ]);
     expect(
       checkFormFields([field({ fieldKey: KEY_A }), scale({ fieldKey: KEY_A })]),
-    ).toEqual([{ field: 'fields[1].fieldKey', code: 'DUPLICATE' }]);
+    ).toEqual([{ field: 'fields.1.fieldKey', code: 'DUPLICATE' }]);
     expect(checkFormFields([choice({ options: ['Boa', 'boa '] })])).toEqual([
-      { field: 'fields[0].options', code: 'DUPLICATE' },
+      { field: 'fields.0.options', code: 'DUPLICATE' },
     ]);
   });
 });
@@ -128,10 +128,10 @@ describe('checkFieldKeys', () => {
 
   it('recusa chave desconhecida e troca de tipo', () => {
     expect(checkFieldKeys([field({ fieldKey: KEY_B })], known)).toEqual([
-      { field: 'fields[0].fieldKey', code: 'UNKNOWN' },
+      { field: 'fields.0.fieldKey', code: 'UNKNOWN' },
     ]);
     expect(checkFieldKeys([scale({ fieldKey: KEY_A })], known)).toEqual([
-      { field: 'fields[0].fieldType', code: 'TYPE_LOCKED' },
+      { field: 'fields.0.fieldType', code: 'TYPE_LOCKED' },
     ]);
   });
 });

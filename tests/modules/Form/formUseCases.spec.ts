@@ -88,7 +88,7 @@ describe('casos de uso de formularios (dados e leitura)', () => {
 
     expect(error.code).toBe('FORM_INVALID_FIELDS');
     expect(error.fields).toEqual([
-      { field: 'fields[0].decimalPlaces', code: 'REQUIRED' },
+      { field: 'fields.0.decimalPlaces', code: 'REQUIRED' },
     ]);
     expect(forms.create).not.toHaveBeenCalled();
   });
@@ -98,7 +98,7 @@ describe('casos de uso de formularios (dados e leitura)', () => {
     [
       {
         kind: 'invalid_fields',
-        errors: [{ field: 'fields[0].fieldKey', code: 'UNKNOWN' }],
+        errors: [{ field: 'fields.0.fieldKey', code: 'UNKNOWN' }],
       },
       'FORM_INVALID_FIELDS',
       422,

@@ -239,7 +239,7 @@ repetição; obrigatório se e só se `audience = patients`), `fields` (1–100
 em `number`), `scaleMin`/`scaleMax` (inteiros −1000…1000, obrigatórios e só em
 `scale`, `min < max`), `options` (2–50 textos únicos de 1–120, obrigatório e só
 em `*_choice`). Combinação errada → `422 FORM_INVALID_FIELDS` com `fields`
-apontando o caminho (`fields[2].options`). `0` em `decimalPlaces`/`scaleMin` e
+apontando o caminho (`fields.2.options`). `0` em `decimalPlaces`/`scaleMin` e
 `false` são valores, não ausência.
 
 **`PATCH /forms/{formId}`:** `name`, `description`, `trackingType`, `frequency`
