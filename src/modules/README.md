@@ -173,8 +173,10 @@ perfis por `provisionTenantProfiles` (criacao de organizacao e seed de
 desenvolvimento) e, para as ja existentes, pela migration
 `1790300000000-SyncTenantAccessProfiles`.
 
-- Rota declara `@RequirePermissions(...)`; o `PermissionsGuard` decide por
-  `hasPermission`/`assertPermission` (`Access/policies/access.policy.ts`).
+- Rota declara `@RequirePermissions(...)` (todas exigidas) e/ou
+  `@RequireAnyPermission(...)` (basta uma, como leitura do admin ou do master);
+  o `PermissionsGuard` decide por `hasPermission`/`assertPermission`/
+  `assertAnyPermission` (`Access/policies/access.policy.ts`).
 - Use case ou job sem guard HTTP na frente chama `assertPermission(ctx, code)`.
 - As permissoes sao relidas do banco a cada requisicao: troca de perfil vale na
   chamada seguinte, sem revogar sessao.

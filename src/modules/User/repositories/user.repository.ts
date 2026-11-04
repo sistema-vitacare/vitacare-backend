@@ -6,6 +6,7 @@ import { translatePgError } from '@/common/errors/pgError.translator';
 import { ProfileCode } from '@/common/context/requestContext.type';
 import type { TenantProfileCode } from '@/modules/Access/access.permissions';
 import { insertAuditEvent } from '@/modules/Audit/repositories/auditEvent.repository';
+import { readEffectivePlan } from '@/modules/Plan/repositories/planTerm.query';
 import { revokeUserSessions } from '@/modules/Auth/repositories/authTransaction.repository';
 
 import type {
@@ -175,9 +176,9 @@ export class UserRepository {
         return { kind: 'actor_forbidden' };
       }
 
-      if (!(await this.hasSeatAvailable(manager, command.organizationId))) {
-        return { kind: 'limit_reached' };
-      }
+      const seat = await this.checkSeat(manager, command.organizationId);
+
+      if (seat) return { kind: seat };
 
       const profile = await this.findProfile(
         manager,
@@ -341,9 +342,9 @@ export class UserRepository {
       if (target === 'actor_forbidden') return { kind: 'actor_forbidden' };
       if (target !== 'inactive') return { kind: 'already_active' };
 
-      if (!(await this.hasSeatAvailable(manager, command.organizationId))) {
-        return { kind: 'limit_reached' };
-      }
+      const seat = await this.checkSeat(manager, command.organizationId);
+
+      if (seat) return { kind: seat };
 
       await manager.query(
         `UPDATE users
@@ -578,23 +579,29 @@ export class UserRepository {
       : 'actor_forbidden';
   }
 
-  /** Plataforma nao tem plano; la nao se chega porque o ator nao e `admin`. */
-  private async hasSeatAvailable(
+  /**
+   * Vencimento bloqueia crescimento (BE-07); o limite e o efetivo do termo
+   * corrente. Plataforma nao tem plano; la nao se chega porque o ator nao e
+   * `admin`.
+   */
+  private async checkSeat(
     manager: EntityManager,
     organizationId: string,
-  ): Promise<boolean> {
-    const [row] = await manager.query<Array<{ available: boolean }>>(
-      `SELECT (SELECT count(*)
-                 FROM users u
-                WHERE u.organization_id = o.id
-                  AND u.status IN ('pending', 'active')) < plan.user_limit AS available
-         FROM organizations o
-         JOIN usage_plans plan ON plan.id = o.usage_plan_id
-        WHERE o.id = $1`,
+  ): Promise<'plan_expired' | 'limit_reached' | null> {
+    const plan = await readEffectivePlan(manager, organizationId);
+
+    if (!plan) return 'limit_reached';
+    if (plan.expired) return 'plan_expired';
+
+    const [{ occupied }] = await manager.query<Array<{ occupied: number }>>(
+      `SELECT count(*)::int AS occupied
+         FROM users
+        WHERE organization_id = $1
+          AND status IN ('pending', 'active')`,
       [organizationId],
     );
 
-    return row?.available ?? false;
+    return occupied < plan.userLimit ? null : 'limit_reached';
   }
 
   private async findProfile(

@@ -24,3 +24,15 @@ export const assertPermission = (
     });
   }
 };
+
+export const assertAnyPermission = (
+  ctx: PermissionSubject,
+  codes: readonly PermissionCode[],
+): void => {
+  if (!codes.some((code) => hasPermission(ctx, code))) {
+    throw new DomainException({
+      ...AuthErrors.FORBIDDEN,
+      detail: 'Nenhuma das permissões aceitas foi concedida à sessão.',
+    });
+  }
+};

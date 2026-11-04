@@ -14,9 +14,13 @@ const contextFor = (permissions?: string[]) =>
     getClass: () => 'class',
   }) as never;
 
-const guardRequiring = (required: string[]): PermissionsGuard =>
+const guardRequiring = (
+  required: string[],
+  anyOf?: string[],
+): PermissionsGuard =>
   new PermissionsGuard({
     getAllAndMerge: jest.fn().mockReturnValue(required),
+    getAllAndOverride: jest.fn().mockReturnValue(anyOf),
   } as never);
 
 describe('PermissionsGuard', () => {
@@ -46,5 +50,35 @@ describe('PermissionsGuard', () => {
     const guard = guardRequiring(['users:reset_password']);
 
     expect(() => guard.canActivate(contextFor())).toThrow(DomainException);
+  });
+
+  it('libera sessao com ao menos uma das permissoes alternativas', () => {
+    const guard = guardRequiring(
+      [],
+      ['plan:read', 'platform_organizations:read'],
+    );
+
+    expect(guard.canActivate(contextFor(['platform_organizations:read']))).toBe(
+      true,
+    );
+  });
+
+  it('recusa sessao sem nenhuma das permissoes alternativas', () => {
+    const guard = guardRequiring(
+      [],
+      ['plan:read', 'platform_organizations:read'],
+    );
+
+    expect(() => guard.canActivate(contextFor(['patients:read']))).toThrow(
+      expect.objectContaining({ code: 'AUTH_FORBIDDEN' }) as DomainException,
+    );
+  });
+
+  it('exige as obrigatorias mesmo com uma alternativa presente', () => {
+    const guard = guardRequiring(['users:read'], ['plan:read']);
+
+    expect(() => guard.canActivate(contextFor(['plan:read']))).toThrow(
+      DomainException,
+    );
   });
 });

@@ -45,6 +45,15 @@ O corpo das rotas de negócio é JSON quando aplicável. Autenticação usa Bear
 | `POST /api/v1/users/:userId/reactivate` | Reativa o usuário, respeitando o limite do plano | [users-reativar.md](endpoints/users-reativar.md) |
 | `POST /api/v1/users/:userId/invitation` | Reemite o convite de usuário pendente | [users-reemitir-convite.md](endpoints/users-reemitir-convite.md) |
 | `PATCH /api/v1/users/:userId/profile` | Troca o perfil de acesso de um usuário da organização | [users-alterar-perfil.md](endpoints/users-alterar-perfil.md) |
+| `GET /api/v1/plans` | Catálogo de planos ativos (admin ou master) | [plans-listar.md](endpoints/plans-listar.md) |
+| `GET /api/v1/organizations/me/plan` | Plano, vigência, limites e uso da organização da sessão | [plans-consultar-proprio.md](endpoints/plans-consultar-proprio.md) |
+| `GET /api/v1/organizations/:organizationId/plan` | Plano de qualquer organização (plataforma) | [plans-consultar.md](endpoints/plans-consultar.md) |
+| `PUT /api/v1/organizations/:organizationId/plan` | Atribui, renova ou personaliza o plano (plataforma) | [plans-atribuir.md](endpoints/plans-atribuir.md) |
+| `POST /api/v1/plan-change-requests` | Solicita mudança de plano | [plan-change-requests-criar.md](endpoints/plan-change-requests-criar.md) |
+| `GET /api/v1/plan-change-requests` | Lista solicitações (as próprias ou, na plataforma, todas) | [plan-change-requests-listar.md](endpoints/plan-change-requests-listar.md) |
+| `POST /api/v1/plan-change-requests/:requestId/cancel` | Cancela a solicitação pendente | [plan-change-requests-cancelar.md](endpoints/plan-change-requests-cancelar.md) |
+| `POST /api/v1/plan-change-requests/:requestId/approve` | Aprova e aplica o plano pedido (plataforma) | [plan-change-requests-aprovar.md](endpoints/plan-change-requests-aprovar.md) |
+| `POST /api/v1/plan-change-requests/:requestId/reject` | Recusa a solicitação (plataforma) | [plan-change-requests-recusar.md](endpoints/plan-change-requests-recusar.md) |
 
 Os caminhos de Swagger usam `SWAGGER_PATH=docs` e só existem com `SWAGGER_ENABLED=true`. O documento OpenAPI é gerado em runtime; consulte a rota JSON do ambiente para conferir a versão publicada. `/health/live` é excluída do OpenAPI de propósito, mas permanece documentada aqui.
 
@@ -69,13 +78,17 @@ Todo usuário de organização cliente tem um de quatro **perfis fixos**: `admin
 
 ### Usuários e convite sem e-mail
 
-O administrador da organização gerencia os usuários do próprio tenant pelas rotas `/api/v1/users` (BE-06, 2026-11-03). Como não há SMTP, o **convite** é uma senha provisória devolvida uma única vez no [cadastro](endpoints/users-criar.md): o administrador a entrega fora da API, o usuário nasce `pending`, entra só pela sessão restrita e vira `active` ao concluir o [primeiro acesso](endpoints/auth-primeiro-acesso.md). A senha vale 24 horas; vencida ou perdida, o administrador a [reemite](endpoints/users-reemitir-convite.md), e a anterior para de valer. Usuários `pending` e `active` — o primeiro administrador incluído — contam no limite de usuários do plano (`usage_plans.user_limit`), verificado no cadastro e na reativação. [Inativar](endpoints/users-inativar.md) revoga sessões, links de recuperação e convite na hora, sem apagar histórico; não existe exclusão.
+O administrador da organização gerencia os usuários do próprio tenant pelas rotas `/api/v1/users` (BE-06, 2026-11-03). Como não há SMTP, o **convite** é uma senha provisória devolvida uma única vez no [cadastro](endpoints/users-criar.md): o administrador a entrega fora da API, o usuário nasce `pending`, entra só pela sessão restrita e vira `active` ao concluir o [primeiro acesso](endpoints/auth-primeiro-acesso.md). A senha vale 24 horas; vencida ou perdida, o administrador a [reemite](endpoints/users-reemitir-convite.md), e a anterior para de valer. Usuários `pending` e `active` — o primeiro administrador incluído — contam no limite de usuários efetivo do plano (personalizado do termo de vigência, senão `usage_plans.user_limit`), verificado no cadastro e na reativação; com a vigência vencida, ambos são bloqueados. [Inativar](endpoints/users-inativar.md) revoga sessões, links de recuperação e convite na hora, sem apagar histórico; não existe exclusão.
 
 Rotas públicas de autenticação: login, solicitação de recuperação e redefinição por token. Todo o resto exige Bearer, e o OpenAPI marca isso no esquema `bearer`.
 
 > **Não existe SMTP configurado em nenhum ambiente** (decisão de 2026-09-22). A solicitação de recuperação responde `202` com `meta.message` orientando a procurar o administrador, mas não cria token nem envia mensagem. O canal operacional de recuperação é a [redefinição administrativa](endpoints/auth-redefinir-senha-usuario.md) (recuperação assistida, 2026-10-29): senha temporária válida por 24 horas, reemitida pelo administrador quando vence ou se perde. O envio por link passa a valer apenas quando houver servidor de e-mail.
 
 A senha tem de 8 a 128 **caracteres**, aceita espaços e Unicode e não tem regra de composição. O armazenamento usa Argon2id.
+
+### Plano de uso, vigência e solicitação de mudança
+
+Cada organização cliente tem um **termo de vigência** corrente (BE-07, 2026-11-03): plano, início, fim opcional e limites personalizados opcionais. O **limite efetivo** é o personalizado, senão o do [catálogo](endpoints/plans-listar.md) (Basic e Enterprise do TCC, sem preço). O administrador consulta tudo em [GET /organizations/me/plan](endpoints/plans-consultar-proprio.md) e pede outro plano por [POST /plan-change-requests](endpoints/plan-change-requests-criar.md); o plano só muda quando o master [aprova](endpoints/plan-change-requests-aprovar.md). O master também [atribui, renova ou personaliza](endpoints/plans-atribuir.md) diretamente. Com a vigência vencida, a leitura e o registro continuam; só novos cadastros e reativações de usuário são bloqueados (`409 USER_PLAN_EXPIRED`). Não há pagamento, cobrança nem renovação automática. Decisões do agente, pendentes de confirmação de Mateus.
 
 ### Administração da plataforma
 
@@ -103,6 +116,11 @@ Todo evento de acesso é gravado em `audit_events`, sempre dentro de uma organiz
 | `organization.updated` | Dados cadastrais alterados; `after_values.changedFields` lista só os **nomes** dos campos. |
 | `organization.deactivated` | Organização inativada; sessões e links de recuperação dela revogados. |
 | `organization.reactivated` | Organização reativada. |
+| `plan.assigned` | Termo de plano aberto pelo master (atribuição ou aprovação); `entity_type = organization_plan_term`, `after_values` com `usagePlanId`, `endsAt`, `userLimit`, `patientLimit` e, na aprovação, `changeRequestId`. |
+| `plan_change_request.created` | Solicitação registrada pelo administrador; `after_values.requestedPlanId`. |
+| `plan_change_request.cancelled` | Solicitação cancelada pelo administrador. |
+| `plan_change_request.approved` | Solicitação aprovada pelo master. |
+| `plan_change_request.rejected` | Solicitação recusada pelo master. |
 
 Ação do master sobre outra organização gera **duas** linhas com o mesmo `request_id`: uma na organização alvo, como evento de sistema com `after_values.platformActorUserId`, porque a FK de autoria só aceita autor da própria organização; e outra na organização de plataforma, com o master como autor.
 

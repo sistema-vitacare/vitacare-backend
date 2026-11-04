@@ -119,7 +119,7 @@ Nunca saem hash ou prazo bruto da senha, troca obrigatória, identificadores int
 1. Validação do corpo → `422 VALIDATION_FAILED`, sem tocar o banco.
 2. Em **uma transação**, trava a linha da organização (`SELECT … FOR NO KEY UPDATE`, a mesma trava da troca de perfil e das demais escritas de usuário). Cadastros e reativações simultâneos da mesma organização ficam em fila.
 3. **Ator relido sob a trava:** se quem chama já não é `admin` ativo → `403 AUTH_FORBIDDEN`.
-4. **Limite do plano:** conta os usuários `pending` e `active` da organização — o primeiro administrador incluído; inativos não contam — e compara com `usage_plans.user_limit` do plano da organização. Contagem igual ou maior que o limite → `409 USER_PLAN_LIMIT_REACHED`. Com `user_limit = 3`, cabem três usuários pendentes ou ativos.
+4. **Limite do plano:** conta os usuários `pending` e `active` da organização — o primeiro administrador incluído; inativos não contam — e compara com o **limite efetivo** da organização (limite personalizado do termo de vigência corrente, senão `usage_plans.user_limit`; ver [plano da organização](plans-consultar-proprio.md)). Contagem igual ou maior que o limite → `409 USER_PLAN_LIMIT_REACHED`. Antes disso, vigência vencida → `409 USER_PLAN_EXPIRED` (BE-07). Com `user_limit = 3`, cabem três usuários pendentes ou ativos.
 5. Insere com `status = pending`, hash da senha provisória, troca obrigatória e prazo de 24 h. E-mail ou CPF já usados na organização — **inclusive por usuário inativo** — → `409 USER_DUPLICATE_EMAIL` / `USER_DUPLICATE_CPF`, com o campo em `fields`. Para quem foi inativado, o caminho é [reativar](users-reativar.md).
 6. Audita `user.created`.
 
@@ -146,6 +146,7 @@ Não é idempotente: repetir a chamada com os mesmos dados responde `409` de dup
 | `409` | `USER_DUPLICATE_EMAIL` | E-mail já usado na organização (sem diferenciar maiúsculas). |
 | `409` | `USER_DUPLICATE_CPF` | CPF já usado na organização. |
 | `409` | `USER_PLAN_LIMIT_REACHED` | Pendentes + ativos já ocupam o limite de usuários do plano. |
+| `409` | `USER_PLAN_EXPIRED` | A vigência do plano da organização venceu; novos cadastros e reativações ficam bloqueados até a renovação pelo master (BE-07). |
 | `422` | `VALIDATION_FAILED` | Campo ausente ou inválido, CPF com dígito verificador errado, perfil fora dos quatro, propriedade extra. |
 
 `409` de limite:

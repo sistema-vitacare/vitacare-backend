@@ -29,6 +29,12 @@ export const UserErrors = {
     message:
       'O limite de usuários do plano foi atingido. Inative um usuário ou solicite a mudança de plano.',
   },
+  PLAN_EXPIRED: {
+    code: 'USER_PLAN_EXPIRED',
+    status: HttpStatus.CONFLICT,
+    message:
+      'A vigência do plano da organização venceu. Novos cadastros ficam bloqueados até a renovação.',
+  },
   NOTHING_TO_UPDATE: {
     code: 'USER_NOTHING_TO_UPDATE',
     status: HttpStatus.UNPROCESSABLE_ENTITY,
