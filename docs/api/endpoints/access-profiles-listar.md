@@ -1,7 +1,7 @@
 ---
 title: Listar perfis de acesso
 status: atual
-updated: 2026-10-30
+updated: 2026-11-04
 method: GET
 path: /api/v1/access-profiles
 source: src/modules/Access/access.controller.ts
@@ -33,7 +33,7 @@ curl -i 'https://api.example.com/api/v1/access-profiles' \
 
 ## Resposta de sucesso
 
-`200 OK`. Exemplo de uma organização com os quatro perfis da matriz. Os perfis `caregiver` e `family` aparecem com a lista completa de permissões; em `admin` (32 permissões) e `professional` (17 permissões) o exemplo mostra só as primeiras, e a resposta real traz todas, na mesma ordem por código:
+`200 OK`. Exemplo de uma organização com os quatro perfis da matriz. Os perfis `caregiver` e `family` aparecem com a lista completa de permissões; em `admin` (32 permissões) e `professional` (18 permissões; `patient_links:manage` desde o BE-10, 2026-11-04, migration `1790800000000-AddPatientCareLinks`) o exemplo mostra só as primeiras, e a resposta real traz todas, na mesma ordem por código:
 
 ```json
 {

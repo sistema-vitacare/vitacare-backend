@@ -13,7 +13,7 @@ source: src/modules/Patient/patient.controller.ts
 
 Cadastro do UC07 (passos 2 a 5; RF006): grava os dados do paciente e o vínculo com o **profissional responsável** numa única transação, e devolve o paciente `active`. Os campos seguem o MER `pacientes` mais a Figura 35, decididos por Mateus em 2026-11-04; obrigatórios são só nome, nascimento e responsável. O paciente ocupa uma vaga do **limite de pacientes ativos** do plano (Quadro 2).
 
-Autenticação: `Authorization: Bearer <token>` de sessão **normal** com `patients:create` — perfis `professional` e `admin` (que herda o profissional). `caregiver`, `family` e o master recebem `403 AUTH_FORBIDDEN`. A organização e o autor vêm da sessão, nunca do corpo.
+Autenticação: `Authorization: Bearer <token>` de sessão **normal** com `patients:create` — perfis `professional` e `admin` (que herda o profissional). `caregiver`, `family` e o master recebem `403 AUTH_FORBIDDEN`. A organização e o autor vêm da sessão, nunca do corpo. O profissional não tem `users:read`; o seletor do responsável usa [GET /patient-links/eligible-users?role=responsible_professional](patient-links-usuarios-elegiveis.md) (BE-10).
 
 ## Request
 
