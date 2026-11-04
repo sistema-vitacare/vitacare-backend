@@ -33,7 +33,7 @@ curl -i 'https://api.example.com/api/v1/access-profiles' \
 
 ## Resposta de sucesso
 
-`200 OK`. Exemplo de uma organização com os quatro perfis da matriz. Os perfis `caregiver` e `family` aparecem com a lista completa de permissões; em `admin` (32 permissões) e `professional` (18 permissões; `patient_links:manage` desde o BE-10, 2026-11-04, migration `1790800000000-AddPatientCareLinks`) o exemplo mostra só as primeiras, e a resposta real traz todas, na mesma ordem por código:
+`200 OK`. Exemplo de uma organização com os quatro perfis da matriz. Os perfis `caregiver` e `family` aparecem com a lista completa de permissões; em `admin` (33 permissões) e `professional` (19 permissões; `patient_links:manage` desde o BE-10, migration `1790800000000-AddPatientCareLinks`, e `follow_ups:annul` desde o BE-12, migration `1791000000000-CreateFollowUpRecords`, ambos em 2026-11-04) o exemplo mostra só as primeiras, e a resposta real traz todas, na mesma ordem por código:
 
 ```json
 {

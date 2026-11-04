@@ -11,7 +11,7 @@ source: src/modules/Form/form.controller.ts
 
 ## Propósito e acesso
 
-Cria um formulário de acompanhamento com nome, descrição, tipo de acompanhamento, frequência esperada, público e campos (UC09 passos 1 a 4; RF008; RF013 na parte de formulário; BE-11). O formulário **nasce em rascunho** (`status = draft`, `currentVersion = null`) com uma versão em rascunho que guarda os campos; ele só passa a valer para preenchimento quando for [publicado](forms-publicar.md) ("salva e ativa" do UC09 passo 6). Regras de alerta por campo (UC09 passo 5) **não** são configuradas aqui: ficam para o BE-15. Respostas e registros de acompanhamento são do BE-12 e ainda não existem.
+Cria um formulário de acompanhamento com nome, descrição, tipo de acompanhamento, frequência esperada, público e campos (UC09 passos 1 a 4; RF008; RF013 na parte de formulário; BE-11). O formulário **nasce em rascunho** (`status = draft`, `currentVersion = null`) com uma versão em rascunho que guarda os campos; ele só passa a valer para preenchimento quando for [publicado](forms-publicar.md) ("salva e ativa" do UC09 passo 6). Regras de alerta por campo (UC09 passo 5) **não** são configuradas aqui: ficam para o BE-15. Respostas e registros de acompanhamento são enviados por [POST /follow-ups](follow-ups-registrar.md) (BE-12), sempre sobre a versão publicada vigente.
 
 Autenticação: `Authorization: Bearer <token>` de sessão normal com `forms:create` — perfis `admin` e `professional` (matriz do BE-05). `caregiver` (só tem `forms:read`), `family` (nenhuma permissão de formulário) e o master (`platform_admin`) recebem `403 AUTH_FORBIDDEN`. A organização vem **sempre** da sessão, nunca do corpo; os pacientes de `patientIds` precisam ser dela.
 
