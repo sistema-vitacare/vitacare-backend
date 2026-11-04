@@ -1,7 +1,7 @@
 ---
 title: Aprovar solicitação de mudança de plano (plataforma)
 status: atual
-updated: 2026-11-03
+updated: 2026-11-04
 method: POST
 path: /api/v1/plan-change-requests/{requestId}/approve
 source: src/modules/Plan/plan.controller.ts
@@ -13,7 +13,7 @@ source: src/modules/Plan/plan.controller.ts
 
 O administrador master aprova a solicitação `pending` (UC04 passo 5, "atualização administrativa"). Na mesma transação, sob a trava da organização: encerra o termo corrente, abre um termo com `origin = "change_request"` ligado à solicitação, com o plano pedido e, se enviados, `endsAt` e limites personalizados; atualiza `organizations.usage_plan_id` e marca a solicitação `approved`. O novo limite e a nova vigência valem na requisição seguinte da organização.
 
-O corpo segue a mesma regra de [atribuição](plans-atribuir.md): ausente/`null` = sem vencimento e limite do catálogo. Decisões do agente em 2026-11-03, pendentes de confirmação de Mateus.
+O corpo segue a mesma regra de [atribuição](plans-atribuir.md): ausente/`null` = sem vencimento e limite do catálogo; limite personalizado só para plano expansível (Enterprise) e só igual ou acima do catálogo (Quadro 2 do TCC, decisão de Mateus em 2026-11-04). Limite recusado → `422` e a solicitação continua `pending`, sem termo novo. Vigência e fluxo de decisão: decisões do agente em 2026-11-03, pendentes de confirmação de Mateus.
 
 Autenticação: sessão **normal** da plataforma com `platform_organizations:update`. Perfis de organização cliente → `403 AUTH_FORBIDDEN`.
 
@@ -34,8 +34,8 @@ Query: nenhum.
 | Propriedade JSON | Tipo / formato | Obrigatória | Null | Default / limites | Significado |
 | --- | --- | --- | --- | --- | --- |
 | `endsAt` | texto ISO 8601 com fuso | não | sim | ausente/`null` = sem vencimento; deve ser futuro | Fim da vigência do novo termo. |
-| `userLimit` | inteiro | não | sim | 0 a 100000; ausente/`null` = catálogo | Limite de usuários personalizado. |
-| `patientLimit` | inteiro | não | sim | 0 a 100000; ausente/`null` = catálogo | Limite de pacientes personalizado. |
+| `userLimit` | inteiro | não | sim | até 100000; ausente/`null` = catálogo; só plano expansível, ≥ `userLimit` do plano | Limite de usuários expandido. |
+| `patientLimit` | inteiro | não | sim | até 100000; ausente/`null` = catálogo; só plano expansível, ≥ `patientLimit` do plano | Limite de pacientes ativos expandido. |
 | `decisionNote` | texto | não | sim | 1 a 500, aparado | Justificativa; também gravada como motivo do termo. |
 
 Corpo vazio (`{}`) é válido.
@@ -45,7 +45,7 @@ curl -i -X POST 'https://api.example.com/api/v1/plan-change-requests/3333333a-00
   -H 'Accept: application/json' \
   -H 'Authorization: Bearer M4st3r...Tk1' \
   -H 'Content-Type: application/json' \
-  -d '{"userLimit":20,"decisionNote":"Contrato assinado."}'
+  -d '{"userLimit":60,"decisionNote":"Contrato assinado."}'
 ```
 
 ## Resposta de sucesso
@@ -89,6 +89,8 @@ Auditoria na organização alvo como evento de sistema (com `platformActorUserId
 | `422` | `VALIDATION_FAILED` | `requestId` não UUID; corpo fora dos limites. |
 | `422` | `PLAN_NOT_FOUND` | O plano pedido saiu do catálogo depois do pedido; a solicitação continua `pending` (recuse-a). |
 | `422` | `PLAN_TERM_END_IN_PAST` | `endsAt` igual ou anterior ao instante atual. |
+| `422` | `PLAN_LIMIT_NOT_EXPANDABLE` | Limite personalizado para plano pedido sem expansão (Basic); `fields[0].field` = `userLimit` ou `patientLimit`. A solicitação continua `pending`. |
+| `422` | `PLAN_LIMIT_BELOW_CATALOG` | Expansão abaixo do limite do plano pedido; a solicitação continua `pending`. |
 
 ```json
 {
@@ -110,4 +112,4 @@ Auditoria na organização alvo como evento de sistema (com `platformActorUserId
 
 ## Origem e validação
 
-Controller `src/modules/Plan/plan.controller.ts`; caso de uso `src/modules/Plan/ApprovePlanChangeRequest/`; resultado comum em `src/modules/Plan/policies/planChangeRequest.policy.ts`; repositório `src/modules/Plan/repositories/plan.repository.ts` (trava organização e solicitação, nessa ordem, e exige `pending`). Testes `tests/modules/Plan/plan.e2e-spec.ts` (permissões, validação e OpenAPI) e `tests/modules/Plan/planManagement.e2e-spec.ts` (aprovação aplica Enterprise com limite 20, termo anterior encerrado, `usage_plan_id` atualizado, auditoria de sistema no tenant, segunda aprovação `409`; admin aprovando → `403`). Conferido contra `/api/docs-json` em 2026-11-03. Vault: [[2026-10-29-be-07-plans]] e [[2026-11-03-planos-vigencia-e-solicitacao]].
+Controller `src/modules/Plan/plan.controller.ts`; caso de uso `src/modules/Plan/ApprovePlanChangeRequest/`; resultado comum em `src/modules/Plan/policies/planChangeRequest.policy.ts`; repositório `src/modules/Plan/repositories/plan.repository.ts` (trava organização e solicitação, nessa ordem, e exige `pending`). Testes `tests/modules/Plan/plan.e2e-spec.ts` (permissões, validação e OpenAPI) e `tests/modules/Plan/planManagement.e2e-spec.ts` (aprovação aplica Enterprise expandido para 60 usuários, aprovação com limite abaixo do catálogo `422` sem decidir, termo anterior encerrado, `usage_plan_id` atualizado, auditoria de sistema no tenant, segunda aprovação `409`; admin aprovando → `403`). Conferido contra `/api/docs-json` em 2026-11-04. Vault: [[2026-10-29-be-07-plans]], [[2026-11-03-planos-vigencia-e-solicitacao]] e [[2026-11-04-planos-regras-quadro-2]].

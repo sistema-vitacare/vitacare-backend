@@ -1,7 +1,7 @@
 ---
 title: Manual de integração da API VitaCare
 status: atual
-updated: 2026-11-03
+updated: 2026-11-04
 ---
 
 # Manual de integração da API VitaCare
@@ -48,7 +48,7 @@ O corpo das rotas de negócio é JSON quando aplicável. Autenticação usa Bear
 | `GET /api/v1/plans` | Catálogo de planos ativos (admin ou master) | [plans-listar.md](endpoints/plans-listar.md) |
 | `GET /api/v1/organizations/me/plan` | Plano, vigência, limites e uso da organização da sessão | [plans-consultar-proprio.md](endpoints/plans-consultar-proprio.md) |
 | `GET /api/v1/organizations/:organizationId/plan` | Plano de qualquer organização (plataforma) | [plans-consultar.md](endpoints/plans-consultar.md) |
-| `PUT /api/v1/organizations/:organizationId/plan` | Atribui, renova ou personaliza o plano (plataforma) | [plans-atribuir.md](endpoints/plans-atribuir.md) |
+| `PUT /api/v1/organizations/:organizationId/plan` | Atribui, renova ou expande o plano (plataforma) | [plans-atribuir.md](endpoints/plans-atribuir.md) |
 | `POST /api/v1/plan-change-requests` | Solicita mudança de plano | [plan-change-requests-criar.md](endpoints/plan-change-requests-criar.md) |
 | `GET /api/v1/plan-change-requests` | Lista solicitações (as próprias ou, na plataforma, todas) | [plan-change-requests-listar.md](endpoints/plan-change-requests-listar.md) |
 | `POST /api/v1/plan-change-requests/:requestId/cancel` | Cancela a solicitação pendente | [plan-change-requests-cancelar.md](endpoints/plan-change-requests-cancelar.md) |
@@ -88,7 +88,7 @@ A senha tem de 8 a 128 **caracteres**, aceita espaços e Unicode e não tem regr
 
 ### Plano de uso, vigência e solicitação de mudança
 
-Cada organização cliente tem um **termo de vigência** corrente (BE-07, 2026-11-03): plano, início, fim opcional e limites personalizados opcionais. O **limite efetivo** é o personalizado, senão o do [catálogo](endpoints/plans-listar.md) (Basic e Enterprise do TCC, sem preço). O administrador consulta tudo em [GET /organizations/me/plan](endpoints/plans-consultar-proprio.md) e pede outro plano por [POST /plan-change-requests](endpoints/plan-change-requests-criar.md); o plano só muda quando o master [aprova](endpoints/plan-change-requests-aprovar.md). O master também [atribui, renova ou personaliza](endpoints/plans-atribuir.md) diretamente. Com a vigência vencida, a leitura e o registro continuam; só novos cadastros e reativações de usuário são bloqueados (`409 USER_PLAN_EXPIRED`). Não há pagamento, cobrança nem renovação automática. Decisões do agente, pendentes de confirmação de Mateus.
+O [catálogo](endpoints/plans-listar.md) segue o **Quadro 2 do TCC** (decisão de Mateus em 2026-11-04): **Basic**, até 10 usuários e 200 pacientes ativos, limites fixos, R$ 499,00/mês; **Enterprise**, até 50 usuários e 1.000 pacientes ativos, expansível conforme contratação, R$ 1.990,00/mês mais adicional conforme volume. O preço é informativo. Cada organização cliente tem um **termo de vigência** corrente (BE-07): plano, início, fim opcional e, só no Enterprise, limites expandidos (nunca abaixo do catálogo). O **limite efetivo** é o expandido, senão o do catálogo. O administrador consulta tudo em [GET /organizations/me/plan](endpoints/plans-consultar-proprio.md) e pede outro plano por [POST /plan-change-requests](endpoints/plan-change-requests-criar.md); o plano só muda quando o master [aprova](endpoints/plan-change-requests-aprovar.md). O master também [atribui, renova ou expande](endpoints/plans-atribuir.md) diretamente. Com a vigência vencida, a leitura e o registro continuam; só novos cadastros e reativações de usuário são bloqueados (`409 USER_PLAN_EXPIRED`). Não há pagamento, cobrança nem renovação automática. Vigência, vencimento e fluxo de decisão são decisões do agente de 2026-11-03, pendentes de confirmação de Mateus.
 
 ### Administração da plataforma
 

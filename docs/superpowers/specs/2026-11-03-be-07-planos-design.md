@@ -117,3 +117,27 @@ mesmo plano recusado e aceito quando vencido; aprovação aplica plano e
 encerra o termo anterior; recusa e cancelamento preservam o plano; duas
 organizações (404 cruzado); profissional 403; master não acessa rotas de admin
 e vice-versa; migration `up/down`.
+
+## 6. Revisão de 2026-11-04 — regras do Quadro 2
+
+Mateus decidiu que o catálogo segue as regras de cada plano do Quadro 2 do
+TCC (seção 3.3, p. 30). Isso substitui as decisões do agente sobre catálogo e
+preço; vigência, vencimento e fluxo de decisão seguem como acima, pendentes de
+confirmação.
+
+- Basic: até 10 usuários e 200 pacientes ativos, limites **fixos**, R$ 499,00
+  por mês. Enterprise: até 50 usuários e 1.000 pacientes ativos, **expansível**
+  conforme contratação, R$ 1.990,00 por mês mais adicional conforme volume.
+  `monthly_price` passa a ter esses valores; o adicional não é modelado e não
+  há cobrança.
+- Nova coluna `usage_plans.expandable`. Limite personalizado no termo só vale
+  para plano expansível e só igual ou acima do catálogo
+  (`PLAN_LIMIT_NOT_EXPANDABLE`, `PLAN_LIMIT_BELOW_CATALOG`, ambos 422), na
+  atribuição e na aprovação. Recusa na aprovação mantém a solicitação
+  `pending`.
+- Descrições = linha "Descrição" do Quadro 2. "Cadastro ampliado" = os próprios
+  limites do Enterprise; "implantação e personalização" é serviço contratado,
+  sem checagem na API.
+- Catálogo restrito a Basic e Enterprise: planos `legacy-*` ficam inativos,
+  sem tirar ninguém do plano em que já está.
+- Migration `1790600000000-ApplyPlanCatalogRules`, reversível.

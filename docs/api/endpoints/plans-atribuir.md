@@ -1,7 +1,7 @@
 ---
 title: Atribuir, renovar ou personalizar o plano (plataforma)
 status: atual
-updated: 2026-11-03
+updated: 2026-11-04
 method: PUT
 path: /api/v1/organizations/{organizationId}/plan
 source: src/modules/Plan/plan.controller.ts
@@ -11,11 +11,13 @@ source: src/modules/Plan/plan.controller.ts
 
 ## Propósito e acesso
 
-"Atualização administrativa" do UC04 passo 5, feita pelo administrador master: troca o plano, **renova** a vigência (mesmo plano com novo `endsAt`) ou define **limites personalizados** (por exemplo, a expansão contratável do Enterprise). Encerra o termo corrente (`superseded_at`) e abre outro com `origin = "assignment"`, na mesma transação e sob a trava da organização usada no cadastro de usuário. `organizations.usage_plan_id` acompanha o plano novo. Não há pagamento, cobrança nem renovação automática.
+"Atualização administrativa" do UC04 passo 5, feita pelo administrador master: troca o plano, **renova** a vigência (mesmo plano com novo `endsAt`) ou **expande os limites** do Enterprise conforme contratação. Encerra o termo corrente (`superseded_at`) e abre outro com `origin = "assignment"`, na mesma transação e sob a trava da organização usada no cadastro de usuário. `organizations.usage_plan_id` acompanha o plano novo. Não há pagamento, cobrança nem renovação automática.
 
-**Substituição completa:** o corpo descreve o termo inteiro. Campo omitido ou `null` volta ao padrão: sem vencimento, limite do catálogo. Para manter um limite personalizado ao renovar, envie-o de novo. Limite abaixo do uso atual é aceito: só bloqueia novos cadastros. A atribuição **não** decide a solicitação pendente da organização, que continua `pending` até ser [aprovada](plan-change-requests-aprovar.md), [recusada](plan-change-requests-recusar.md) ou [cancelada](plan-change-requests-cancelar.md).
+**Regra de limites do Quadro 2 do TCC (decisão de Mateus em 2026-11-04):** só plano com `expandable: true` (Enterprise) aceita limite personalizado, e só **igual ou acima** do limite do catálogo (expansão, nunca redução). Basic tem limites fixos: `userLimit`/`patientLimit` informados → `422 PLAN_LIMIT_NOT_EXPANDABLE`. Enterprise com limite abaixo de 50 usuários ou 1.000 pacientes → `422 PLAN_LIMIT_BELOW_CATALOG`. O adicional de preço da expansão não é modelado.
 
-Decisões do agente em 2026-11-03, pendentes de confirmação de Mateus. Autenticação: sessão **normal** da plataforma com `platform_organizations:update`. Perfis de organização cliente → `403 AUTH_FORBIDDEN`.
+**Substituição completa:** o corpo descreve o termo inteiro. Campo omitido ou `null` volta ao padrão: sem vencimento, limite do catálogo. Para manter uma expansão ao renovar, envie-a de novo. Trocar para Basic descarta a expansão; se o uso ficar acima do limite novo, nada é apagado: só novos cadastros e reativações ficam bloqueados. A atribuição **não** decide a solicitação pendente da organização, que continua `pending` até ser [aprovada](plan-change-requests-aprovar.md), [recusada](plan-change-requests-recusar.md) ou [cancelada](plan-change-requests-cancelar.md).
+
+Vigência, renovação e substituição completa são decisões do agente em 2026-11-03, pendentes de confirmação de Mateus. Autenticação: sessão **normal** da plataforma com `platform_organizations:update`. Perfis de organização cliente → `403 AUTH_FORBIDDEN`.
 
 ## Request
 
@@ -31,10 +33,10 @@ Decisões do agente em 2026-11-03, pendentes de confirmação de Mateus. Autenti
 
 | Propriedade JSON | Tipo / formato | Obrigatória | Null | Default / limites | Significado |
 | --- | --- | --- | --- | --- | --- |
-| `planId` | texto, UUID | sim | não | plano ativo do [catálogo](plans-listar.md) | Plano a vigorar. Pode ser o atual (renovação ou personalização). |
+| `planId` | texto, UUID | sim | não | plano ativo do [catálogo](plans-listar.md) | Plano a vigorar. Pode ser o atual (renovação ou expansão). |
 | `endsAt` | texto ISO 8601 com fuso | não | sim | ausente/`null` = sem vencimento; deve ser **futuro** | Fim da vigência. |
-| `userLimit` | inteiro | não | sim | 0 a 100000; ausente/`null` = catálogo | Limite de usuários personalizado. |
-| `patientLimit` | inteiro | não | sim | 0 a 100000; ausente/`null` = catálogo | Limite de pacientes personalizado (aplicação no BE-08). |
+| `userLimit` | inteiro | não | sim | até 100000; ausente/`null` = catálogo; só plano expansível, ≥ `userLimit` do plano | Limite de usuários expandido. |
+| `patientLimit` | inteiro | não | sim | até 100000; ausente/`null` = catálogo; só plano expansível, ≥ `patientLimit` do plano | Limite de pacientes ativos expandido (aplicação no BE-08). |
 | `reason` | texto | não | sim | 1 a 500 caracteres, aparado | Motivo, gravado no termo. |
 
 ```bash
@@ -42,12 +44,12 @@ curl -i -X PUT 'https://api.example.com/api/v1/organizations/0f1e2d3c-4b5a-4968-
   -H 'Accept: application/json' \
   -H 'Content-Type: application/json' \
   -H 'Authorization: Bearer M4st3r...Tk1' \
-  -d '{"planId":"6a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d","endsAt":"2027-11-01T00:00:00-03:00","userLimit":15,"reason":"Renovacao anual com 5 vagas extras."}'
+  -d '{"planId":"7b2c3d4e-5f6a-4b7c-8d9e-0f1a2b3c4d5e","endsAt":"2027-11-01T00:00:00-03:00","userLimit":60,"reason":"Enterprise com 10 usuarios adicionais contratados."}'
 ```
 
 ## Resposta de sucesso
 
-`200 OK`, com o plano já aplicado, na estrutura de [plans-consultar-proprio.md](plans-consultar-proprio.md) (`term.origin = "assignment"`, `term.userLimit = 15`, `limits.users = 15` no exemplo).
+`200 OK`, com o plano já aplicado, na estrutura de [plans-consultar-proprio.md](plans-consultar-proprio.md) (`plan.code = "enterprise"`, `term.origin = "assignment"`, `term.userLimit = 60`, `limits.users = 60` no exemplo).
 
 ## Efeitos
 
@@ -65,6 +67,8 @@ curl -i -X PUT 'https://api.example.com/api/v1/organizations/0f1e2d3c-4b5a-4968-
 | `422` | `VALIDATION_FAILED` | `organizationId`/`planId` não UUID, `endsAt` fora de ISO 8601, limite negativo, não inteiro ou acima de 100000, `reason` vazio ou longo. |
 | `422` | `PLAN_NOT_FOUND` | Plano inexistente, inativo ou excluído (`fields[0].field = "planId"`). |
 | `422` | `PLAN_TERM_END_IN_PAST` | `endsAt` igual ou anterior ao instante atual (`fields[0].field = "endsAt"`). |
+| `422` | `PLAN_LIMIT_NOT_EXPANDABLE` | Limite personalizado para plano sem expansão (Basic); `fields[0].field` = `userLimit` ou `patientLimit`, `code = "NOT_EXPANDABLE"`. |
+| `422` | `PLAN_LIMIT_BELOW_CATALOG` | Expansão abaixo do limite do plano; `fields[0].field` = `userLimit` ou `patientLimit`, `code = "BELOW_CATALOG"`. |
 
 ```json
 {
@@ -86,4 +90,4 @@ curl -i -X PUT 'https://api.example.com/api/v1/organizations/0f1e2d3c-4b5a-4968-
 
 ## Origem e validação
 
-Controller `src/modules/Plan/plan.controller.ts`; caso de uso `src/modules/Plan/AssignOrganizationPlan/`; DTOs `assignOrganizationPlan.dto.ts` e `dtos/planTermFields.dto.ts`; policy `policies/planTerm.policy.ts`; termo em `repositories/planTerm.query.ts`. Testes: `tests/modules/Plan/planTerm.policy.spec.ts`, `tests/modules/Plan/plan.e2e-spec.ts` (403 do admin, 422 sem tocar o banco, OpenAPI) e `tests/modules/Plan/planManagement.e2e-spec.ts` (plano retirado, fim no passado, limite personalizado bloqueando cadastro, renovação de termo vencido). Conferido contra `/api/docs-json` em 2026-11-03. Vault: [[2026-10-29-be-07-plans]] e [[2026-11-03-planos-vigencia-e-solicitacao]].
+Controller `src/modules/Plan/plan.controller.ts`; caso de uso `src/modules/Plan/AssignOrganizationPlan/`; DTOs `assignOrganizationPlan.dto.ts` e `dtos/planTermFields.dto.ts`; policy `policies/planTerm.policy.ts`; termo em `repositories/planTerm.query.ts`. Testes: `tests/modules/Plan/planTerm.policy.spec.ts`, `tests/modules/Plan/plan.e2e-spec.ts` (403 do admin, 422 sem tocar o banco, OpenAPI) e `tests/modules/Plan/planManagement.e2e-spec.ts` (plano retirado, fim no passado, expansão recusada no Basic e abaixo do catálogo no Enterprise, limite expandido bloqueando cadastro, renovação de termo vencido). Conferido contra `/api/docs-json` em 2026-11-04. Vault: [[2026-10-29-be-07-plans]], [[2026-11-03-planos-vigencia-e-solicitacao]] e [[2026-11-04-planos-regras-quadro-2]].
