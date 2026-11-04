@@ -1,6 +1,9 @@
 import { Check, Column, Entity, PrimaryColumn } from 'typeorm';
 
+import type { PlanFeature } from '../types/plan.types';
+
 @Entity('usage_plans')
+@Check('usage_plans_code_format_check', "code ~ '^[a-z0-9][a-z0-9-]*$'")
 @Check('usage_plans_user_limit_check', 'user_limit >= 0')
 @Check('usage_plans_patient_limit_check', 'patient_limit >= 0')
 @Check(
@@ -10,6 +13,9 @@ import { Check, Column, Entity, PrimaryColumn } from 'typeorm';
 export class UsagePlan {
   @PrimaryColumn('uuid', { default: () => 'gen_random_uuid()' })
   id!: string;
+
+  @Column({ type: 'varchar', length: 40, unique: true })
+  code!: string;
 
   @Column({ type: 'varchar', length: 120 })
   name!: string;
@@ -22,6 +28,9 @@ export class UsagePlan {
 
   @Column({ type: 'integer' })
   patientLimit!: number;
+
+  @Column({ type: 'text', array: true, default: () => "'{}'" })
+  features!: PlanFeature[];
 
   @Column({ type: 'numeric', precision: 12, scale: 2, nullable: true })
   monthlyPrice!: string | null;
