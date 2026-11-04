@@ -224,11 +224,41 @@ do tenant. Validada em 2026-11-03 **somente em PostgreSQL descartavel**
 `tests/modules/User/userManagement.e2e-spec.ts`. **Nao aplicada no banco local
 de `.env` nem em producao.**
 
+## Pacientes e vinculo do responsavel
+
+`migrations/1790700000000-CreatePatients.ts` (BE-09, 2026-11-04) cria
+`patients` (MER `pacientes` + Figura 35, por decisao de Mateus) e
+`user_patients` (MER `usuarios_pacientes`). Em `patients`, so `name` e
+`birth_date` (`date`) sao obrigatorios; `cpf` e opcional, com 11 digitos e
+indice unico parcial `patients_org_cpf_unique (organization_id, cpf) WHERE cpf
+IS NOT NULL`, que tambem vale para pacientes inativos. `status` e so cadastral
+(`active`/`inactive`), ligado a `deleted_at` por `patients_deactivation_check`;
+endereco, condicoes (`secondary_conditions text[]`) e plano de saude
+(`health_plan`, texto livre, sem relacao com `usage_plans`) sao anulaveis.
+
+`user_patients` guarda o profissional responsavel (`role =
+'responsible_professional'`, unico papel ate o BE-10; `link_type` e `note`
+ficam nulos). As FKs compostas `(user_id, organization_id)` e `(patient_id,
+organization_id)` recusam vinculo entre organizacoes, e o indice unico parcial
+`user_patients_single_responsible_unique` admite um so responsavel vigente
+(`deleted_at IS NULL`) por paciente; trocar o responsavel encerra o vinculo
+anterior. A migration tambem troca o rotulo de `patients:deactivate` para
+"Inativar e reativar pacientes"; o `down` restaura o rotulo e remove as duas
+tabelas. O limite de pacientes do plano conta `status = 'active'`
+(`PLAN_SEAT_COUNT.patients`) sob a mesma trava da organizacao.
+
+Validada em 2026-11-04 **somente em PostgreSQL 17 descartavel** com
+`migration:show`, `migration:run`, `migration:revert` e `migration:run` pela
+CLI e pelo entrypoint da imagem (`RUN_MIGRATIONS=true`). Evidencia em
+`tests/modules/Patient/patientSchema.e2e-spec.ts` e
+`tests/modules/Patient/patientManagement.e2e-spec.ts`. **Nao aplicada no banco
+local de `.env` nem em producao.**
+
 `organizations.usage_plan_id` e obrigatorio nas organizacoes clientes (anulavel
 so na de plataforma, desde `1790100000000`) e referencia `usage_plans.id` com
 `ON DELETE RESTRICT`. A tabela de planos oferece somente a estrutura fisica do
-catalogo; ofertas, vigencia, troca e o limite de pacientes continuam pendentes
-(o de usuarios e aplicado desde o BE-06).
+catalogo; o limite de usuarios e aplicado desde o BE-06 e o de pacientes
+desde o BE-09.
 `users.cpf` e obrigatorio, armazena 11 digitos e e unico por organizacao;
 o banco verifica o formato, nao os digitos verificadores. E-mail de usuario
 tambem e unico por organizacao. `organizations.legal_name` e a razao social
