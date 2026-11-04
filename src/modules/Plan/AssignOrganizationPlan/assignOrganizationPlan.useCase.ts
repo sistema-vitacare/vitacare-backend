@@ -11,7 +11,10 @@ import {
   toPlanActor,
 } from '../parsers/plan.parser';
 import { PlanErrors } from '../plan.errors';
-import { toPlanTermInput } from '../policies/planTerm.policy';
+import {
+  toPlanTermInput,
+  toTermLimitException,
+} from '../policies/planTerm.policy';
 import { PlanRepository } from '../repositories/plan.repository';
 import type { AssignOrganizationPlanDto } from './assignOrganizationPlan.dto';
 
@@ -51,6 +54,10 @@ export class AssignOrganizationPlanUseCase {
           detail: 'Plano inexistente, inativo ou excluído.',
           fields: [{ field: 'planId', code: 'NOT_FOUND' }],
         });
+
+      case 'limit_not_expandable':
+      case 'limit_below_plan':
+        throw toTermLimitException(outcome);
 
       default: {
         const [[pending]] = await this.plans.listRequests({

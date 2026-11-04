@@ -4,6 +4,11 @@ import { DataSource, type EntityManager } from 'typeorm';
 import { translatePgError } from '@/common/errors/pgError.translator';
 import { insertAuditEventForTarget } from '@/modules/Audit/repositories/auditEvent.repository';
 
+import {
+  type TermLimitViolation,
+  termLimitViolation,
+} from '../policies/planTerm.policy';
+
 import { UsagePlan } from '../entities/usagePlan.entity';
 import type {
   OrganizationPlanRow,
@@ -18,7 +23,8 @@ const SINGLE_PENDING_CONSTRAINT = 'plan_change_requests_single_pending_unique';
 
 export type AssignPlanOutcome =
   | { kind: 'assigned'; plan: OrganizationPlanRow }
-  | { kind: 'organization_not_found' | 'plan_not_found' };
+  | { kind: 'organization_not_found' | 'plan_not_found' }
+  | TermLimitViolation;
 
 export type CreateRequestOutcome =
   | { kind: 'created'; request: PlanChangeRequestRow }
@@ -26,7 +32,10 @@ export type CreateRequestOutcome =
 
 export type DecideRequestOutcome =
   | { kind: 'decided'; request: PlanChangeRequestRow }
-  | { kind: 'not_found' | 'not_pending' | 'plan_not_found' };
+  | { kind: 'not_found' | 'not_pending' | 'plan_not_found' }
+  | TermLimitViolation;
+
+type TermCheck = { kind: 'plan_not_found' } | TermLimitViolation | null;
 
 export interface ApproveRequestCommand {
   requestId: string;
@@ -105,8 +114,10 @@ export class PlanRepository {
         return { kind: 'organization_not_found' };
       }
 
-      if (!(await this.isPlanAvailable(manager, usagePlanId))) {
-        return { kind: 'plan_not_found' };
+      const rejected = await this.checkTerm(manager, usagePlanId, term);
+
+      if (rejected) {
+        return rejected;
       }
 
       const termId = await insertPlanTerm(manager, {
@@ -275,8 +286,14 @@ export class PlanRepository {
       undefined,
       actor,
       async (manager, request) => {
-        if (!(await this.isPlanAvailable(manager, request.requestedPlan.id))) {
-          return null;
+        const rejected = await this.checkTerm(
+          manager,
+          request.requestedPlan.id,
+          term,
+        );
+
+        if (rejected) {
+          return rejected;
         }
 
         const termId = await insertPlanTerm(manager, {
@@ -317,7 +334,8 @@ export class PlanRepository {
    * Trava organizacao e solicitacao, nessa ordem (a mesma do cadastro), exige
    * `pending` e audita a decisao. `organizationId` restringe ao tenant da
    * sessao; sem ele, a plataforma alcanca qualquer solicitacao. `apply`
-   * devolve a acao auditada, ou `null` quando o plano pedido saiu do catalogo.
+   * devolve a acao auditada, ou a recusa do termo (plano fora do catalogo ou
+   * limite fora da regra do plano), sem gravar nada.
    */
   private async decide(
     requestId: string,
@@ -326,7 +344,7 @@ export class PlanRepository {
     apply: (
       manager: EntityManager,
       request: PlanChangeRequestRow,
-    ) => Promise<string | null>,
+    ) => Promise<string | NonNullable<TermCheck>>,
   ): Promise<DecideRequestOutcome> {
     return this.write(async (manager) => {
       const found = await this.readRequest(manager, requestId);
@@ -352,8 +370,8 @@ export class PlanRepository {
 
       const action = await apply(manager, found);
 
-      if (action === null) {
-        return { kind: 'plan_not_found' };
+      if (typeof action !== 'string') {
+        return action;
       }
 
       await insertAuditEventForTarget(manager, actor, {
@@ -417,6 +435,30 @@ export class PlanRepository {
     return rows.length === 1;
   }
 
+  /** Plano disponivel e limites conforme a regra dele (Quadro 2). */
+  private async checkTerm(
+    manager: EntityManager,
+    usagePlanId: string,
+    term: PlanTermInput,
+  ): Promise<TermCheck> {
+    const [plan] = await manager.query<
+      Array<{ userLimit: number; patientLimit: number; expandable: boolean }>
+    >(
+      `SELECT user_limit AS "userLimit",
+              patient_limit AS "patientLimit",
+              expandable
+         FROM usage_plans
+        WHERE id = $1 AND status = true AND deleted_at IS NULL`,
+      [usagePlanId],
+    );
+
+    if (!plan) {
+      return { kind: 'plan_not_found' };
+    }
+
+    return termLimitViolation(plan, term);
+  }
+
   private async isPlanAvailable(
     manager: EntityManager,
     usagePlanId: string,
@@ -449,7 +491,8 @@ export class PlanRepository {
                 'userLimit', plan.user_limit,
                 'patientLimit', plan.patient_limit,
                 'features', plan.features,
-                'monthlyPrice', plan.monthly_price::text
+                'monthlyPrice', plan.monthly_price::text,
+                'expandable', plan.expandable
               ) AS plan,
               json_build_object(
                 'id', term.id,

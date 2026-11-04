@@ -60,6 +60,7 @@ export interface OrganizationPlanRow {
     patientLimit: number;
     features: PlanFeature[];
     monthlyPrice: string | null;
+    expandable: boolean;
   };
   term: {
     id: string;

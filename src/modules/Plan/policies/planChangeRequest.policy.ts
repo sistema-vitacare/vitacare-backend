@@ -5,6 +5,7 @@ import type { PlanChangeRequestDto } from '../dtos/plan.dto';
 import { toPlanChangeRequestResponse } from '../parsers/plan.parser';
 import { PlanErrors } from '../plan.errors';
 import type { DecideRequestOutcome } from '../repositories/plan.repository';
+import { toTermLimitException } from './planTerm.policy';
 
 /** Resultado comum de cancelar, aprovar e recusar. */
 export const toDecidedRequest = (
@@ -29,6 +30,10 @@ export const toDecidedRequest = (
         ...PlanErrors.NOT_FOUND,
         detail: 'O plano solicitado saiu do catálogo depois do pedido.',
       });
+
+    case 'limit_not_expandable':
+    case 'limit_below_plan':
+      throw toTermLimitException(outcome);
 
     default:
       return toPlanChangeRequestResponse(outcome.request, ctx);

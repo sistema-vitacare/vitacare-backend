@@ -11,6 +11,18 @@ export const PlanErrors = {
     status: HttpStatus.UNPROCESSABLE_ENTITY,
     message: 'A data de fim da vigência deve ser futura.',
   },
+  LIMIT_NOT_EXPANDABLE: {
+    code: 'PLAN_LIMIT_NOT_EXPANDABLE',
+    status: HttpStatus.UNPROCESSABLE_ENTITY,
+    message:
+      'Este plano tem limites fixos. Só o plano Enterprise admite expansão conforme contratação.',
+  },
+  LIMIT_BELOW_CATALOG: {
+    code: 'PLAN_LIMIT_BELOW_CATALOG',
+    status: HttpStatus.UNPROCESSABLE_ENTITY,
+    message:
+      'A expansão não pode ficar abaixo do limite do plano. Omita o campo para usar o limite do catálogo.',
+  },
   SAME_PLAN: {
     code: 'PLAN_CHANGE_SAME_PLAN',
     status: HttpStatus.UNPROCESSABLE_ENTITY,

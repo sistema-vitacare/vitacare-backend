@@ -40,11 +40,18 @@ export class PlanDto extends PlanSummaryDto {
 
   @ApiProperty({
     nullable: true,
-    example: null,
+    example: '499.00',
     description:
-      'Mensalidade em reais com duas casas, como texto. `null`: sem preco publicado (os do TCC sao academicos).',
+      'Mensalidade de referencia em reais, com duas casas, como texto (Quadro 2 do TCC). Plano expansivel soma adicional conforme o volume contratado. `null`: sem preco publicado.',
   })
   monthlyPrice!: string | null;
+
+  @ApiProperty({
+    example: false,
+    description:
+      'Aceita expansao de limites conforme contratacao (so o Enterprise, pelo Quadro 2). Plano sem expansao nao aceita limite personalizado.',
+  })
+  expandable!: boolean;
 }
 
 export class PlanTermDto {

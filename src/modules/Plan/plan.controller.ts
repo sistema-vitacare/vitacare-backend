@@ -125,7 +125,13 @@ export class PlanController {
   @ApiEnvelope(OrganizationPlanDto)
   @ApiErrors(UNAUTHENTICATED, FORBIDDEN, ORGANIZATION_NOT_FOUND, {
     status: 422,
-    codes: ['VALIDATION_FAILED', 'PLAN_NOT_FOUND', 'PLAN_TERM_END_IN_PAST'],
+    codes: [
+      'VALIDATION_FAILED',
+      'PLAN_NOT_FOUND',
+      'PLAN_TERM_END_IN_PAST',
+      'PLAN_LIMIT_NOT_EXPANDABLE',
+      'PLAN_LIMIT_BELOW_CATALOG',
+    ],
   })
   async assign(
     @Param('organizationId', UuidParam('organizationId'))
@@ -202,7 +208,13 @@ export class PlanController {
   @ApiEnvelope(PlanChangeRequestDto)
   @ApiErrors(UNAUTHENTICATED, FORBIDDEN, REQUEST_NOT_FOUND, NOT_PENDING, {
     status: 422,
-    codes: ['VALIDATION_FAILED', 'PLAN_NOT_FOUND', 'PLAN_TERM_END_IN_PAST'],
+    codes: [
+      'VALIDATION_FAILED',
+      'PLAN_NOT_FOUND',
+      'PLAN_TERM_END_IN_PAST',
+      'PLAN_LIMIT_NOT_EXPANDABLE',
+      'PLAN_LIMIT_BELOW_CATALOG',
+    ],
   })
   async approve(
     @Param('requestId', UuidParam('requestId')) requestId: string,
