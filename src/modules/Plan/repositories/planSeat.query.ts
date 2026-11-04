@@ -2,8 +2,8 @@ import type { EntityManager } from 'typeorm';
 
 import { readEffectivePlan } from './planTerm.query';
 
-/** Recursos com vaga no plano. Pacientes (ativos) entram com o BE-09. */
-export type PlanSeatResource = 'users';
+/** Recursos com vaga no plano. */
+export type PlanSeatResource = 'users' | 'patients';
 
 export type PlanSeatRefusal = 'plan_expired' | 'limit_reached';
 
@@ -15,9 +15,12 @@ export const PLAN_SEAT_COUNT: Record<PlanSeatResource, string> = {
   users: `SELECT count(*)::int FROM users
            WHERE organization_id = $1
              AND status IN ('pending', 'active')`,
+  patients: `SELECT count(*)::int FROM patients
+              WHERE organization_id = $1
+                AND status = 'active'`,
 };
 
-const LIMIT_FIELD = { users: 'userLimit' } as const;
+const LIMIT_FIELD = { users: 'userLimit', patients: 'patientLimit' } as const;
 
 /**
  * Vencimento bloqueia crescimento (BE-07); o limite e o efetivo do termo

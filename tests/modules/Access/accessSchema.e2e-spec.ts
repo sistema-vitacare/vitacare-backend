@@ -683,7 +683,11 @@ describeWithDatabase('perfis de acesso em PostgreSQL descartavel', () => {
       );
 
       expect(current).toEqual(SNAPSHOT_PROFILES);
-      expect(PERMISSION_LABELS).toEqual(SNAPSHOT_LABELS);
+      // Rotulo trocado depois pela migration 1790700000000-CreatePatients.
+      expect(PERMISSION_LABELS).toEqual({
+        ...SNAPSHOT_LABELS,
+        'patients:deactivate': 'Inativar e reativar pacientes',
+      });
       expect([...TENANT_PERMISSION_CODES].sort()).toEqual(
         [...SNAPSHOT_TENANT_CODES].sort(),
       );

@@ -71,7 +71,7 @@ export interface OrganizationPlanRow {
     origin: PlanTermOrigin;
     expired: boolean;
   };
-  usage: { users: number };
+  usage: { users: number; patients: number };
 }
 
 export interface PlanChangeRequestRow {

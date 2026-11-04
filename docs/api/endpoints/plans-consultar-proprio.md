@@ -15,7 +15,7 @@ UC04 passos 1–3 (RF018): o administrador vê o plano contratado, os recursos, 
 
 - **Limite efetivo** = limite expandido do termo corrente, se o master definiu; senão, o do catálogo. Pelo Quadro 2 do TCC só o Enterprise (`plan.expandable = true`) é expandido, e só para cima (decisão de Mateus em 2026-11-04).
 - **Vigência:** `term.endsAt = null` não vence. Com `endsAt` no passado, `term.status = "expired"`: a organização continua lendo e registrando tudo, mas **novos cadastros e reativações de usuário** são bloqueados (`409 USER_PLAN_EXPIRED`) até o master renovar. Política de vencimento decidida pelo agente em 2026-11-03, pendente de confirmação. Este estado é a notificação ao administrador nesta entrega; aviso ativo por e-mail/push fica para o BE-17.
-- **Uso:** `usage.users` conta `pending` + `active` com a mesma consulta que decide o limite no cadastro e na reativação (`checkPlanSeat`, BE-08), então o número exibido é o aplicado. Uso acima do limite — depois de um rebaixamento de plano — é possível e aparece como está: ninguém é inativado, só novos cadastros e reativações ficam bloqueados. `usage.patients` é sempre `null` até existir o cadastro de pacientes (BE-09), quando passará a contar pacientes **ativos**.
+- **Uso:** `usage.users` conta `pending` + `active` com a mesma consulta que decide o limite no cadastro e na reativação (`checkPlanSeat`, BE-08), então o número exibido é o aplicado. Uso acima do limite — depois de um rebaixamento de plano — é possível e aparece como está: ninguém é inativado, só novos cadastros e reativações ficam bloqueados. `usage.patients` conta os pacientes `active` com a mesma consulta que decide o limite no [cadastro](patients-criar.md) e na [reativação](patients-reativar.md) de pacientes (BE-09, 2026-11-04); paciente inativo não conta.
 
 Autenticação: `Authorization: Bearer <token>` de sessão **normal** com `plan:read` (só o perfil `admin`). Demais perfis e o administrador master (a organização de plataforma não tem plano) → `403 AUTH_FORBIDDEN`. A organização vem **sempre** da sessão.
 
@@ -64,7 +64,7 @@ curl -i 'https://api.example.com/api/v1/organizations/me/plan' \
       "patientLimit": null
     },
     "limits": { "users": 10, "patients": 200 },
-    "usage": { "users": 7, "patients": null },
+    "usage": { "users": 7, "patients": 42 },
     "pendingChangeRequest": {
       "id": "3333333a-0000-4000-8000-00000000000a",
       "organizationId": "0f1e2d3c-4b5a-4968-8776-655443322110",
@@ -99,9 +99,9 @@ curl -i 'https://api.example.com/api/v1/organizations/me/plan' \
 | `data.term.userLimit` | inteiro ≥ 0 | sim | Limite de usuários expandido (só plano expansível, ≥ o do catálogo); `null` = o do catálogo. |
 | `data.term.patientLimit` | inteiro ≥ 0 | sim | Limite de pacientes ativos expandido (mesma regra); `null` = o do catálogo. |
 | `data.limits.users` | inteiro ≥ 0 | não | Limite de usuários **efetivo**, aplicado no cadastro e na reativação. |
-| `data.limits.patients` | inteiro ≥ 0 | não | Limite de pacientes ativos efetivo; aplicado a partir do cadastro de pacientes (BE-09). |
+| `data.limits.patients` | inteiro ≥ 0 | não | Limite de pacientes ativos efetivo, aplicado no cadastro e na reativação de pacientes. |
 | `data.usage.users` | inteiro ≥ 0 | não | Usuários `pending` + `active`, o primeiro administrador incluído; mesma contagem do limite. Pode passar de `limits.users` após rebaixamento. |
-| `data.usage.patients` | `null` | sim | Sempre `null` até o BE-09 (pacientes ativos). |
+| `data.usage.patients` | inteiro ≥ 0 | não | Pacientes `active` (mesma contagem do limite). Pode passar do limite após rebaixamento. Era sempre `null` antes do BE-09 (2026-11-04). |
 | `data.pendingChangeRequest` | objeto | sim | Solicitação `pending` da organização (no máximo uma); `null` se não houver. Estrutura em [criar solicitação](plan-change-requests-criar.md). |
 
 ## Erros

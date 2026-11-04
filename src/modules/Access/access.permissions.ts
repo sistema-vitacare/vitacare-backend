@@ -53,7 +53,7 @@ export const PERMISSION_LABELS: Readonly<Record<PermissionName, string>> = {
   'patients:read': 'Consultar pacientes',
   'patients:create': 'Cadastrar pacientes',
   'patients:update': 'Editar pacientes',
-  'patients:deactivate': 'Inativar pacientes',
+  'patients:deactivate': 'Inativar e reativar pacientes',
   'patient_history:read': 'Consultar historico do paciente',
   'patient_evolution:read': 'Consultar evolucao do paciente',
   'alerts:read': 'Consultar alertas',

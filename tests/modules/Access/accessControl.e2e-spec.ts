@@ -21,6 +21,7 @@ import { AddTemporaryPasswordExpiry1790200000000 } from '@/database/migrations/1
 import { SyncTenantAccessProfiles1790300000000 } from '@/database/migrations/1790300000000-SyncTenantAccessProfiles';
 import { AddPlanTermsAndChangeRequests1790500000000 } from '@/database/migrations/1790500000000-AddPlanTermsAndChangeRequests';
 import { ApplyPlanCatalogRules1790600000000 } from '@/database/migrations/1790600000000-ApplyPlanCatalogRules';
+import { CreatePatients1790700000000 } from '@/database/migrations/1790700000000-CreatePatients';
 import { runPlatformSeed } from '@/database/seeds/platformSeed';
 import { SnakeNamingStrategy } from '@/database/snakeNaming.strategy';
 import { AccessController } from '@/modules/Access/access.controller';
@@ -77,10 +78,11 @@ const MIGRATIONS = [
   SyncTenantAccessProfiles1790300000000,
   AddPlanTermsAndChangeRequests1790500000000,
   ApplyPlanCatalogRules1790600000000,
+  CreatePatients1790700000000,
 ];
 
 const TRUNCATE_ALL =
-  'TRUNCATE organization_plan_terms, plan_change_requests, audit_events, auth_sessions, password_reset_tokens, users, profile_permissions, permissions, access_profiles, organizations, usage_plans';
+  'TRUNCATE user_patients, patients, organization_plan_terms, plan_change_requests, audit_events, auth_sessions, password_reset_tokens, users, profile_permissions, permissions, access_profiles, organizations, usage_plans';
 
 const SETTINGS: Record<string, number> = {
   'auth.sessionIdleSeconds': 1800,

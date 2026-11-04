@@ -36,7 +36,7 @@ Vigência, renovação e substituição completa são decisões do agente em 202
 | `planId` | texto, UUID | sim | não | plano ativo do [catálogo](plans-listar.md) | Plano a vigorar. Pode ser o atual (renovação ou expansão). |
 | `endsAt` | texto ISO 8601 com fuso | não | sim | ausente/`null` = sem vencimento; deve ser **futuro** | Fim da vigência. |
 | `userLimit` | inteiro | não | sim | até 100000; ausente/`null` = catálogo; só plano expansível, ≥ `userLimit` do plano | Limite de usuários expandido. |
-| `patientLimit` | inteiro | não | sim | até 100000; ausente/`null` = catálogo; só plano expansível, ≥ `patientLimit` do plano | Limite de pacientes ativos expandido (aplicado a partir do cadastro de pacientes, BE-09). |
+| `patientLimit` | inteiro | não | sim | até 100000; ausente/`null` = catálogo; só plano expansível, ≥ `patientLimit` do plano | Limite de pacientes ativos expandido (aplicado no cadastro e na reativação de pacientes, BE-09). |
 | `reason` | texto | não | sim | 1 a 500 caracteres, aparado | Motivo, gravado no termo. |
 
 ```bash

@@ -78,7 +78,7 @@ export const toOrganizationPlanResponse = (
     users: row.term.userLimit ?? row.plan.userLimit,
     patients: row.term.patientLimit ?? row.plan.patientLimit,
   },
-  usage: { users: row.usage.users, patients: null },
+  usage: { users: row.usage.users, patients: row.usage.patients },
   pendingChangeRequest: pending
     ? toPlanChangeRequestResponse(pending, ctx)
     : null,

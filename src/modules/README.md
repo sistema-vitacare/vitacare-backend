@@ -181,8 +181,12 @@ desenvolvimento) e, para as ja existentes, pela migration
 - As permissoes sao relidas do banco a cada requisicao: troca de perfil vale na
   chamada seguinte, sem revogar sessao.
 - Permissao nova exige matriz, migration e testes.
-- Ainda **nao** cobertos: escopo por vinculo com paciente (BE-10) e campos
-  visiveis por perfil (BE-09/BE-19).
+- Escopo por paciente (BE-09): `admin` e `professional` alcancam a organizacao
+  inteira; os demais perfis so pacientes com vinculo vigente em
+  `user_patients` num papel que o perfil le (`LINK_ROLES_BY_PROFILE` em
+  `Patient/policies/patient.policy.ts`; o de responsavel nao conta). Ainda **nao**
+  cobertos: tipos de vinculo e revogacao (BE-10) e campos visiveis por perfil
+  (BE-19).
 
 ## Outras regras
 

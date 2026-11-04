@@ -9,6 +9,7 @@ import { SyncTenantAccessProfiles1790300000000 } from '@/database/migrations/179
 import { AddUserPendingCheck1790400000000 } from '@/database/migrations/1790400000000-AddUserPendingCheck';
 import { AddPlanTermsAndChangeRequests1790500000000 } from '@/database/migrations/1790500000000-AddPlanTermsAndChangeRequests';
 import { ApplyPlanCatalogRules1790600000000 } from '@/database/migrations/1790600000000-ApplyPlanCatalogRules';
+import { CreatePatients1790700000000 } from '@/database/migrations/1790700000000-CreatePatients';
 import { SnakeNamingStrategy } from '@/database/snakeNaming.strategy';
 import { ChangePasswordUseCase } from '@/modules/Auth/ChangePassword/changePassword.useCase';
 import { CompleteFirstAccessUseCase } from '@/modules/Auth/CompleteFirstAccess/completeFirstAccess.useCase';
@@ -240,6 +241,7 @@ describeWithDatabase('autenticacao em PostgreSQL descartavel', () => {
         AddUserPendingCheck1790400000000,
         AddPlanTermsAndChangeRequests1790500000000,
         ApplyPlanCatalogRules1790600000000,
+        CreatePatients1790700000000,
       ],
       namingStrategy: new SnakeNamingStrategy(),
       synchronize: false,
@@ -258,7 +260,7 @@ describeWithDatabase('autenticacao em PostgreSQL descartavel', () => {
     }
 
     migrated = (await dataSource.runMigrations()).length;
-    expect(migrated).toBe(8);
+    expect(migrated).toBe(9);
 
     passwords = new PasswordHasher();
     tokens = new TokenService();
@@ -1029,7 +1031,7 @@ describeWithDatabase('autenticacao em PostgreSQL descartavel', () => {
   });
 
   describe('schema completo', () => {
-    it('mapeia as onze tabelas nas entidades TypeORM', () => {
+    it('mapeia as treze tabelas nas entidades TypeORM', () => {
       expect(
         dataSource.entityMetadatas.map((metadata) => metadata.tableName).sort(),
       ).toEqual([
@@ -1039,10 +1041,12 @@ describeWithDatabase('autenticacao em PostgreSQL descartavel', () => {
         'organization_plan_terms',
         'organizations',
         'password_reset_tokens',
+        'patients',
         'permissions',
         'plan_change_requests',
         'profile_permissions',
         'usage_plans',
+        'user_patients',
         'users',
       ]);
     });

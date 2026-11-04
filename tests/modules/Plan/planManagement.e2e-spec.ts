@@ -21,6 +21,7 @@ import { SyncTenantAccessProfiles1790300000000 } from '@/database/migrations/179
 import { AddUserPendingCheck1790400000000 } from '@/database/migrations/1790400000000-AddUserPendingCheck';
 import { AddPlanTermsAndChangeRequests1790500000000 } from '@/database/migrations/1790500000000-AddPlanTermsAndChangeRequests';
 import { ApplyPlanCatalogRules1790600000000 } from '@/database/migrations/1790600000000-ApplyPlanCatalogRules';
+import { CreatePatients1790700000000 } from '@/database/migrations/1790700000000-CreatePatients';
 import { runPlatformSeed } from '@/database/seeds/platformSeed';
 import { SnakeNamingStrategy } from '@/database/snakeNaming.strategy';
 import { AuthGuard } from '@/modules/Auth/guards/auth.guard';
@@ -58,10 +59,11 @@ const MIGRATIONS = [
   AddUserPendingCheck1790400000000,
   AddPlanTermsAndChangeRequests1790500000000,
   ApplyPlanCatalogRules1790600000000,
+  CreatePatients1790700000000,
 ];
 
 const TRUNCATE_ALL =
-  'TRUNCATE organization_plan_terms, plan_change_requests, audit_events, auth_sessions, password_reset_tokens, users, profile_permissions, permissions, access_profiles, organizations, usage_plans';
+  'TRUNCATE user_patients, patients, organization_plan_terms, plan_change_requests, audit_events, auth_sessions, password_reset_tokens, users, profile_permissions, permissions, access_profiles, organizations, usage_plans';
 
 const SETTINGS: Record<string, number> = {
   'auth.sessionIdleSeconds': 1800,
@@ -149,7 +151,7 @@ interface OrganizationPlanBody {
     userLimit: number | null;
   };
   limits: { users: number; patients: number };
-  usage: { users: number; patients: number | null };
+  usage: { users: number; patients: number };
   pendingChangeRequest: RequestBody | null;
 }
 
@@ -509,7 +511,7 @@ describeWithDatabase('planos de uso em PostgreSQL (e2e)', () => {
         plan: { code: 'basic', userLimit: 10 },
         term: { status: 'active', origin: 'initial', endsAt: null },
         limits: { users: 10, patients: 200 },
-        usage: { users: 2, patients: null },
+        usage: { users: 2, patients: 0 },
         pendingChangeRequest: null,
       });
     });
@@ -1170,6 +1172,7 @@ describeWithDatabase('planos de uso em PostgreSQL (e2e)', () => {
 
   describe('migration', () => {
     it('reverte as regras do Quadro 2 sem perder planos nem termos', async () => {
+      await dataSource.undoLastMigration(); // CreatePatients, que vem depois
       await dataSource.undoLastMigration();
 
       expect(
@@ -1194,6 +1197,7 @@ describeWithDatabase('planos de uso em PostgreSQL (e2e)', () => {
     });
 
     it('reverte e reaplica com dados, mantendo o plano do catalogo em uso', async () => {
+      await dataSource.undoLastMigration(); // CreatePatients
       await dataSource.undoLastMigration();
       await dataSource.undoLastMigration();
 

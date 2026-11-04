@@ -109,13 +109,11 @@ export class PlanUsageDto {
   users!: number;
 
   @ApiProperty({
-    nullable: true,
-    type: Number,
-    example: null,
+    minimum: 0,
     description:
-      'Sempre `null` ate o cadastro de pacientes (BE-09), quando conta os pacientes ativos.',
+      'Pacientes `active` (mesma contagem do limite). Pode passar do limite apos rebaixamento de plano.',
   })
-  patients!: number | null;
+  patients!: number;
 }
 
 export class PlanChangeRequestDto {
