@@ -65,7 +65,7 @@ const row = (
     expired: false,
     ...term,
   },
-  usage: { users: 3 },
+  usage: { users: 3, patients: 7 },
 });
 
 describe('plan.parser', () => {
@@ -108,6 +108,6 @@ describe('plan.parser', () => {
       status: 'expired',
       endsAt: '2026-11-02T00:00:00.000Z',
     });
-    expect(response.usage).toEqual({ users: 3, patients: null });
+    expect(response.usage).toEqual({ users: 3, patients: 7 });
   });
 });

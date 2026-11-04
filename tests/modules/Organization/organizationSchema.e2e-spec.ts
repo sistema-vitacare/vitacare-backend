@@ -13,6 +13,7 @@ import { SyncTenantAccessProfiles1790300000000 } from '@/database/migrations/179
 import { AddUserPendingCheck1790400000000 } from '@/database/migrations/1790400000000-AddUserPendingCheck';
 import { AddPlanTermsAndChangeRequests1790500000000 } from '@/database/migrations/1790500000000-AddPlanTermsAndChangeRequests';
 import { ApplyPlanCatalogRules1790600000000 } from '@/database/migrations/1790600000000-ApplyPlanCatalogRules';
+import { CreatePatients1790700000000 } from '@/database/migrations/1790700000000-CreatePatients';
 import { runPlatformSeed } from '@/database/seeds/platformSeed';
 import {
   TENANT_PROFILE_CODES,
@@ -166,6 +167,7 @@ describeWithDatabase('organizacoes em PostgreSQL descartavel', () => {
         AddUserPendingCheck1790400000000,
         AddPlanTermsAndChangeRequests1790500000000,
         ApplyPlanCatalogRules1790600000000,
+        CreatePatients1790700000000,
       ],
       namingStrategy: new SnakeNamingStrategy(),
       synchronize: false,
@@ -183,7 +185,7 @@ describeWithDatabase('organizacoes em PostgreSQL descartavel', () => {
     }
 
     migrated = (await dataSource.runMigrations()).length;
-    expect(migrated).toBe(8);
+    expect(migrated).toBe(9);
 
     passwords = new PasswordHasher();
     tokens = new TokenService();
@@ -235,7 +237,7 @@ describeWithDatabase('organizacoes em PostgreSQL descartavel', () => {
     }
 
     await dataSource.query(
-      'TRUNCATE organization_plan_terms, plan_change_requests, audit_events, auth_sessions, password_reset_tokens, users, profile_permissions, permissions, access_profiles, organizations, usage_plans',
+      'TRUNCATE user_patients, patients, organization_plan_terms, plan_change_requests, audit_events, auth_sessions, password_reset_tokens, users, profile_permissions, permissions, access_profiles, organizations, usage_plans',
     );
 
     for (let index = 0; index < migrated; index += 1) {
