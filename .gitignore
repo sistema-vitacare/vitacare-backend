@@ -13,3 +13,6 @@ coverage/
 # Overrides locais do compose (desenvolvimento)
 compose.override.yaml
 compose.override.yml
+
+# Copia local do TCC; a fonte oficial fica no vault (ver CLAUDE.md)
+docs/*.pdf
