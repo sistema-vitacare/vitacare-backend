@@ -505,7 +505,8 @@ export class PlanRepository {
                 'expired', COALESCE(term.ends_at <= now(), false)
               ) AS term,
               json_build_object(
-                'users', (${PLAN_SEAT_COUNT.users})
+                'users', (${PLAN_SEAT_COUNT.users}),
+                'patients', (${PLAN_SEAT_COUNT.patients})
               ) AS usage
          FROM organizations o
          JOIN usage_plans plan ON plan.id = o.usage_plan_id

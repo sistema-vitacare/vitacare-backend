@@ -11,7 +11,7 @@ const isPostgresError = (error: unknown): error is PostgresError =>
   error !== null &&
   typeof (error as { code?: unknown }).code === 'string';
 
-/** `ux_patients_org_document` -> texto seguro. Sem valor de coluna. */
+/** `patients_org_cpf_unique` -> texto seguro. Sem valor de coluna. */
 const constraintOf = (error: PostgresError): string =>
   error.constraint ?? 'sem constraint identificada';
 
