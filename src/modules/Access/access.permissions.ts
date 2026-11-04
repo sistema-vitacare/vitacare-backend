@@ -5,7 +5,8 @@ import { ProfileCode } from '@/common/context/requestContext.type';
  * (admin, professional, caregiver, family), decidida em 2026-10-29 (BE-05,
  * RF005/RF016, Figura 28). O admin herda o profissional, mas nao o cuidador:
  * so o cuidador registra acompanhamento. Desde o BE-10 (2026-11-04) o
- * profissional tambem gerencia vinculos com pacientes. As quatro
+ * profissional tambem gerencia vinculos com pacientes e, desde o BE-12, anula
+ * registros de acompanhamento. As quatro
  * `platform_organizations:*` so valem na organizacao de plataforma.
  */
 export const Permissions = {
@@ -22,6 +23,7 @@ export const Permissions = {
   FORMS_DEACTIVATE: 'forms:deactivate',
   ALERT_RULES_MANAGE: 'alert_rules:manage',
   FOLLOW_UPS_CREATE: 'follow_ups:create',
+  FOLLOW_UPS_ANNUL: 'follow_ups:annul',
   MEDICATIONS_READ: 'medications:read',
   MEDICATIONS_CREATE: 'medications:create',
   MEDICATIONS_UPDATE: 'medications:update',
@@ -64,6 +66,7 @@ export const PERMISSION_LABELS: Readonly<Record<PermissionName, string>> = {
   'forms:deactivate': 'Desativar e reativar formularios',
   'alert_rules:manage': 'Configurar regras de alerta',
   'follow_ups:create': 'Registrar acompanhamento',
+  'follow_ups:annul': 'Anular registro de acompanhamento',
   'medications:read': 'Consultar medicamentos',
   'medications:create': 'Cadastrar medicamentos',
   'medications:update': 'Editar medicamentos',
@@ -132,6 +135,7 @@ const PROFESSIONAL_PERMISSIONS: readonly PermissionName[] = [
   P.FORMS_UPDATE,
   P.FORMS_DEACTIVATE,
   P.ALERT_RULES_MANAGE,
+  P.FOLLOW_UPS_ANNUL,
   P.MEDICATIONS_READ,
   P.MEDICATIONS_CREATE,
   P.MEDICATIONS_UPDATE,
@@ -200,7 +204,7 @@ export const TENANT_PROFILE_CODES: readonly TenantProfileCode[] = Object.keys(
   TENANT_PROFILES,
 ) as TenantProfileCode[];
 
-/** Os 33 codigos de tenant (sem `platform_*`). */
+/** Os 34 codigos de tenant (sem `platform_*`). */
 export const TENANT_PERMISSION_CODES: readonly PermissionName[] = (
   Object.values(Permissions) as PermissionName[]
 ).filter((code) => !isPlatformPermission(code));
