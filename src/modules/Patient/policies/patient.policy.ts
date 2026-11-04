@@ -12,14 +12,16 @@ const ORGANIZATION_WIDE_PROFILES: ReadonlySet<ProfileCode> = new Set([
 ]);
 
 /**
- * Papeis de vinculo que dao leitura aos demais perfis. O vinculo de
+ * Papel de vinculo que da leitura a cada perfil restrito. O vinculo de
  * responsavel nao conta: um profissional rebaixado a cuidador ou familiar nao
- * herda os pacientes de que era responsavel. O BE-10 cria os papeis destes
- * perfis; ate la eles nao alcancam nenhum paciente.
+ * herda os pacientes de que era responsavel.
  */
 const LINK_ROLES_BY_PROFILE: Partial<
   Record<ProfileCode, readonly PatientLinkRole[]>
-> = {};
+> = {
+  [ProfileCode.CAREGIVER]: ['caregiver'],
+  [ProfileCode.FAMILY]: ['family'],
+};
 
 /**
  * Admin e profissional veem a organizacao inteira; os demais perfis com

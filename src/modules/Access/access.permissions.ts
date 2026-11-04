@@ -4,8 +4,9 @@ import { ProfileCode } from '@/common/context/requestContext.type';
  * Catalogo de permissoes nomeadas e matriz dos quatro perfis fixos de tenant
  * (admin, professional, caregiver, family), decidida em 2026-10-29 (BE-05,
  * RF005/RF016, Figura 28). O admin herda o profissional, mas nao o cuidador:
- * so o cuidador registra acompanhamento. As quatro `platform_organizations:*`
- * so valem na organizacao de plataforma.
+ * so o cuidador registra acompanhamento. Desde o BE-10 (2026-11-04) o
+ * profissional tambem gerencia vinculos com pacientes. As quatro
+ * `platform_organizations:*` so valem na organizacao de plataforma.
  */
 export const Permissions = {
   PATIENTS_READ: 'patients:read',
@@ -136,6 +137,7 @@ const PROFESSIONAL_PERMISSIONS: readonly PermissionName[] = [
   P.MEDICATIONS_UPDATE,
   P.MEDICATIONS_DEACTIVATE,
   P.REPORTS_GENERATE,
+  P.PATIENT_LINKS_MANAGE,
 ];
 
 const ADMINISTRATIVE_PERMISSIONS: readonly PermissionName[] = [
@@ -148,7 +150,6 @@ const ADMINISTRATIVE_PERMISSIONS: readonly PermissionName[] = [
   P.USERS_CHANGE_PROFILE,
   P.USERS_RESET_PASSWORD,
   P.ACCESS_PROFILES_READ,
-  P.PATIENT_LINKS_MANAGE,
   P.PLAN_READ,
   P.PLAN_CHANGE_REQUESTS_CREATE,
   P.DASHBOARD_READ,

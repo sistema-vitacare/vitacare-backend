@@ -682,7 +682,17 @@ describeWithDatabase('perfis de acesso em PostgreSQL descartavel', () => {
         ]),
       );
 
-      expect(current).toEqual(SNAPSHOT_PROFILES);
+      // Concessao acrescentada depois pela migration 1790800000000-AddPatientCareLinks.
+      expect(current).toEqual({
+        ...SNAPSHOT_PROFILES,
+        professional: {
+          ...SNAPSHOT_PROFILES.professional,
+          permissions: [
+            ...SNAPSHOT_PROFILES.professional.permissions,
+            'patient_links:manage',
+          ].sort(),
+        },
+      });
       // Rotulo trocado depois pela migration 1790700000000-CreatePatients.
       expect(PERMISSION_LABELS).toEqual({
         ...SNAPSHOT_LABELS,

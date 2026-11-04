@@ -24,6 +24,7 @@ import { AuthModule } from './modules/Auth/auth.module';
 import { OrganizationModule } from './modules/Organization/organization.module';
 import { PlanModule } from './modules/Plan/plan.module';
 import { PatientModule } from './modules/Patient/patient.module';
+import { PatientAccessModule } from './modules/PatientAccess/patientAccess.module';
 import { UserModule } from './modules/User/user.module';
 import { QueueModule } from './queue/queue.module';
 import { RedisModule } from './redis/redis.module';
@@ -103,6 +104,7 @@ function prettyTransport() {
     AccessModule,
     UserModule,
     PatientModule,
+    PatientAccessModule,
     AuditModule,
     AuthModule,
     RedisModule,

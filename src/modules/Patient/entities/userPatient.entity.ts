@@ -14,12 +14,13 @@ import type { PatientLinkRole } from '../types/patient.types';
 import { Patient } from './patient.entity';
 
 /**
- * Vinculo usuario-paciente (MER `usuarios_pacientes`). No BE-09 so existe o
- * profissional responsavel; `linkType` e `note` ficam nulos ate o BE-10.
- * `deletedAt` encerra o vinculo sem apagar quem foi responsavel.
+ * Vinculo usuario-paciente (MER `usuarios_pacientes`): profissional
+ * responsavel (BE-09), cuidador e familiar (BE-10). `deletedAt` revoga o
+ * vinculo sem apagar a linha, que fica como historico.
  */
 @Entity('user_patients')
 @Index('user_patients_single_responsible_unique', { synchronize: false })
+@Index('user_patients_care_link_unique', { synchronize: false })
 @Index('user_patients_org_user_idx', { synchronize: false })
 @ForeignKey(() => Organization, ['organizationId'], ['id'], {
   name: 'user_patients_organization_fk',
@@ -40,7 +41,10 @@ import { Patient } from './patient.entity';
   ['id', 'organizationId'],
   { name: 'user_patients_patient_tenant_fk', onDelete: 'RESTRICT' },
 )
-@Check('user_patients_role_check', "role IN ('responsible_professional')")
+@Check(
+  'user_patients_role_check',
+  "role IN ('responsible_professional', 'caregiver', 'family')",
+)
 export class UserPatient {
   @PrimaryColumn('uuid', { default: () => 'gen_random_uuid()' })
   id!: string;

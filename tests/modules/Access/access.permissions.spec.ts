@@ -96,6 +96,7 @@ describe('matriz de permissoes dos perfis', () => {
         'medications:update',
         'medications:deactivate',
         'reports:generate',
+        'patient_links:manage',
       ]),
     );
     expect(perms(ProfileCode.ADMIN)).toHaveLength(32);

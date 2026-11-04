@@ -6,6 +6,7 @@ import { translatePgError } from '@/common/errors/pgError.translator';
 import { ProfileCode } from '@/common/context/requestContext.type';
 import type { TenantProfileCode } from '@/modules/Access/access.permissions';
 import { insertAuditEvent } from '@/modules/Audit/repositories/auditEvent.repository';
+import { revokeCareLinksOnProfileChange } from '@/modules/PatientAccess/repositories/patientLink.repository';
 import { checkPlanSeat } from '@/modules/Plan/repositories/planSeat.query';
 import { revokeUserSessions } from '@/modules/Auth/repositories/authTransaction.repository';
 
@@ -430,7 +431,8 @@ export class UserRepository {
   }
 
   /**
-   * Troca de perfil (BE-05, spec 5.5). O status do alvo nao importa; o perfil
+   * Troca de perfil (BE-05, spec 5.5); revoga os vinculos de cuidado que nao
+   * cabem no novo perfil (BE-10). O status do alvo nao importa; o perfil
    * atual do alvo e lido sem filtro de `deleted_at` para que um perfil excluido
    * ainda possa ser trocado.
    */
@@ -488,6 +490,13 @@ export class UserRepository {
         'user.profile_changed',
         { fromProfile: target.profileCode, toProfile: command.profileCode },
       );
+      await revokeCareLinksOnProfileChange(manager, {
+        organizationId: command.organizationId,
+        actorUserId: command.actorUserId,
+        requestId: command.requestId,
+        userId: command.targetUserId,
+        newProfile: command.profileCode,
+      });
 
       return {
         kind: 'changed',
