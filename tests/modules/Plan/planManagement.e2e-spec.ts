@@ -37,6 +37,7 @@ import { OrganizationRepository } from '@/modules/Organization/repositories/orga
 import { PlanController } from '@/modules/Plan/plan.controller';
 import { PLAN_USE_CASES } from '@/modules/Plan/plan.module';
 import { PlanRepository } from '@/modules/Plan/repositories/plan.repository';
+import { checkPlanSeat } from '@/modules/Plan/repositories/planSeat.query';
 import { UserRepository } from '@/modules/User/repositories/user.repository';
 import { UserController } from '@/modules/User/user.controller';
 import { USER_USE_CASES } from '@/modules/User/user.module';
@@ -163,6 +164,8 @@ describeWithDatabase('planos de uso em PostgreSQL (e2e)', () => {
 
   let passwords: PasswordHasher;
   let login: LoginUseCase;
+  let createOrganization: CreateOrganizationUseCase;
+  let master: RequestContext;
 
   let masterToken: string;
   let platformId: string;
@@ -265,6 +268,49 @@ describeWithDatabase('planos de uso em PostgreSQL (e2e)', () => {
         WHERE organization_id = $1 AND superseded_at IS NULL`,
       [organizationId],
     ))!;
+
+  /** Organizacao cliente no Basic com admin e um profissional ativos. */
+  const newTenant = async (code: string): Promise<Tenant> => {
+    const organization = await createOrganization.execute(
+      {
+        code,
+        tradeName: `Organizacao ${code}`,
+        usagePlanId: plans.basic,
+        administrator: {
+          name: `Admin ${code}`,
+          email: `admin@${code}.test`,
+          cpf: nextCpf(),
+        },
+      },
+      master,
+    );
+
+    const id = organization.organization.id;
+    const hash = await passwords.hash(KNOWN_PASSWORD);
+
+    await dataSource.query(
+      `UPDATE users SET password_hash = $1, must_change_password = false
+        WHERE id = $2`,
+      [hash, organization.administrator.id],
+    );
+
+    await dataSource.query(
+      `INSERT INTO users
+         (organization_id, profile_id, name, email, cpf, status, password_hash, must_change_password)
+       SELECT $1, id, 'Profissional', $2, $3, 'active', $4, false
+         FROM access_profiles
+        WHERE organization_id = $1 AND code = 'professional'`,
+      [id, `profissional@${code}.test`, nextCpf(), hash],
+    );
+
+    return {
+      id,
+      code,
+      admin: organization.administrator.id,
+      adminToken: await loginAs(code, `admin@${code}.test`),
+      professionalToken: await loginAs(code, `profissional@${code}.test`),
+    };
+  };
 
   beforeAll(async () => {
     const parsed = new URL(databaseUrl!);
@@ -377,7 +423,7 @@ describeWithDatabase('planos de uso em PostgreSQL (e2e)', () => {
     );
     masterToken = await loginAs('vitacare', 'master@vitacare.test');
 
-    const master: RequestContext = {
+    master = {
       requestId: 'req-master',
       userId: seeded.userId,
       organizationId: seeded.organizationId,
@@ -386,49 +432,10 @@ describeWithDatabase('planos de uso em PostgreSQL (e2e)', () => {
       permissions: new Set(),
     };
 
-    const createOrganization = moduleRef.get(CreateOrganizationUseCase);
+    createOrganization = moduleRef.get(CreateOrganizationUseCase);
 
     for (const key of ['A', 'B'] as const) {
-      const code = `casa-planos-${key.toLowerCase()}`;
-      const organization = await createOrganization.execute(
-        {
-          code,
-          tradeName: `Organizacao ${code}`,
-          usagePlanId: plans.basic,
-          administrator: {
-            name: `Admin ${code}`,
-            email: `admin@${code}.test`,
-            cpf: nextCpf(),
-          },
-        },
-        master,
-      );
-
-      const id = organization.organization.id;
-      const hash = await passwords.hash(KNOWN_PASSWORD);
-
-      await dataSource.query(
-        `UPDATE users SET password_hash = $1, must_change_password = false
-          WHERE id = $2`,
-        [hash, organization.administrator.id],
-      );
-
-      await dataSource.query(
-        `INSERT INTO users
-           (organization_id, profile_id, name, email, cpf, status, password_hash, must_change_password)
-         SELECT $1, id, 'Profissional', $2, $3, 'active', $4, false
-           FROM access_profiles
-          WHERE organization_id = $1 AND code = 'professional'`,
-        [id, `profissional@${code}.test`, nextCpf(), hash],
-      );
-
-      tenants[key] = {
-        id,
-        code,
-        admin: organization.administrator.id,
-        adminToken: await loginAs(code, `admin@${code}.test`),
-        professionalToken: await loginAs(code, `profissional@${code}.test`),
-      };
+      tenants[key] = await newTenant(`casa-planos-${key.toLowerCase()}`);
     }
   }, 180000);
 
@@ -916,6 +923,251 @@ describeWithDatabase('planos de uso em PostgreSQL (e2e)', () => {
     });
   });
 
+  describe('consumo e limites de usuarios (BE-08)', () => {
+    const tenantsBe08: Record<'C' | 'D', Tenant> = {} as never;
+
+    const occupiedSeats = async (organizationId: string) =>
+      Number(
+        await scalar(
+          `SELECT count(*)::text AS value FROM users
+            WHERE organization_id = $1 AND status IN ('pending', 'active')`,
+          [organizationId],
+        ),
+      );
+
+    // Teto baixo direto no termo corrente: provoca o limite sem dezenas de cadastros.
+    const setUserLimit = (organizationId: string, userLimit: number | null) =>
+      dataSource.query(
+        `UPDATE organization_plan_terms SET user_limit = $2
+          WHERE organization_id = $1 AND superseded_at IS NULL`,
+        [organizationId, userLimit],
+      );
+
+    const userAction = (
+      tenant: Tenant,
+      userId: string,
+      action: 'deactivate' | 'reactivate',
+    ) => http('post', `/api/v1/users/${userId}/${action}`, tenant.adminToken);
+
+    const createdUserId = async (tenant: Tenant) => {
+      const response = await createUser(tenant);
+
+      expect(response.status).toBe(201);
+
+      return (response.body as { data: { user: { id: string } } }).data.user.id;
+    };
+
+    const inactiveUserId = async (tenant: Tenant) => {
+      const id = await createdUserId(tenant);
+
+      expect((await userAction(tenant, id, 'deactivate')).status).toBe(200);
+
+      return id;
+    };
+
+    beforeAll(async () => {
+      for (const key of ['C', 'D'] as const) {
+        tenantsBe08[key] = await newTenant(`casa-consumo-${key.toLowerCase()}`);
+      }
+    }, 60000);
+
+    afterEach(async () => {
+      for (const tenant of Object.values(tenantsBe08)) {
+        await setUserLimit(tenant.id, null);
+        await dataSource.query(
+          `UPDATE organization_plan_terms SET ends_at = NULL
+            WHERE organization_id = $1 AND superseded_at IS NULL`,
+          [tenant.id],
+        );
+      }
+    });
+
+    describe('checkPlanSeat', () => {
+      it('conta pendentes e ativos, ignora inativos e da prioridade ao vencimento', async () => {
+        const { C } = tenantsBe08;
+        const seat = () => checkPlanSeat(dataSource.manager, C.id, 'users');
+
+        await inactiveUserId(C);
+        const occupied = await occupiedSeats(C.id);
+
+        await setUserLimit(C.id, occupied + 1);
+        await expect(seat()).resolves.toBeNull();
+
+        await createdUserId(C);
+        await expect(seat()).resolves.toBe('limit_reached');
+
+        await dataSource.query(
+          `UPDATE organization_plan_terms SET ends_at = now() - interval '1 second',
+                  starts_at = now() - interval '1 day'
+            WHERE organization_id = $1 AND superseded_at IS NULL`,
+          [C.id],
+        );
+        await expect(seat()).resolves.toBe('plan_expired');
+      });
+
+      it('nega vaga na organizacao de plataforma, que nao tem plano', async () => {
+        await expect(
+          checkPlanSeat(dataSource.manager, platformId, 'users'),
+        ).resolves.toBe('limit_reached');
+      });
+    });
+
+    it('consumo exibido e o mesmo aplicado, isolado por organizacao', async () => {
+      const { C, D } = tenantsBe08;
+
+      await inactiveUserId(C);
+      await createdUserId(C);
+
+      for (const tenant of [C, D]) {
+        expect((await ownPlan(tenant)).usage.users).toBe(
+          await occupiedSeats(tenant.id),
+        );
+      }
+
+      const before = (await ownPlan(D)).usage.users;
+
+      await setUserLimit(C.id, await occupiedSeats(C.id));
+
+      const blocked = await createUser(C);
+      expect(blocked.status).toBe(409);
+      expect(errorCode(blocked)).toBe('USER_PLAN_LIMIT_REACHED');
+
+      expect((await createUser(D)).status).toBe(201);
+      expect((await ownPlan(D)).usage.users).toBe(before + 1);
+      expect((await ownPlan(C)).usage.users).toBe(await occupiedSeats(C.id));
+    });
+
+    it('reativacoes simultaneas na ultima vaga: uma aceita, uma recusada', async () => {
+      const { C } = tenantsBe08;
+
+      for (let round = 0; round < ROUNDS; round += 1) {
+        const ids = [await inactiveUserId(C), await inactiveUserId(C)];
+
+        await setUserLimit(C.id, (await occupiedSeats(C.id)) + 1);
+
+        const results = await Promise.all(
+          ids.map((id) => userAction(C, id, 'reactivate')),
+        );
+
+        expect(results.map((response) => response.status).sort()).toEqual([
+          200, 409,
+        ]);
+        expect(
+          errorCode(results.find((response) => response.status === 409)!),
+        ).toBe('USER_PLAN_LIMIT_REACHED');
+
+        const winner = ids[results.findIndex((r) => r.status === 200)];
+        expect((await userAction(C, winner, 'deactivate')).status).toBe(200);
+      }
+    }, 60000);
+
+    it('cadastro e reativacao simultaneos na ultima vaga: so um passa', async () => {
+      const { C } = tenantsBe08;
+
+      for (let round = 0; round < ROUNDS; round += 1) {
+        const inactive = await inactiveUserId(C);
+        const limit = (await occupiedSeats(C.id)) + 1;
+
+        await setUserLimit(C.id, limit);
+
+        const [created, reactivated] = await Promise.all([
+          createUser(C),
+          userAction(C, inactive, 'reactivate'),
+        ]);
+
+        expect([created.status, reactivated.status].sort()).toEqual(
+          created.status === 201 ? [201, 409] : [200, 409],
+        );
+        expect(await occupiedSeats(C.id)).toBe(limit);
+
+        const winner =
+          created.status === 201
+            ? (created.body as { data: { user: { id: string } } }).data.user.id
+            : inactive;
+        expect((await userAction(C, winner, 'deactivate')).status).toBe(200);
+      }
+    }, 60000);
+
+    it('vencido bloqueia reativacao; inativar e listar continuam', async () => {
+      const { C } = tenantsBe08;
+      const inactive = await inactiveUserId(C);
+      const active = await createdUserId(C);
+
+      await dataSource.query(
+        `UPDATE organization_plan_terms SET ends_at = now() - interval '1 second',
+                starts_at = now() - interval '1 day'
+          WHERE organization_id = $1 AND superseded_at IS NULL`,
+        [C.id],
+      );
+
+      const blocked = await userAction(C, inactive, 'reactivate');
+      expect(blocked.status).toBe(409);
+      expect(errorCode(blocked)).toBe('USER_PLAN_EXPIRED');
+
+      expect((await userAction(C, active, 'deactivate')).status).toBe(200);
+      expect((await http('get', '/api/v1/users', C.adminToken)).status).toBe(
+        200,
+      );
+    });
+
+    it('rebaixamento abaixo do uso nao inativa ninguem e so bloqueia crescimento', async () => {
+      const { D } = tenantsBe08;
+
+      expect(
+        (
+          await http('put', `/api/v1/organizations/${D.id}/plan`, masterToken, {
+            planId: plans.enterprise,
+          })
+        ).status,
+      ).toBe(200);
+
+      // Ocupa vagas acima do Basic sem passar pela API.
+      await dataSource.query(
+        `INSERT INTO users (organization_id, profile_id, name, email, cpf, status)
+         SELECT $1, p.id, 'Excedente ' || g, 'excedente' || g || '@casa-consumo-d.test',
+                lpad(g::text, 11, '8'), 'active'
+           FROM access_profiles p, generate_series(1, 12 - $2::int) g
+          WHERE p.organization_id = $1 AND p.code = 'caregiver'`,
+        [D.id, await occupiedSeats(D.id)],
+      );
+      expect(await occupiedSeats(D.id)).toBe(12);
+
+      const downgraded = await http(
+        'put',
+        `/api/v1/organizations/${D.id}/plan`,
+        masterToken,
+        { planId: plans.basic, reason: 'Rebaixamento contratado.' },
+      );
+      expect(downgraded.status).toBe(200);
+      expect(
+        (downgraded.body as { data: OrganizationPlanBody }).data,
+      ).toMatchObject({ limits: { users: 10 }, usage: { users: 12 } });
+
+      expect(await occupiedSeats(D.id)).toBe(12);
+      expect((await http('get', '/api/v1/users', D.adminToken)).status).toBe(
+        200,
+      );
+      expect(errorCode(await createUser(D))).toBe('USER_PLAN_LIMIT_REACHED');
+
+      const surplus = await dataSource.query<Array<{ id: string }>>(
+        `SELECT id FROM users
+          WHERE organization_id = $1 AND email LIKE 'excedente%'
+          ORDER BY email`,
+        [D.id],
+      );
+
+      for (const { id } of surplus.slice(0, 3)) {
+        expect((await userAction(D, id, 'deactivate')).status).toBe(200);
+      }
+
+      expect(await occupiedSeats(D.id)).toBe(9);
+      expect((await createUser(D)).status).toBe(201);
+      expect(errorCode(await userAction(D, surplus[0].id, 'reactivate'))).toBe(
+        'USER_PLAN_LIMIT_REACHED',
+      );
+    });
+  });
+
   describe('migration', () => {
     it('reverte as regras do Quadro 2 sem perder planos nem termos', async () => {
       await dataSource.undoLastMigration();
@@ -964,7 +1216,11 @@ describeWithDatabase('planos de uso em PostgreSQL (e2e)', () => {
           `SELECT count(*)::text AS value FROM organization_plan_terms
             WHERE origin = 'migration' AND superseded_at IS NULL`,
         ),
-      ).toBe('2');
+      ).toBe(
+        await scalar(
+          "SELECT count(*)::text AS value FROM organizations WHERE kind = 'tenant'",
+        ),
+      );
       expect(
         await scalar(
           "SELECT count(*)::text AS value FROM usage_plans WHERE code LIKE 'legacy-%' AND NOT status",

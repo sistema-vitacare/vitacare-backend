@@ -17,6 +17,7 @@ import type {
   PlanChangeRequestRow,
   PlanTermInput,
 } from '../types/plan.types';
+import { PLAN_SEAT_COUNT } from './planSeat.query';
 import { insertPlanTerm } from './planTerm.query';
 
 const SINGLE_PENDING_CONSTRAINT = 'plan_change_requests_single_pending_unique';
@@ -504,10 +505,7 @@ export class PlanRepository {
                 'expired', COALESCE(term.ends_at <= now(), false)
               ) AS term,
               json_build_object(
-                'users', (SELECT count(*)::int
-                            FROM users u
-                           WHERE u.organization_id = o.id
-                             AND u.status IN ('pending', 'active'))
+                'users', (${PLAN_SEAT_COUNT.users})
               ) AS usage
          FROM organizations o
          JOIN usage_plans plan ON plan.id = o.usage_plan_id

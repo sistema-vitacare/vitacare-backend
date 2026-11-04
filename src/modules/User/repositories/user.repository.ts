@@ -6,7 +6,7 @@ import { translatePgError } from '@/common/errors/pgError.translator';
 import { ProfileCode } from '@/common/context/requestContext.type';
 import type { TenantProfileCode } from '@/modules/Access/access.permissions';
 import { insertAuditEvent } from '@/modules/Audit/repositories/auditEvent.repository';
-import { readEffectivePlan } from '@/modules/Plan/repositories/planTerm.query';
+import { checkPlanSeat } from '@/modules/Plan/repositories/planSeat.query';
 import { revokeUserSessions } from '@/modules/Auth/repositories/authTransaction.repository';
 
 import type {
@@ -176,7 +176,11 @@ export class UserRepository {
         return { kind: 'actor_forbidden' };
       }
 
-      const seat = await this.checkSeat(manager, command.organizationId);
+      const seat = await checkPlanSeat(
+        manager,
+        command.organizationId,
+        'users',
+      );
 
       if (seat) return { kind: seat };
 
@@ -342,7 +346,11 @@ export class UserRepository {
       if (target === 'actor_forbidden') return { kind: 'actor_forbidden' };
       if (target !== 'inactive') return { kind: 'already_active' };
 
-      const seat = await this.checkSeat(manager, command.organizationId);
+      const seat = await checkPlanSeat(
+        manager,
+        command.organizationId,
+        'users',
+      );
 
       if (seat) return { kind: seat };
 
@@ -577,31 +585,6 @@ export class UserRepository {
     return (await this.isActiveAdmin(manager, command))
       ? target.status
       : 'actor_forbidden';
-  }
-
-  /**
-   * Vencimento bloqueia crescimento (BE-07); o limite e o efetivo do termo
-   * corrente. Plataforma nao tem plano; la nao se chega porque o ator nao e
-   * `admin`.
-   */
-  private async checkSeat(
-    manager: EntityManager,
-    organizationId: string,
-  ): Promise<'plan_expired' | 'limit_reached' | null> {
-    const plan = await readEffectivePlan(manager, organizationId);
-
-    if (!plan) return 'limit_reached';
-    if (plan.expired) return 'plan_expired';
-
-    const [{ occupied }] = await manager.query<Array<{ occupied: number }>>(
-      `SELECT count(*)::int AS occupied
-         FROM users
-        WHERE organization_id = $1
-          AND status IN ('pending', 'active')`,
-      [organizationId],
-    );
-
-    return occupied < plan.userLimit ? null : 'limit_reached';
   }
 
   private async findProfile(

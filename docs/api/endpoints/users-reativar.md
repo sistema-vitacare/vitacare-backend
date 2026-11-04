@@ -95,7 +95,7 @@ Nunca saem hash ou prazo bruto da senha, troca obrigatória, identificadores int
 1. Própria conta → `409 USER_SELF_STATUS_CHANGE` (não ocorre na prática: um inativo não tem sessão).
 2. Transação com a trava da organização; alvo de outra organização → `404`; ator relido → `403` se deixou de ser admin ativo.
 3. Alvo não inativo → `409 USER_ALREADY_ACTIVE`.
-4. Vigência e limite conferidos como no [cadastro](users-criar.md): termo vencido → `409 USER_PLAN_EXPIRED`; pendentes + ativos ≥ limite efetivo → `409 USER_PLAN_LIMIT_REACHED`.
+4. Vigência e limite conferidos como no [cadastro](users-criar.md): termo vencido → `409 USER_PLAN_EXPIRED`; pendentes + ativos ≥ limite efetivo → `409 USER_PLAN_LIMIT_REACHED`. A checagem roda sob a trava da organização: reativações e cadastros simultâneos disputando a última vaga resultam em um aceito e os demais `409` (BE-08).
 5. Grava `status = active` e `deleted_at = NULL`. Hash, troca obrigatória e prazo de senha ficam como estavam.
 6. Audita `user.reactivated` (sem `after_values`).
 
