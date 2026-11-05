@@ -12,7 +12,15 @@ import {
 import { FileInterceptor } from '@nestjs/platform-express';
 import type { Request } from 'express';
 import { open } from 'node:fs/promises';
-import { defer, finalize, from, type Observable, switchMap } from 'rxjs';
+import {
+  catchError,
+  concatMap,
+  defer,
+  from,
+  type Observable,
+  switchMap,
+  throwError,
+} from 'rxjs';
 
 import { DomainException } from '@/common/errors/domain.exception';
 import { FileStorageService } from '@/storage/fileStorage.service';
@@ -70,19 +78,25 @@ export class AttachmentUploadInterceptor implements NestInterceptor {
     next: CallHandler,
   ): Promise<Observable<unknown>> {
     const request = context.switchToHttp().getRequest<UploadRequest>();
+    // A limpeza termina antes da resposta sair, com sucesso ou erro.
     const handler: CallHandler = {
       handle: () =>
         defer(() => from(this.describe(request))).pipe(
           switchMap(() => next.handle()),
+          concatMap(async (value: unknown) => {
+            await this.cleanUp(request);
+            return value;
+          }),
+          catchError((error: unknown) =>
+            from(this.cleanUp(request)).pipe(
+              switchMap(() => throwError(() => error)),
+            ),
+          ),
         ),
     };
 
     try {
-      const response = await this.multer.intercept(context, handler);
-
-      return (response as Observable<unknown>).pipe(
-        finalize(() => void this.cleanUp(request)),
-      );
+      return await this.multer.intercept(context, handler);
     } catch (error) {
       await this.cleanUp(request);
       throw this.translate(error);
@@ -108,14 +122,26 @@ export class AttachmentUploadInterceptor implements NestInterceptor {
     });
   }
 
+  /**
+   * O Nest so traduz erros do multer pela mensagem, que mudou no multer 2;
+   * por isso o `MulterError` cru tambem e reconhecido pelo `code`.
+   */
   private translate(error: unknown): unknown {
-    if (error instanceof PayloadTooLargeException) {
+    const multerCode =
+      (error as { name?: string }).name === 'MulterError'
+        ? (error as { code?: string }).code
+        : undefined;
+
+    if (
+      error instanceof PayloadTooLargeException ||
+      multerCode === 'LIMIT_FILE_SIZE'
+    ) {
       return new DomainException({
         ...AttachmentErrors.TOO_LARGE,
         detail: `Limite de ${ATTACHMENT_MAX_BYTES} bytes por arquivo.`,
       });
     }
-    if (error instanceof BadRequestException) {
+    if (error instanceof BadRequestException || multerCode) {
       return new DomainException({
         ...AttachmentErrors.FILE_REQUIRED,
         detail:
