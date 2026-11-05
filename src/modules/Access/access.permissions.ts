@@ -6,7 +6,8 @@ import { ProfileCode } from '@/common/context/requestContext.type';
  * RF005/RF016, Figura 28). O admin herda o profissional, mas nao o cuidador:
  * so o cuidador registra acompanhamento. Desde o BE-10 (2026-11-04) o
  * profissional tambem gerencia vinculos com pacientes e, desde o BE-12, anula
- * registros de acompanhamento. As quatro
+ * registros de acompanhamento. Desde o BE-14 (2026-11-05) cuidador e familiar
+ * consultam medicamentos dos pacientes vinculados. As quatro
  * `platform_organizations:*` so valem na organizacao de plataforma.
  */
 export const Permissions = {
@@ -112,6 +113,7 @@ const FAMILY_PERMISSIONS: readonly PermissionName[] = [
   P.PATIENT_HISTORY_READ,
   P.PATIENT_EVOLUTION_READ,
   P.ALERTS_READ,
+  P.MEDICATIONS_READ,
 ];
 
 const CAREGIVER_PERMISSIONS: readonly PermissionName[] = [
@@ -120,6 +122,7 @@ const CAREGIVER_PERMISSIONS: readonly PermissionName[] = [
   P.ALERTS_READ,
   P.FORMS_READ,
   P.FOLLOW_UPS_CREATE,
+  P.MEDICATIONS_READ,
 ];
 
 const PROFESSIONAL_PERMISSIONS: readonly PermissionName[] = [

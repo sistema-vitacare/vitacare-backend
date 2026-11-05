@@ -1,7 +1,7 @@
 ---
 title: Listar perfis de acesso
 status: atual
-updated: 2026-11-04
+updated: 2026-11-05
 method: GET
 path: /api/v1/access-profiles
 source: src/modules/Access/access.controller.ts
@@ -33,7 +33,7 @@ curl -i 'https://api.example.com/api/v1/access-profiles' \
 
 ## Resposta de sucesso
 
-`200 OK`. Exemplo de uma organização com os quatro perfis da matriz. Os perfis `caregiver` e `family` aparecem com a lista completa de permissões; em `admin` (33 permissões) e `professional` (19 permissões; `patient_links:manage` desde o BE-10, migration `1790800000000-AddPatientCareLinks`, e `follow_ups:annul` desde o BE-12, migration `1791000000000-CreateFollowUpRecords`, ambos em 2026-11-04) o exemplo mostra só as primeiras, e a resposta real traz todas, na mesma ordem por código:
+`200 OK`. Exemplo de uma organização com os quatro perfis da matriz. Os perfis `caregiver` (6 permissões) e `family` (5) aparecem com a lista completa de permissões — `medications:read` entrou nos dois no BE-14, migration `1791200000000-CreateMedications`, em 2026-11-05; em `admin` (33 permissões) e `professional` (19 permissões; `patient_links:manage` desde o BE-10, migration `1790800000000-AddPatientCareLinks`, e `follow_ups:annul` desde o BE-12, migration `1791000000000-CreateFollowUpRecords`, ambos em 2026-11-04) o exemplo mostra só as primeiras, e a resposta real traz todas, na mesma ordem por código:
 
 ```json
 {
@@ -67,6 +67,7 @@ curl -i 'https://api.example.com/api/v1/access-profiles' \
         { "code": "alerts:read", "name": "Consultar alertas" },
         { "code": "follow_ups:create", "name": "Registrar acompanhamento" },
         { "code": "forms:read", "name": "Consultar formularios" },
+        { "code": "medications:read", "name": "Consultar medicamentos" },
         { "code": "patient_history:read", "name": "Consultar historico do paciente" },
         { "code": "patients:read", "name": "Consultar pacientes" }
       ]
@@ -77,6 +78,7 @@ curl -i 'https://api.example.com/api/v1/access-profiles' \
       "description": "Familiar com acesso somente leitura",
       "permissions": [
         { "code": "alerts:read", "name": "Consultar alertas" },
+        { "code": "medications:read", "name": "Consultar medicamentos" },
         { "code": "patient_evolution:read", "name": "Consultar evolucao do paciente" },
         { "code": "patient_history:read", "name": "Consultar historico do paciente" },
         { "code": "patients:read", "name": "Consultar pacientes" }

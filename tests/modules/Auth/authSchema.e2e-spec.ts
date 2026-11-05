@@ -13,6 +13,7 @@ import { CreatePatients1790700000000 } from '@/database/migrations/1790700000000
 import { CreateFollowUpForms1790900000000 } from '@/database/migrations/1790900000000-CreateFollowUpForms';
 import { CreateFollowUpRecords1791000000000 } from '@/database/migrations/1791000000000-CreateFollowUpRecords';
 import { CreateFollowUpAttachments1791100000000 } from '@/database/migrations/1791100000000-CreateFollowUpAttachments';
+import { CreateMedications1791200000000 } from '@/database/migrations/1791200000000-CreateMedications';
 import { SnakeNamingStrategy } from '@/database/snakeNaming.strategy';
 import { ChangePasswordUseCase } from '@/modules/Auth/ChangePassword/changePassword.useCase';
 import { CompleteFirstAccessUseCase } from '@/modules/Auth/CompleteFirstAccess/completeFirstAccess.useCase';
@@ -248,6 +249,7 @@ describeWithDatabase('autenticacao em PostgreSQL descartavel', () => {
         CreateFollowUpForms1790900000000,
         CreateFollowUpRecords1791000000000,
         CreateFollowUpAttachments1791100000000,
+        CreateMedications1791200000000,
       ],
       namingStrategy: new SnakeNamingStrategy(),
       synchronize: false,
@@ -266,7 +268,7 @@ describeWithDatabase('autenticacao em PostgreSQL descartavel', () => {
     }
 
     migrated = (await dataSource.runMigrations()).length;
-    expect(migrated).toBe(12);
+    expect(migrated).toBe(13);
 
     passwords = new PasswordHasher();
     tokens = new TokenService();
@@ -1037,7 +1039,7 @@ describeWithDatabase('autenticacao em PostgreSQL descartavel', () => {
   });
 
   describe('schema completo', () => {
-    it('mapeia as vinte e uma tabelas nas entidades TypeORM', () => {
+    it('mapeia as vinte e tres tabelas nas entidades TypeORM', () => {
       expect(
         dataSource.entityMetadatas.map((metadata) => metadata.tableName).sort(),
       ).toEqual([
@@ -1052,6 +1054,8 @@ describeWithDatabase('autenticacao em PostgreSQL descartavel', () => {
         'follow_up_records',
         'follow_up_response_items',
         'follow_up_responses',
+        'medication_reminders',
+        'medications',
         'organization_plan_terms',
         'organizations',
         'password_reset_tokens',

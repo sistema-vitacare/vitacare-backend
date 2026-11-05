@@ -69,6 +69,7 @@ describe('matriz de permissoes dos perfis', () => {
         'patient_history:read',
         'patient_evolution:read',
         'alerts:read',
+        'medications:read',
       ]),
     );
   });
@@ -78,6 +79,7 @@ describe('matriz de permissoes dos perfis', () => {
       'alerts:read',
       'follow_ups:create',
       'forms:read',
+      'medications:read',
       'patient_history:read',
       'patients:read',
     ]);
