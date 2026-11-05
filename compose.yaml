@@ -29,6 +29,12 @@ services:
       retries: 3
     security_opt:
       - no-new-privileges:true
+    volumes:
+      # Anexos privados (STORAGE_PATH da imagem); persiste entre `up` e `down` (sem `-v`).
+      - vitacare-storage-dev:/app/storage
+
+volumes:
+  vitacare-storage-dev:
 
 # PostgreSQL e Redis sao externos: o container precisa entrar na rede onde eles
 # ja existem. Crie-a uma vez com `docker network create vitacare-net` ou aponte

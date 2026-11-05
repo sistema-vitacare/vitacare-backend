@@ -94,6 +94,15 @@ services:
       SMTP_PASSWORD: ${SMTP_PASSWORD:-}
       SMTP_FROM: ${SMTP_FROM:-}
       PASSWORD_RESET_URL: ${PASSWORD_RESET_URL:-}
+
+      # --- Anexos privados: volume nomeado abaixo (molde <sistema>-storage).
+      # Fixo: é o ponto de montagem, não uma escolha da stack.
+      STORAGE_PATH: /app/storage
+    volumes:
+      # Sobrevive a deploy e recriação do container; some só com
+      # `docker volume rm`. Nunca servido direto: a API autoriza cada download.
+      # Backup semanal do volume: docs/deploy-vps.md.
+      - vitacare-storage:/app/storage
     ports:
       # 127.0.0.1 por padrão: o público entra pelo Nginx Proxy Manager (rede
       # proxy, https). Sem domínio: APP_BIND=0.0.0.0 expõe http://IP:1050.
@@ -125,6 +134,10 @@ services:
     networks:
       - infra                      # postgresql e redis pelo nome
       - proxy                      # Nginx Proxy Manager (fase com domínio)
+
+volumes:
+  # No host vira `vitacare_vitacare-storage` (prefixo = nome da stack).
+  vitacare-storage:
 
 networks:
   # Criada pela stack `infra`: Postgres e Redis pelo nome do container.

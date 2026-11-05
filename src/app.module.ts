@@ -14,6 +14,7 @@ import { environmentValidationSchema } from './config/env.validation';
 import redisConfig from './config/redis.config';
 import mailConfig from './config/mail.config';
 import securityConfig from './config/security.config';
+import storageConfig from './config/storage.config';
 import { DatabaseModule } from './database/database.module';
 import { REDIS_CLIENT } from './redis/redis.constants';
 import { RedisThrottlerStorage } from './redis/redisThrottler.storage';
@@ -30,6 +31,7 @@ import { PatientAccessModule } from './modules/PatientAccess/patientAccess.modul
 import { UserModule } from './modules/User/user.module';
 import { QueueModule } from './queue/queue.module';
 import { RedisModule } from './redis/redis.module';
+import { StorageModule } from './storage/storage.module';
 
 // pino-pretty e devDependency: a imagem de runtime instala com --omit=dev e nao
 // o tem. Fora de producao usamos o log formatado quando o pacote existe e
@@ -56,6 +58,7 @@ function prettyTransport() {
         redisConfig,
         securityConfig,
         mailConfig,
+        storageConfig,
       ],
       validationSchema: environmentValidationSchema,
       validationOptions: {
@@ -113,6 +116,7 @@ function prettyTransport() {
     AuthModule,
     RedisModule,
     QueueModule,
+    StorageModule,
     HealthModule,
   ],
   controllers: [AppController],
