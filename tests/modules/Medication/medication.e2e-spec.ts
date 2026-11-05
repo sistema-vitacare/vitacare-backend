@@ -291,6 +291,28 @@ describe('Medication HTTP (e2e)', () => {
       'times',
     ]);
     expect(schemas.UpdateMedicationDto.required ?? []).toEqual([]);
+
+    for (const dto of ['CreateMedicationDto', 'UpdateMedicationDto']) {
+      const properties = schemas[dto].properties!;
+
+      expect({
+        name: properties.name.type,
+        doseAmount: properties.doseAmount.type,
+        startDate: properties.startDate.type,
+        endDate: properties.endDate.type,
+        intervalDays: properties.intervalDays.type,
+        times: properties.times.type,
+        remindersEnabled: properties.remindersEnabled.type,
+      }).toEqual({
+        name: 'string',
+        doseAmount: 'number',
+        startDate: 'string',
+        endDate: 'string',
+        intervalDays: 'integer',
+        times: 'array',
+        remindersEnabled: 'boolean',
+      });
+    }
     expect(schemas.CreateMedicationDto.properties?.doseUnit.enum).toEqual([
       'mg',
       'mcg',

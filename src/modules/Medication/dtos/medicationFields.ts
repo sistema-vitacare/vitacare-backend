@@ -131,7 +131,7 @@ export const medicationField = (
 export const NameField = (mode: FieldMode): PropertyDecorator =>
   medicationField(
     mode,
-    { example: 'Losartana potassica', maxLength: 200 },
+    { type: String, example: 'Losartana potassica', maxLength: 200 },
     PatientText('O nome do medicamento', 200),
   );
 
@@ -139,6 +139,7 @@ export const DoseAmountField = (mode: FieldMode): PropertyDecorator =>
   medicationField(
     mode,
     {
+      type: Number,
       example: 50,
       exclusiveMinimum: true,
       minimum: 0,
@@ -199,6 +200,7 @@ export const StartDateField = (mode: FieldMode): PropertyDecorator =>
   medicationField(
     mode,
     {
+      type: String,
       format: 'date',
       example: '2026-11-05',
       description: `Inicio do tratamento e ancora do intervalo (hora local de Brasilia). Omitido na criacao = hoje. Entre ${MIN_START_DATE} e hoje + ${MAX_START_DAYS_AHEAD} dias.`,
@@ -234,6 +236,7 @@ export const IntervalDaysField = (mode: FieldMode): PropertyDecorator =>
   medicationField(
     mode,
     {
+      type: 'integer',
       minimum: 1,
       maximum: MAX_INTERVAL_DAYS,
       default: 1,
@@ -273,6 +276,7 @@ export const RemindersEnabledField = (mode: FieldMode): PropertyDecorator =>
   medicationField(
     mode,
     {
+      type: Boolean,
       default: false,
       description:
         'Programa lembretes automaticos nos horarios (UC08, "se desejado").',
