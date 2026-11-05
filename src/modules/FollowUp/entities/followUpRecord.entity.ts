@@ -19,7 +19,7 @@ import type { FollowUpStatus } from '../types/followUp.types';
  * `visitedAt`, a hora da visita informada pelo cuidador. Anular grava
  * `deletedAt`, autor e motivo; o registro anulado continua no historico.
  * `alertsEvaluatedAt` nulo marca o registro ainda nao avaliado pelas regras de
- * alerta (BE-15).
+ * alerta (BE-15); `alertsEvaluationFailedAt` adia a varredura apos uma falha.
  */
 @Entity('follow_up_records')
 @Index('follow_up_records_patient_visit_idx', { synchronize: false })
@@ -83,6 +83,9 @@ export class FollowUpRecord {
 
   @Column({ type: 'timestamptz', nullable: true })
   alertsEvaluatedAt!: Date | null;
+
+  @Column({ type: 'timestamptz', nullable: true })
+  alertsEvaluationFailedAt!: Date | null;
 
   @Column({ type: 'timestamptz', default: () => 'now()' })
   createdAt!: Date;

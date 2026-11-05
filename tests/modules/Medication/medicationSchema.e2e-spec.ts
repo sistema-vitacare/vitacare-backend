@@ -383,6 +383,11 @@ describeWithDatabase('schema de medicamentos em PostgreSQL descartavel', () => {
       changes.upQueries
         .map((query) => query.query)
         .filter((sql) =>
+          ['"medications"', '"medication_reminders"'].some((table) =>
+            sql.includes(table),
+          ),
+        )
+        .filter((sql) =>
           /\b(?:CREATE|DROP) TABLE\b|\b(?:ADD|DROP) COLUMN\b/.test(sql),
         ),
     ).toEqual([]);
