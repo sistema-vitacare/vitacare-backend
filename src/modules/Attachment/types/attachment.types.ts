@@ -35,6 +35,8 @@ export interface UploadedTempFile {
   path: string;
   originalName: string;
   size: number;
+  /** Primeiros bytes, para reconhecer o tipo pelo conteudo. */
+  head: Buffer;
 }
 
 export interface UploadAttachmentCommand extends FollowUpActor {
