@@ -1,6 +1,8 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 
+import { AlertModule } from '@/modules/Alert/alert.module';
+
 import { AnnulFollowUpUseCase } from './AnnulFollowUp/annulFollowUp.useCase';
 import { CreateFollowUpUseCase } from './CreateFollowUp/createFollowUp.useCase';
 import { FollowUpRecord } from './entities/followUpRecord.entity';
@@ -20,6 +22,7 @@ export const FOLLOW_UP_USE_CASES = [
 
 @Module({
   imports: [
+    AlertModule,
     TypeOrmModule.forFeature([
       FollowUpRecord,
       FollowUpResponse,

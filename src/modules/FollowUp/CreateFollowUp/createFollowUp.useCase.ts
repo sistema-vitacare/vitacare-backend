@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 
 import type { RequestContext } from '@/common/context/requestContext.type';
 import { DomainException } from '@/common/errors/domain.exception';
+import { EvaluateFollowUpAlertsUseCase } from '@/modules/Alert/EvaluateFollowUpAlerts/evaluateFollowUpAlerts.useCase';
 import { FormErrors } from '@/modules/Form/form.errors';
 import { PatientErrors } from '@/modules/Patient/patient.errors';
 import { patientScope } from '@/modules/Patient/policies/patient.policy';
@@ -64,10 +65,15 @@ const FAILURES: Record<
 /**
  * UC11: o cuidador vinculado envia o formulario vigente do paciente. A autoria
  * e a organizacao vem da sessao; nada e gravado se qualquer regra falhar.
+ * Depois do commit, os valores passam pelas regras de alerta (passo 6); falha
+ * nessa avaliacao nao desfaz o registro.
  */
 @Injectable()
 export class CreateFollowUpUseCase {
-  constructor(private readonly followUps: FollowUpRepository) {}
+  constructor(
+    private readonly followUps: FollowUpRepository,
+    private readonly alerts: EvaluateFollowUpAlertsUseCase,
+  ) {}
 
   async execute(
     dto: CreateFollowUpDto,
@@ -97,6 +103,8 @@ export class CreateFollowUpUseCase {
     });
 
     if (outcome.kind === 'created') {
+      await this.alerts.afterSubmit(ctx.organizationId, outcome.followUp.id);
+
       return toFollowUpResponse(outcome.followUp, ctx);
     }
     if (outcome.kind === 'invalid_answers') {
