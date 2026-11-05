@@ -5,6 +5,7 @@ import {
   ForeignKey,
   Index,
   PrimaryColumn,
+  Unique,
 } from 'typeorm';
 
 import { Organization } from '@/modules/Organization/entities/organization.entity';
@@ -17,10 +18,14 @@ import { Medication } from './medication.entity';
  * Brasilia, repetido a cada `intervalDays` dias desde `startDate`. A linha
  * vale de `createdAt` ate `deletedAt`; mudar a agenda encerra a linha e cria
  * outra, entao um disparo so e valido se cair nesse intervalo.
+ * `dispatchedThrough` e o cursor do BE-16: horarios ate ali ja geraram
+ * lembrete (nulo = desde `createdAt`).
  */
 @Entity('medication_reminders')
 @Index('medication_reminders_active_time_unique', { synchronize: false })
 @Index('medication_reminders_medication_idx', { synchronize: false })
+@Index('medication_reminders_due_idx', { synchronize: false })
+@Unique('medication_reminders_id_org_unique', ['id', 'organizationId'])
 @ForeignKey(() => Organization, ['organizationId'], ['id'], {
   name: 'medication_reminders_organization_fk',
   onDelete: 'RESTRICT',
@@ -65,6 +70,9 @@ export class MedicationReminder {
 
   @Column({ type: 'varchar', length: 16, default: 'active' })
   status!: MedicationReminderStatus;
+
+  @Column({ type: 'timestamptz', nullable: true })
+  dispatchedThrough!: Date | null;
 
   @Column({ type: 'timestamptz', default: () => 'now()' })
   createdAt!: Date;

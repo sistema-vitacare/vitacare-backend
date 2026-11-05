@@ -15,6 +15,7 @@ import { CreateFollowUpRecords1791000000000 } from '@/database/migrations/179100
 import { CreateFollowUpAttachments1791100000000 } from '@/database/migrations/1791100000000-CreateFollowUpAttachments';
 import { CreateMedications1791200000000 } from '@/database/migrations/1791200000000-CreateMedications';
 import { CreateAlerts1791300000000 } from '@/database/migrations/1791300000000-CreateAlerts';
+import { CreateScheduledAlerts1791400000000 } from '@/database/migrations/1791400000000-CreateScheduledAlerts';
 import { SnakeNamingStrategy } from '@/database/snakeNaming.strategy';
 import { ChangePasswordUseCase } from '@/modules/Auth/ChangePassword/changePassword.useCase';
 import { CompleteFirstAccessUseCase } from '@/modules/Auth/CompleteFirstAccess/completeFirstAccess.useCase';
@@ -252,6 +253,7 @@ describeWithDatabase('autenticacao em PostgreSQL descartavel', () => {
         CreateFollowUpAttachments1791100000000,
         CreateMedications1791200000000,
         CreateAlerts1791300000000,
+        CreateScheduledAlerts1791400000000,
       ],
       namingStrategy: new SnakeNamingStrategy(),
       synchronize: false,
@@ -270,7 +272,7 @@ describeWithDatabase('autenticacao em PostgreSQL descartavel', () => {
     }
 
     migrated = (await dataSource.runMigrations()).length;
-    expect(migrated).toBe(14);
+    expect(migrated).toBe(15);
 
     passwords = new PasswordHasher();
     tokens = new TokenService();
@@ -1041,7 +1043,7 @@ describeWithDatabase('autenticacao em PostgreSQL descartavel', () => {
   });
 
   describe('schema completo', () => {
-    it('mapeia as vinte e cinco tabelas nas entidades TypeORM', () => {
+    it('mapeia as vinte e seis tabelas nas entidades TypeORM', () => {
       expect(
         dataSource.entityMetadatas.map((metadata) => metadata.tableName).sort(),
       ).toEqual([
@@ -1050,6 +1052,7 @@ describeWithDatabase('autenticacao em PostgreSQL descartavel', () => {
         'alerts',
         'audit_events',
         'auth_sessions',
+        'follow_up_absence_monitors',
         'follow_up_attachments',
         'follow_up_form_fields',
         'follow_up_form_patients',

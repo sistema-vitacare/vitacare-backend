@@ -14,8 +14,14 @@ export const ALERT_RULE_STATUSES = ['active', 'inactive'] as const;
 
 export type AlertRuleStatus = (typeof ALERT_RULE_STATUSES)[number];
 
-/** Origem do alerta; ausencia e lembrete entram no BE-16. */
-export type AlertSource = 'reading';
+/** Origem: valor registrado (BE-15), ausencia e lembrete (BE-16). */
+export const ALERT_SOURCES = [
+  'reading',
+  'absence',
+  'medication_reminder',
+] as const;
+
+export type AlertSource = (typeof ALERT_SOURCES)[number];
 
 /** Leitura e resolucao ficam no BE-17. */
 export type AlertStatus = 'open';
