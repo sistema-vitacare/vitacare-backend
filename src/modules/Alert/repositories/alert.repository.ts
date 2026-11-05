@@ -3,6 +3,7 @@ import { DataSource, type EntityManager } from 'typeorm';
 
 import { translatePgError } from '@/common/errors/pgError.translator';
 import { insertAuditEvent } from '@/modules/Audit/repositories/auditEvent.repository';
+import type { FrequencyUnit } from '@/modules/Form/types/form.types';
 import { findPatientInScope } from '@/modules/PatientAccess/repositories/patientAccess.query';
 import { PATIENT_SCOPE_WHERE } from '@/modules/Patient/repositories/patientScope.query';
 
@@ -22,12 +23,18 @@ const ALERT_FROM = `
     JOIN patients p
       ON p.id = a.patient_id
      AND p.organization_id = a.organization_id
-    JOIN alert_rules ar
+    LEFT JOIN alert_rules ar
       ON ar.id = a.rule_id
      AND ar.organization_id = a.organization_id
-    JOIN follow_up_records r
+    LEFT JOIN follow_up_records r
       ON r.id = a.follow_up_record_id
      AND r.organization_id = a.organization_id
+    LEFT JOIN follow_up_forms f
+      ON f.id = a.form_id
+     AND f.organization_id = a.organization_id
+    LEFT JOIN medications m
+      ON m.id = a.medication_id
+     AND m.organization_id = a.organization_id
   ${PATIENT_SCOPE_WHERE}`;
 
 const ALERT_SELECT = `
@@ -50,46 +57,104 @@ const ALERT_SELECT = `
          a.value,
          a.operator,
          a.reference_value AS "referenceValue",
+         f.id AS "formId",
+         f.name AS "formName",
+         a.absence_since AS "absenceSince",
+         a.due_at AS "dueAt",
+         a.frequency_interval AS "frequencyInterval",
+         a.frequency_unit AS "frequencyUnit",
+         m.id AS "medicationId",
+         m.name AS "medicationName",
+         a.medication_reminder_id AS "medicationReminderId",
+         a.scheduled_at AS "scheduledAt",
          a.generated_at AS "generatedAt"
   ${ALERT_FROM}`;
 
-type RawAlertRow = Omit<
+type RawAlertRow = Pick<
   AlertRow,
-  'patient' | 'rule' | 'followUp' | 'field' | 'referenceValue'
+  | 'id'
+  | 'source'
+  | 'severity'
+  | 'status'
+  | 'title'
+  | 'message'
+  | 'value'
+  | 'operator'
+  | 'generatedAt'
 > & {
   patientId: string;
   patientName: string;
-  ruleId: string;
-  ruleName: string;
-  followUpId: string;
-  visitedAt: Date;
-  followUpStatus: string;
-  fieldKey: string;
-  fieldName: string;
+  ruleId: string | null;
+  ruleName: string | null;
+  followUpId: string | null;
+  visitedAt: Date | null;
+  followUpStatus: string | null;
+  fieldKey: string | null;
+  fieldName: string | null;
   fieldUnit: string | null;
-  referenceValue: string;
+  referenceValue: string | null;
+  formId: string | null;
+  formName: string | null;
+  absenceSince: Date | null;
+  dueAt: Date | null;
+  frequencyInterval: number | null;
+  frequencyUnit: FrequencyUnit | null;
+  medicationId: string | null;
+  medicationName: string | null;
+  medicationReminderId: string | null;
+  scheduledAt: Date | null;
 };
 
-const toRow = (raw: RawAlertRow): AlertRow => ({
-  id: raw.id,
-  patient: { id: raw.patientId, name: raw.patientName },
-  source: raw.source,
-  severity: raw.severity,
-  status: raw.status,
-  title: raw.title,
-  message: raw.message,
-  rule: { id: raw.ruleId, name: raw.ruleName },
-  followUp: {
-    id: raw.followUpId,
-    visitedAt: raw.visitedAt,
-    status: raw.followUpStatus,
-  },
-  field: { key: raw.fieldKey, name: raw.fieldName, unit: raw.fieldUnit },
-  value: raw.value,
-  operator: raw.operator,
-  referenceValue: Number(raw.referenceValue),
-  generatedAt: raw.generatedAt,
-});
+/** Cada origem preenche so o proprio bloco; os demais saem nulos. */
+const toRow = (raw: RawAlertRow): AlertRow => {
+  const reading = raw.source === 'reading';
+
+  return {
+    id: raw.id,
+    patient: { id: raw.patientId, name: raw.patientName },
+    source: raw.source,
+    severity: raw.severity,
+    status: raw.status,
+    title: raw.title,
+    message: raw.message,
+    rule: reading ? { id: raw.ruleId!, name: raw.ruleName! } : null,
+    followUp: reading
+      ? {
+          id: raw.followUpId!,
+          visitedAt: raw.visitedAt!,
+          status: raw.followUpStatus!,
+        }
+      : null,
+    field: reading
+      ? { key: raw.fieldKey!, name: raw.fieldName!, unit: raw.fieldUnit }
+      : null,
+    value: raw.value,
+    operator: raw.operator,
+    referenceValue:
+      raw.referenceValue === null ? null : Number(raw.referenceValue),
+    absence:
+      raw.source === 'absence'
+        ? {
+            form: { id: raw.formId!, name: raw.formName! },
+            since: raw.absenceSince!,
+            dueAt: raw.dueAt!,
+            frequency: {
+              interval: raw.frequencyInterval!,
+              unit: raw.frequencyUnit!,
+            },
+          }
+        : null,
+    medicationReminder:
+      raw.source === 'medication_reminder'
+        ? {
+            medication: { id: raw.medicationId!, name: raw.medicationName! },
+            reminderId: raw.medicationReminderId!,
+            scheduledAt: raw.scheduledAt!,
+          }
+        : null,
+    generatedAt: raw.generatedAt,
+  };
+};
 
 /**
  * Itens numericos do registro `$2` contra as regras ativas do formulario

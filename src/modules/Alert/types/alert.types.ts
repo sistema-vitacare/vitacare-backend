@@ -1,3 +1,4 @@
+import type { FormFrequency } from '@/modules/Form/types/form.types';
 import type { PatientScope } from '@/modules/Patient/types/patient.types';
 
 /** Operadores decididos por Mateus em 2026-11-05 (MER `operador ENUM`). */
@@ -14,8 +15,14 @@ export const ALERT_RULE_STATUSES = ['active', 'inactive'] as const;
 
 export type AlertRuleStatus = (typeof ALERT_RULE_STATUSES)[number];
 
-/** Origem do alerta; ausencia e lembrete entram no BE-16. */
-export type AlertSource = 'reading';
+/** Origem: valor registrado (BE-15), ausencia e lembrete (BE-16). */
+export const ALERT_SOURCES = [
+  'reading',
+  'absence',
+  'medication_reminder',
+] as const;
+
+export type AlertSource = (typeof ALERT_SOURCES)[number];
 
 /** Leitura e resolucao ficam no BE-17. */
 export type AlertStatus = 'open';
@@ -121,12 +128,26 @@ export interface AlertRow {
   status: AlertStatus;
   title: string;
   message: string;
-  rule: { id: string; name: string };
-  followUp: { id: string; visitedAt: Date; status: string };
-  field: { key: string; name: string; unit: string | null };
-  value: string;
-  operator: AlertRuleOperator;
-  referenceValue: number;
+  /** Origem `reading`; nulos nas demais. */
+  rule: NamedRef | null;
+  followUp: { id: string; visitedAt: Date; status: string } | null;
+  field: { key: string; name: string; unit: string | null } | null;
+  value: string | null;
+  operator: AlertRuleOperator | null;
+  referenceValue: number | null;
+  /** Origem `absence` (BE-16). */
+  absence: {
+    form: NamedRef;
+    since: Date;
+    dueAt: Date;
+    frequency: FormFrequency;
+  } | null;
+  /** Origem `medication_reminder` (BE-16). */
+  medicationReminder: {
+    medication: NamedRef;
+    reminderId: string;
+    scheduledAt: Date;
+  } | null;
   generatedAt: Date;
 }
 

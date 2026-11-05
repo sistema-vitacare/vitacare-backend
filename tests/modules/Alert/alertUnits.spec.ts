@@ -97,6 +97,75 @@ describe('parsers de regra e alerta', () => {
       referenceValue: 180,
       followUp: { status: 'annulled', visitedAt: '2026-11-05T11:00:00.000Z' },
       generatedAt: '2026-11-05T12:01:00.000Z',
+      absence: null,
+      medicationReminder: null,
+    });
+  });
+
+  const scheduled = {
+    rule: null,
+    followUp: null,
+    field: null,
+    value: null,
+    operator: null,
+    referenceValue: null,
+  };
+
+  it('ausencia expoe formulario, ultimo envio, prazo e frequencia', () => {
+    expect(
+      toAlertResponse(
+        alertRow({
+          ...scheduled,
+          source: 'absence',
+          absence: {
+            form: { id: 'form', name: 'Sinais vitais' },
+            since: new Date('2026-11-04T12:00:00.000Z'),
+            dueAt: new Date('2026-11-05T12:00:00.000Z'),
+            frequency: { interval: 1, unit: 'days' },
+          },
+        }),
+        ctx,
+      ),
+    ).toMatchObject({
+      source: 'absence',
+      rule: null,
+      followUp: null,
+      field: null,
+      value: null,
+      operator: null,
+      referenceValue: null,
+      medicationReminder: null,
+      absence: {
+        form: { id: 'form', name: 'Sinais vitais' },
+        since: '2026-11-04T12:00:00.000Z',
+        dueAt: '2026-11-05T12:00:00.000Z',
+        frequency: { interval: 1, unit: 'days' },
+      },
+    });
+  });
+
+  it('lembrete expoe medicamento, linha da agenda e horario programado', () => {
+    expect(
+      toAlertResponse(
+        alertRow({
+          ...scheduled,
+          source: 'medication_reminder',
+          medicationReminder: {
+            medication: { id: 'med', name: 'Losartana' },
+            reminderId: 'rem',
+            scheduledAt: new Date('2026-11-05T11:00:00.000Z'),
+          },
+        }),
+        ctx,
+      ),
+    ).toMatchObject({
+      source: 'medication_reminder',
+      absence: null,
+      medicationReminder: {
+        medication: { id: 'med', name: 'Losartana' },
+        reminderId: 'rem',
+        scheduledAt: '2026-11-05T11:00:00.000Z',
+      },
     });
   });
 });
