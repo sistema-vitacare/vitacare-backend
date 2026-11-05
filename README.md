@@ -54,8 +54,9 @@ docker compose up --build -d
 docker compose logs -f api
 ```
 
-O Compose cria somente o container `vitacare-backend`. PostgreSQL e Redis nao
-sao criados localmente, pois sao dependencias externas.
+O Compose cria somente o container `vitacare-backend` e o volume
+`vitacare-storage-dev` (anexos privados, montado em `/app/storage`). PostgreSQL
+e Redis nao sao criados localmente, pois sao dependencias externas.
 
 A porta interna do container e fixa em `3000`; publique outra no host com
 `HOST_PORT`. Para usar outro arquivo de ambiente:
@@ -213,6 +214,7 @@ src/
 ├── modules/                 # modulos de dominio (ver modules/README.md)
 ├── queue/                   # BullMQ compartilhado
 ├── redis/                   # cliente ioredis + RedisService (cache)
+├── storage/                 # arquivos privados no volume (STORAGE_PATH)
 ├── cli/                     # entrypoints de operacao (seeds)
 ├── app.setup.ts             # pipeline HTTP, reusado pelos testes e2e
 └── main.ts                  # bootstrap
@@ -274,6 +276,15 @@ a API (`RUN_MIGRATIONS=false` desliga; fora da stack de producao vem desligado).
 
 Entidades sao descobertas pelo glob `*.entity.ts` e registradas no modulo do
 dominio com `TypeOrmModule.forFeature([...])`.
+
+## Arquivos privados
+
+Anexos de registro (BE-13) ficam em `STORAGE_PATH` (padrao `./storage`, fora do
+git; na imagem, o volume `/app/storage`). `FileStorageService` grava, abre e
+apaga por chave gerada no servidor e recusa caminho fora da raiz. Nada dali e
+servido direto: o download passa por rota autenticada. Sem permissao de escrita
+na raiz a API nao sobe. Volume e backup em producao:
+[`docs/deploy-vps.md`](docs/deploy-vps.md#arquivos-privados-volume-vitacare-storage).
 
 ## Cache e filas
 

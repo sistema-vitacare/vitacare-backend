@@ -46,6 +46,8 @@ merge na main
 | `migrate --force` no entrypoint | igual: `RUN_MIGRATIONS=true` no entrypoint |
 | `/version.txt` | `GET /api/v1` → `data.version` |
 | `/up` | `/health/live` (processo) e `/health/ready` (PostgreSQL + Redis) |
+| volume `<sistema>-storage:/var/www/storage/app` | volume `vitacare-storage:/app/storage` (anexos privados; ver abaixo) |
+| `storage:link` (arquivos públicos via nginx) | **não existe** de propósito: anexo é dado de saúde e só sai pela API autenticada |
 | queue-worker / scheduler | **ainda não existem** (ver Pendências) |
 
 ## Recursos
@@ -64,6 +66,29 @@ docker stats --no-stream app-vitacare
 docker exec -it postgresql psql -U mavila -d postgres \
   -c "select application_name, state, count(*) from pg_stat_activity where usename = 'vitacare' group by 1, 2;"
 ```
+
+## Arquivos privados (volume `vitacare-storage`)
+
+Decisão de Mateus em 2026-11-05 (BE-13), no lugar do S3 previsto no TCC: os
+anexos de registro ficam no volume nomeado `vitacare-storage`, montado em
+`/app/storage` (`STORAGE_PATH`, fixo no `docker-compose.prod.yml`). No host o
+volume se chama `vitacare_vitacare-storage` (prefixo = nome da stack).
+
+- **Persiste** a deploy, pull e recriação do container; some só com
+  `docker volume rm` (ou `down -v`). Nunca apagar no dia a dia.
+- **Privado:** não há `storage:link` nem rota estática. Cada download é
+  autorizado pela API a partir do banco; o nome no disco
+  (`attachments/<organização>/<id>`) não serve de autorização.
+- **Dono:** o diretório nasce na imagem com dono `node`; um volume nomeado novo
+  herda esse dono na primeira montagem. Sem escrita em `/app/storage`, a API
+  **não sobe** (erro no log do container).
+- **Temporários** de upload ficam em `/app/storage/tmp` e são apagados ao fim de
+  cada requisição.
+- **Tamanho:** até 10 MB por arquivo e 5 por registro. Acompanhar com
+  `docker run --rm -v vitacare_vitacare-storage:/d alpine du -sh /d`.
+- Banco e volume precisam ser restaurados **juntos** (mesmo dia): linha sem
+  arquivo responde `404 ATTACHMENT_CONTENT_MISSING` e loga `error`; arquivo sem
+  linha fica inacessível.
 
 ## Hierarquia de timeouts (crescente de dentro para fora)
 
@@ -210,6 +235,8 @@ workflow do passo 1: três jobs verdes, "Versão `<sha>` no ar".
 
   ```cron
   20 3 * * * docker exec postgresql pg_dump -U mavila -Fc vitacare > /root/backups/vitacare-$(date +\%F).dump && find /root/backups -name 'vitacare-*.dump' -mtime +14 -delete
+  # Anexos (volume), semanal, 30 dias — A CONFIGURAR (molde vps-hostinger-backup)
+  50 3 * * 0 docker run --rm -v vitacare_vitacare-storage:/d:ro -v /root/backups:/b alpine tar czf /b/vitacare-uploads-$(date +\%F).tgz -C /d attachments && find /root/backups -name 'vitacare-uploads-*.tgz' -mtime +30 -delete
   ```
 
 - Logs: Grafana → Loki `{stack="vitacare"}`.
@@ -256,4 +283,10 @@ removida do firewall. A API lê o IP real por `X-Forwarded-For`
 - **Worker e agendamento**: BullMQ está configurado, mas não há processor nem job
   agendado. Quando lembretes/alertas (RF007/RF013) existirem, o worker e o
   heartbeat do Uptime Kuma entram como o `queue-worker`/`scheduler` do molde.
-- **S3** (anexos e PDF) e **SMTP** (decisão de não ter, 2026-09-22) fora do deploy.
+- **S3**: anexos usam o volume local (decisão de 2026-11-05); armazenamento de
+  relatórios PDF (BE-21) ainda não decidido. **SMTP**: decisão de não ter
+  (2026-09-22).
+- **Backup do volume de anexos**: linha de cron acima ainda não configurada na
+  VPS; cópia externa (camada 3 do `vps-hostinger-backup`) também pendente.
+- **Órfãos no volume**: arquivo cuja compensação falhou fica inacessível; não há
+  limpeza periódica (BE-25).
