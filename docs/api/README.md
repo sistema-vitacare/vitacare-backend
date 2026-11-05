@@ -1,7 +1,7 @@
 ---
 title: Manual de integração da API VitaCare
 status: atual
-updated: 2026-11-04
+updated: 2026-11-05
 ---
 
 # Manual de integração da API VitaCare
@@ -74,6 +74,12 @@ O corpo das rotas de negócio é JSON quando aplicável. Autenticação usa Bear
 | `GET /api/v1/follow-ups/:followUpId/attachments` | Lista os anexos ativos de um registro ao alcance | [follow-up-attachments-listar.md](endpoints/follow-up-attachments-listar.md) |
 | `GET /api/v1/follow-ups/:followUpId/attachments/:attachmentId/content` | Baixa o arquivo (binário, fora do envelope), reautorizado a cada chamada | [follow-up-attachments-baixar.md](endpoints/follow-up-attachments-baixar.md) |
 | `DELETE /api/v1/follow-ups/:followUpId/attachments/:attachmentId` | Remove o anexo e apaga o arquivo (`204`) | [follow-up-attachments-remover.md](endpoints/follow-up-attachments-remover.md) |
+| `POST /api/v1/medications` | Cadastra medicamento de paciente ativo e programa a agenda de horários; sobreposição volta como aviso | [medications-criar.md](endpoints/medications-criar.md) |
+| `GET /api/v1/medications` | Lista os medicamentos de um paciente ao alcance, ativos primeiro | [medications-listar.md](endpoints/medications-listar.md) |
+| `GET /api/v1/medications/:medicationId` | Consulta um medicamento com agenda, próximo horário e sobreposição | [medications-consultar.md](endpoints/medications-consultar.md) |
+| `PATCH /api/v1/medications/:medicationId` | Edita o medicamento; mudar a agenda encerra a vigente e programa a nova | [medications-atualizar.md](endpoints/medications-atualizar.md) |
+| `POST /api/v1/medications/:medicationId/deactivate` | Inativa o medicamento e encerra a agenda, preservando o histórico | [medications-inativar.md](endpoints/medications-inativar.md) |
+| `POST /api/v1/medications/:medicationId/reactivate` | Reativa o medicamento; a mesma agenda volta a valer a partir de agora | [medications-reativar.md](endpoints/medications-reativar.md) |
 | `GET /api/v1/plans` | Catálogo de planos ativos (admin ou master) | [plans-listar.md](endpoints/plans-listar.md) |
 | `GET /api/v1/organizations/me/plan` | Plano, vigência, limites e uso da organização da sessão | [plans-consultar-proprio.md](endpoints/plans-consultar-proprio.md) |
 | `GET /api/v1/organizations/:organizationId/plan` | Plano de qualquer organização (plataforma) | [plans-consultar.md](endpoints/plans-consultar.md) |
@@ -138,6 +144,10 @@ O cuidador registra a visita pelas rotas `/api/v1/follow-ups` (BE-12, 2026-11-04
 ### Anexos de registro
 
 O cuidador anexa fotos e documentos ao registro de acompanhamento pelas rotas `/api/v1/follow-ups/:followUpId/attachments` (BE-13, 2026-11-05; RF009/RF016; UC11; decisões de Mateus). O TCC previa S3; por decisão de Mateus o arquivo fica num **volume Docker privado** da API (`vitacare-storage`, montado em `STORAGE_PATH`), sem URL pública: todo download passa pela API e é reautorizado a cada chamada. [Enviar](endpoints/follow-up-attachments-enviar.md) é `multipart/form-data` com uma única parte `file`, **depois** do registro, só pelo `caregiver` **autor** do registro, com vínculo vigente, registro válido (não anulado) e paciente ativo, sem prazo. Aceita **JPEG, PNG, WEBP e PDF** reconhecidos pelo **conteúdo** (não pela extensão), até **10 MB** (10 485 760 bytes), **5 anexos ativos** por registro. O arquivo só é gravado depois de todas as checagens, dentro da transação, e é apagado se a transação falhar. [Listar](endpoints/follow-up-attachments-listar.md) e [baixar](endpoints/follow-up-attachments-baixar.md) exigem `patient_history:read` no alcance do registro (familiar vinculado incluído até o BE-19). O download é binário, `Content-Disposition: attachment` e `Cache-Control: private, no-store`. [Remover](endpoints/follow-up-attachments-remover.md) (`204`) cabe ao autor ou a `admin`/`professional` (`follow_ups:annul`): a linha recebe `deleted_at` e o arquivo é apagado do volume. Anexos de registro anulado ou de paciente inativo continuam legíveis. Auditoria `follow_up_attachment.created` e `follow_up_attachment.removed` com o **nome do arquivo** (decisão de Mateus).
+
+### Medicamentos e agenda de lembretes
+
+Profissionais e administradores mantêm os medicamentos de cada paciente pelas rotas `/api/v1/medications` (BE-14, 2026-11-05; RF007; UC08; decisões de Mateus). O medicamento tem nome, **dose decimal com unidade** de lista fechada (`mg`, `mcg`, `g`, `ml`, `iu`, `drops`, `tablet`, `capsule`, `application`; o MER tinha `dosagem_mg INT`), via de administração opcional em lista fechada (só no DER) e observação. A **agenda** é uma lista de horários `HH:mm` que se repete a cada N dias (1–30; 1 = diário) entre a data de início e um fim opcional (sem fim = uso contínuo), sempre no fuso **`America/Sao_Paulo`**; cada horário é uma linha de `medication_reminders` (o `lembretes_medicamentos` do MER) válida de `created_at` até `deleted_at`. [Cadastrar](endpoints/medications-criar.md) grava medicamento e agenda numa transação; `remindersEnabled` liga os lembretes automáticos (padrão `false`). [Editar](endpoints/medications-atualizar.md) início, fim, intervalo, horários ou lembretes **encerra** a agenda vigente e grava a nova no mesmo instante, para que um horário antigo nunca mais seja válido; [inativar](endpoints/medications-inativar.md) encerra a agenda no instante da inativação, preservando tudo, e [reativar](endpoints/medications-reativar.md) recria a mesma agenda a partir de agora. **Sobreposição** (mesmo horário de outro medicamento ativo do paciente num dia comum, de hoje em diante) volta em `scheduleConflicts` como aviso e **nunca bloqueia**. Toda resposta traz `nextScheduledAt` (próximo horário, em UTC). Paciente inativo não recebe medicamento novo, nem edição ou reativação (`409 MEDICATION_PATIENT_INACTIVE`). **Alcance:** escrevem `admin` e `professional`; [listar](endpoints/medications-listar.md) (por `patientId`) e [consultar](endpoints/medications-consultar.md) exigem `medications:read`, que desde o BE-14 vale também para `caregiver` e `family` **só nos pacientes vinculados** (familiar com o medicamento completo até o BE-19). O disparo dos lembretes, destinatários e entrega são do BE-16/BE-17 e **ainda não existem**; tomada, adesão, atraso e "Suspenso" (Figura 41) não são modelados (BE-26). Auditoria `medication.created|updated|deactivated|reactivated`, com nomes de campos alterados e sem nome do medicamento, dose ou observação.
 
 ### Administração da plataforma
 
