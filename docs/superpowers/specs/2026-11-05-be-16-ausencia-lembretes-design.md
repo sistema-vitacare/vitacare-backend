@@ -100,6 +100,11 @@ Segue a ADR do BE-15: **o estado mora no PostgreSQL e o Redis só agenda.**
 - **Chave única** cobre o que escapar da trava: `UNIQUE (patient_id, form_id,
   due_at)` para ausência e `UNIQUE (medication_reminder_id, scheduled_at)` para
   lembrete, com `ON CONFLICT DO NOTHING`.
+- **Só o que venceu (achado da revisão final):** cada par guarda `next_due_at`
+  e cada linha da agenda `next_dispatch_at` (`infinity` quando a agenda
+  acabou); a varredura seleciona só o vencido. O par também volta se o
+  formulário mudou ou um registro dele foi anulado depois da última
+  conferência, porque os dois podem antecipar o prazo.
 - **Limites por execução:** 200 itens e 50 ocorrências por item; o resto fica
   para a próxima (o cursor avança só até o último gerado).
 - Falha de um item vai para o log e não avança o cursor: ele é tentado de novo
