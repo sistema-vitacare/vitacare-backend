@@ -39,7 +39,7 @@ Query: nenhum.
 | `name` | texto | não | não | 1–120 caracteres, aparado | Ausente não muda. `null` responde `422`. |
 | `description` | texto | não | sim | 1–1000 caracteres, aparado | Ausente não muda; `null` limpa. |
 | `trackingType` | texto | não | sim | 1–80 caracteres, aparado | Ausente não muda; `null` limpa. |
-| `frequency` | objeto | não | sim | — | Ausente não muda; `null` remove a frequência esperada; objeto substitui. |
+| `frequency` | objeto | não | sim | — | Ausente não muda; `null` remove a frequência esperada e encerra o monitoramento de ausência; objeto substitui e vale para os prazos ainda não vencidos (BE-16). |
 | `frequency.interval` | inteiro | sim, se `frequency` for objeto | não | 1 a 365 | A cada N unidades. |
 | `frequency.unit` | texto, enum | sim, se `frequency` for objeto | não | `hours`, `days`, `weeks` | Unidade do intervalo. |
 | `audience` | texto, enum | condicional | não | `organization`, `patients` | Ausente não muda o público nem a lista. **Obrigatório quando `patientIds` vier.** |
@@ -170,7 +170,7 @@ curl -i -X PATCH 'https://api.example.com/api/v1/forms/5b2d7e10-4c3a-4f8e-9a1b-2
 | `data.status` | texto, enum | não | `draft` (nunca publicado), `active` (tem versão vigente) ou `inactive` (desativado). |
 | `data.audience` | texto, enum | não | `organization` (vale para todos os pacientes da organização) ou `patients` (vale só para os de `patientIds`). |
 | `data.patientIds` | lista de UUID | não | Pacientes da lista vigente, na ordem em que entraram. Lista vazia com `audience = organization`. Para o cuidador, só os pacientes ao alcance dele. Pode conter paciente que ficou inativo depois de entrar na lista. |
-| `data.frequency` | objeto | sim | Frequência esperada de preenchimento; `null` = sem frequência (não gera ausência). |
+| `data.frequency` | objeto | sim | Frequência esperada de preenchimento; `null` = sem frequência (não gera ausência); com frequência, cada período vencido sem envio gera alerta de ausência (BE-16). |
 | `data.frequency.interval` | inteiro | não | A cada N unidades, de 1 a 365. |
 | `data.frequency.unit` | texto, enum | não | `hours`, `days` ou `weeks`. |
 | `data.currentVersion` | objeto | sim | Versão vigente: a publicada de maior número. `null` enquanto o formulário nunca foi publicado. |

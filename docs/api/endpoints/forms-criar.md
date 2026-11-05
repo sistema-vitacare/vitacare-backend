@@ -33,7 +33,7 @@ Path: nenhum. Query: nenhum.
 | `name` | texto | sim | não | 1–120 caracteres, aparado | Nome do formulário. Não precisa ser único. |
 | `description` | texto | não | sim | 1–1000 caracteres, aparado | Descrição. Ausente ou `null` grava `null`. |
 | `trackingType` | texto | não | sim | 1–80 caracteres, aparado | Tipo de acompanhamento em texto livre (ex.: "Dados clinicos", "Atividades"); não é um domínio fechado. Ausente ou `null` grava `null`. |
-| `frequency` | objeto | não | sim | — | Frequência esperada de preenchimento, igual para todos os pacientes a que o formulário se aplica. Ausente ou `null` = sem frequência (não gera ausência; o cálculo de ausência é do BE-16). |
+| `frequency` | objeto | não | sim | — | Frequência esperada de preenchimento, igual para todos os pacientes a que o formulário se aplica. Ausente ou `null` = sem frequência (não gera ausência). Com frequência, cada período vencido sem envio gera um alerta `warning` de ausência em `GET /api/v1/alerts` (BE-16). |
 | `frequency.interval` | inteiro | sim, se `frequency` vier | não | 1 a 365 | A cada N unidades. |
 | `frequency.unit` | texto, enum | sim, se `frequency` vier | não | `hours`, `days`, `weeks` | Unidade do intervalo. |
 | `audience` | texto, enum | sim | não | `organization`, `patients` | `organization`: vale para todos os pacientes da organização. `patients`: vale só para a lista `patientIds` (o "grupo de pacientes" do UC09 é essa lista; não há entidade de grupo). |
@@ -224,7 +224,7 @@ curl -i -X POST 'https://api.example.com/api/v1/forms' \
 | `data.status` | texto, enum | não | `draft` (nunca publicado), `active` (tem versão vigente) ou `inactive` (desativado). |
 | `data.audience` | texto, enum | não | `organization` (vale para todos os pacientes da organização) ou `patients` (vale só para os de `patientIds`). |
 | `data.patientIds` | lista de UUID | não | Pacientes da lista vigente, na ordem em que entraram. Lista vazia com `audience = organization`. Para o cuidador, só os pacientes ao alcance dele. Pode conter paciente que ficou inativo depois de entrar na lista. |
-| `data.frequency` | objeto | sim | Frequência esperada de preenchimento; `null` = sem frequência (não gera ausência). |
+| `data.frequency` | objeto | sim | Frequência esperada de preenchimento; `null` = sem frequência (não gera ausência); com frequência, cada período vencido sem envio gera alerta de ausência (BE-16). |
 | `data.frequency.interval` | inteiro | não | A cada N unidades, de 1 a 365. |
 | `data.frequency.unit` | texto, enum | não | `hours`, `days` ou `weeks`. |
 | `data.currentVersion` | objeto | sim | Versão vigente: a publicada de maior número. `null` enquanto o formulário nunca foi publicado. |

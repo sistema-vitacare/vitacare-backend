@@ -280,9 +280,10 @@ removida do firewall. A API lê o IP real por `X-Forwarded-For`
 
 ## Pendências
 
-- **Worker e agendamento**: BullMQ está configurado, mas não há processor nem job
-  agendado. Quando lembretes/alertas (RF007/RF013) existirem, o worker e o
-  heartbeat do Uptime Kuma entram como o `queue-worker`/`scheduler` do molde.
+- **Worker e agendamento**: o próprio container `api` roda os workers BullMQ
+  (filas `alerts`, varredura de avaliação do BE-15, e `automation`, ausência e
+  lembretes do BE-16), com job schedulers de 60 s gravados no Redis. Falta o
+  heartbeat no Uptime Kuma para acusar varredura parada.
 - **S3**: anexos usam o volume local (decisão de 2026-11-05); armazenamento de
   relatórios PDF (BE-21) ainda não decidido. **SMTP**: decisão de não ter
   (2026-09-22).
