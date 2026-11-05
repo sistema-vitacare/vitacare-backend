@@ -1,7 +1,7 @@
 ---
 title: Registrar acompanhamento
 status: atual
-updated: 2026-11-04
+updated: 2026-11-05
 method: POST
 path: /api/v1/follow-ups
 source: src/modules/FollowUp/followUp.controller.ts
@@ -15,7 +15,7 @@ UC11 (RF009; BE-12): o cuidador, durante ou depois da visita, envia o formulári
 
 - **Cancelar** (UC11, fluxo alternativo) é não enviar: não há rascunho nem gravação parcial, e o histórico não muda.
 - **Formulário sem campos preenchidos** (UC11, fluxo alternativo) → `422 FOLLOW_UP_EMPTY`. `0` e `false` contam como preenchidos; `null`, texto em branco e `[]` não. As observações da visita (`notes`) sozinhas não bastam.
-- **Valor fora da faixa clínica** é dado a gravar, nunca erro: a API só valida tipo, casas decimais, escala, opções e obrigatoriedade. A avaliação de regras de alerta é do BE-15 e **não** roda nesta transação; o registro nasce marcado como "ainda não avaliado" (coluna interna `alerts_evaluated_at` nula), e uma falha futura da avaliação nunca desfaz o dado clínico.
+- **Valor fora da faixa clínica** é dado a gravar, nunca erro: a API só valida tipo, casas decimais, escala, opções e obrigatoriedade. Desde o BE-15 (2026-11-05), **logo depois do commit** e ainda nesta requisição, os valores numéricos passam pelas [regras de alerta](alert-rules-criar.md) do formulário (UC11 passo 6); os alertas gerados saem em [`GET /api/v1/alerts`](alerts-listar.md). A avaliação **não** roda na transação do registro: ele nasce marcado como "ainda não avaliado" (coluna interna `alerts_evaluated_at` nula), e uma falha na avaliação só vai para o log — a resposta continua `201` e uma varredura periódica avalia o registro depois. A resposta não traz os alertas.
 - **Um formulário por registro** (decisão de Mateus, 2026-11-04).
 - **Hora da visita × envio** (decisão de Mateus, 2026-11-04): `visitedAt` é informado pelo cuidador (padrão = agora; não pode estar no futuro); `submittedAt` é gravado pelo servidor.
 - Para corrigir um registro enviado, [anule-o](follow-ups-anular.md) e registre de novo.
