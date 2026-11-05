@@ -551,7 +551,11 @@ describeWithDatabase('perfis de acesso em PostgreSQL descartavel', () => {
           records
             .find((record) => record.code === 'family')
             ?.permissions.map((permission) => permission.code),
-        ).toEqual(['patient_history:read', 'patients:read']);
+        ).toEqual([
+          'medications:read',
+          'patient_history:read',
+          'patients:read',
+        ]);
         expect(
           records
             .find((record) => record.code === 'admin')
@@ -683,7 +687,8 @@ describeWithDatabase('perfis de acesso em PostgreSQL descartavel', () => {
       );
 
       // Concessoes acrescentadas depois pelas migrations
-      // 1790800000000-AddPatientCareLinks e 1791000000000-CreateFollowUpRecords.
+      // 1790800000000-AddPatientCareLinks, 1791000000000-CreateFollowUpRecords
+      // e 1791200000000-CreateMedications.
       expect(current).toEqual({
         ...SNAPSHOT_PROFILES,
         admin: {
@@ -699,6 +704,20 @@ describeWithDatabase('perfis de acesso em PostgreSQL descartavel', () => {
             ...SNAPSHOT_PROFILES.professional.permissions,
             'patient_links:manage',
             'follow_ups:annul',
+          ].sort(),
+        },
+        caregiver: {
+          ...SNAPSHOT_PROFILES.caregiver,
+          permissions: [
+            ...SNAPSHOT_PROFILES.caregiver.permissions,
+            'medications:read',
+          ].sort(),
+        },
+        family: {
+          ...SNAPSHOT_PROFILES.family,
+          permissions: [
+            ...SNAPSHOT_PROFILES.family.permissions,
+            'medications:read',
           ].sort(),
         },
       });

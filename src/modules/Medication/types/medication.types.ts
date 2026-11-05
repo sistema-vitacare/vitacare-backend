@@ -58,3 +58,5 @@ export interface ScheduleConflict {
   medicationName: string;
   time: string;
 }
+
+export type MedicationReminderStatus = 'active' | 'ended';
