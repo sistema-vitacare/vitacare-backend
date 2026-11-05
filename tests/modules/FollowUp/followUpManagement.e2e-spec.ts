@@ -38,6 +38,7 @@ import { AuthRateLimiter } from '@/modules/Auth/security/authRateLimiter';
 import { PasswordHasher } from '@/modules/Auth/security/passwordHasher';
 import { TokenService } from '@/modules/Auth/security/token.service';
 import { FollowUpController } from '@/modules/FollowUp/followUp.controller';
+import { EvaluateFollowUpAlertsUseCase } from '@/modules/Alert/EvaluateFollowUpAlerts/evaluateFollowUpAlerts.useCase';
 import { FOLLOW_UP_USE_CASES } from '@/modules/FollowUp/followUp.module';
 import { FollowUpRepository } from '@/modules/FollowUp/repositories/followUp.repository';
 import { FormController } from '@/modules/Form/form.controller';
@@ -457,6 +458,10 @@ describeWithDatabase('registros de acompanhamento em PostgreSQL (e2e)', () => {
         ...FORM_USE_CASES,
         FormRepository,
         ...FOLLOW_UP_USE_CASES,
+        {
+          provide: EvaluateFollowUpAlertsUseCase,
+          useValue: { afterSubmit: jest.fn().mockResolvedValue(undefined) },
+        },
         FollowUpRepository,
 
         { provide: APP_GUARD, useClass: AuthGuard },
