@@ -67,6 +67,9 @@ export class AttachmentUploadInterceptor implements NestInterceptor {
   constructor(private readonly storage: FileStorageService) {
     const Multer: Type<NestInterceptor> = FileInterceptor(FIELD, {
       dest: storage.tempDir,
+      // Navegadores mandam o nome do arquivo em UTF-8 cru; o padrao do
+      // multer 2 (latin1) corromperia todo nome com acento.
+      defParamCharset: 'utf8',
       limits: { fileSize: ATTACHMENT_MAX_BYTES, files: 1, fields: 0, parts: 1 },
     });
 

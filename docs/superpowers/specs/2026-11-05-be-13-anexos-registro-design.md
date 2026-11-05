@@ -162,8 +162,11 @@ Regras, nesta ordem (caso de uso + uma transação no repositório):
 4. **Compensação:** se qualquer passo depois da gravação falhar (INSERT,
    auditoria, COMMIT), o caso de uso apaga o arquivo e relança o erro. Se a
    própria remoção falhar, o arquivo fica órfão **e inacessível** (o download só
-   parte de uma linha válida do banco) e um `warn` sai no log com a chave. Não
-   há caminho em que exista linha sem arquivo por causa do envio.
+   parte de uma linha válida do banco) e um `warn` sai no log com a chave.
+   Exceção rara (revisão final, 2026-11-05): se a conexão cair durante o
+   COMMIT e o PostgreSQL tiver efetivado, a compensação apaga o arquivo de uma
+   linha válida; o download responde `ATTACHMENT_CONTENT_MISSING` e a remoção
+   limpa a linha.
 
 ### 6.2 Nome do arquivo
 

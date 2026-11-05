@@ -7,9 +7,12 @@ import { ConfigService } from '@nestjs/config';
 import { APP_GUARD } from '@nestjs/core';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import { Test } from '@nestjs/testing';
-import { mkdtemp, readdir, rm } from 'node:fs/promises';
+import { mkdtemp, readdir, rm, writeFile } from 'node:fs/promises';
+import { get, type Server } from 'node:http';
+import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import type { Readable } from 'node:stream';
 import request from 'supertest';
 import type { App } from 'supertest/types';
 
@@ -198,6 +201,20 @@ describe('Attachment HTTP (e2e)', () => {
     await expect(tempFiles()).resolves.toEqual([]);
   });
 
+  it('nome com acento enviado em UTF-8 cru chega intacto', async () => {
+    acceptUpload();
+
+    const response = await post().attach('file', PNG, 'pressão ç.png');
+
+    expect(response.status).toBe(201);
+
+    const [command] = attachments.upload.mock.calls[0] as [
+      { fileName: string },
+    ];
+
+    expect(command.fileName).toBe('pressão ç.png');
+  });
+
   it('acima de 10 MB responde 413 sem chamar o banco nem deixar temporario', async () => {
     const response = await post().attach(
       'file',
@@ -318,6 +335,65 @@ describe('Attachment HTTP (e2e)', () => {
     );
     expect(response.headers['cache-control']).toBe('private, no-store');
     expect(response.headers['x-content-type-options']).toBe('nosniff');
+  });
+
+  it('cliente que aborta o download libera o arquivo aberto', async () => {
+    const key = 'attachments/org/grande';
+    const temp = join(storage.tempDir, 'grande');
+    const opened: Readable[] = [];
+
+    await writeFile(temp, Buffer.alloc(8 * 1024 * 1024, 1));
+    await storage.promote(temp, key);
+    attachments.findForDownload.mockResolvedValue({
+      ...attachmentRow({ sizeBytes: 8 * 1024 * 1024 }),
+      storageKey: key,
+    });
+
+    const open = storage.open.bind(storage);
+    const spy = jest.spyOn(storage, 'open').mockImplementation(async (k) => {
+      const file = await open(k);
+      if (file) opened.push(file.stream);
+      return file;
+    });
+
+    try {
+      const http = app.getHttpServer() as Server;
+
+      if (!http.listening) {
+        await new Promise<void>((resolve) =>
+          http.listen(0, '127.0.0.1', resolve),
+        );
+      }
+
+      const address = http.address() as AddressInfo;
+
+      await new Promise<void>((resolve, reject) => {
+        const req = get(
+          {
+            host: '127.0.0.1',
+            port: address.port,
+            path: `${base}/${ATTACHMENT_ID}/content`,
+            headers: { Authorization: 'Bearer family' },
+          },
+          (res) => {
+            res.once('data', () => {
+              req.destroy();
+              resolve();
+            });
+          },
+        );
+        req.on('error', (error: NodeJS.ErrnoException) => {
+          if (error.code !== 'ECONNRESET') reject(error);
+        });
+      });
+
+      await new Promise((resolve) => setTimeout(resolve, 200));
+
+      expect(opened).toHaveLength(1);
+      expect(opened[0].destroyed).toBe(true);
+    } finally {
+      spy.mockRestore();
+    }
   });
 
   it('download de anexo fora do alcance responde 404 em JSON', async () => {

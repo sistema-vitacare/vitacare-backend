@@ -7,6 +7,7 @@ import {
   HttpStatus,
   Param,
   Post,
+  Res,
   StreamableFile,
   UseInterceptors,
 } from '@nestjs/common';
@@ -20,6 +21,8 @@ import {
   ApiProduces,
   ApiTags,
 } from '@nestjs/swagger';
+
+import type { Response } from 'express';
 
 import { CurrentContext } from '@/common/context/currentContext.decorator';
 import type { RequestContext } from '@/common/context/requestContext.type';
@@ -165,8 +168,18 @@ export class AttachmentController {
     @Param('followUpId', UuidParam('followUpId')) followUpId: string,
     @Param('attachmentId', UuidParam('attachmentId')) attachmentId: string,
     @CurrentContext() ctx: RequestContext,
+    @Res({ passthrough: true }) response: Response,
   ): Promise<StreamableFile> {
-    return this.downloadAttachment.execute(followUpId, attachmentId, ctx);
+    const file = await this.downloadAttachment.execute(
+      followUpId,
+      attachmentId,
+      ctx,
+    );
+
+    // O Nest so faz `pipe`: sem isto, cliente que aborta deixa o arquivo aberto.
+    response.once('close', () => file.getStream().destroy());
+
+    return file;
   }
 
   @Delete(':attachmentId')
