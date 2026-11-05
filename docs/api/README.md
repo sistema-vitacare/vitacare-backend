@@ -70,6 +70,10 @@ O corpo das rotas de negócio é JSON quando aplicável. Autenticação usa Bear
 | `GET /api/v1/follow-ups` | Lista os registros de um paciente ao alcance, da visita mais recente para a mais antiga | [follow-ups-listar.md](endpoints/follow-ups-listar.md) |
 | `GET /api/v1/follow-ups/:followUpId` | Consulta um registro com as respostas e os campos da versão respondida | [follow-ups-consultar.md](endpoints/follow-ups-consultar.md) |
 | `POST /api/v1/follow-ups/:followUpId/annul` | Anula um registro com motivo, preservando-o no histórico | [follow-ups-anular.md](endpoints/follow-ups-anular.md) |
+| `POST /api/v1/follow-ups/:followUpId/attachments` | Anexa um arquivo (JPEG, PNG, WEBP ou PDF, até 10 MB) ao registro; só o cuidador autor, até 5 por registro | [follow-up-attachments-enviar.md](endpoints/follow-up-attachments-enviar.md) |
+| `GET /api/v1/follow-ups/:followUpId/attachments` | Lista os anexos ativos de um registro ao alcance | [follow-up-attachments-listar.md](endpoints/follow-up-attachments-listar.md) |
+| `GET /api/v1/follow-ups/:followUpId/attachments/:attachmentId/content` | Baixa o arquivo (binário, fora do envelope), reautorizado a cada chamada | [follow-up-attachments-baixar.md](endpoints/follow-up-attachments-baixar.md) |
+| `DELETE /api/v1/follow-ups/:followUpId/attachments/:attachmentId` | Remove o anexo e apaga o arquivo (`204`) | [follow-up-attachments-remover.md](endpoints/follow-up-attachments-remover.md) |
 | `GET /api/v1/plans` | Catálogo de planos ativos (admin ou master) | [plans-listar.md](endpoints/plans-listar.md) |
 | `GET /api/v1/organizations/me/plan` | Plano, vigência, limites e uso da organização da sessão | [plans-consultar-proprio.md](endpoints/plans-consultar-proprio.md) |
 | `GET /api/v1/organizations/:organizationId/plan` | Plano de qualquer organização (plataforma) | [plans-consultar.md](endpoints/plans-consultar.md) |
@@ -131,6 +135,10 @@ Profissionais e administradores montam os formulários que o cuidador preencher�
 
 O cuidador registra a visita pelas rotas `/api/v1/follow-ups` (BE-12, 2026-11-04; RF009; UC11; decisões de Mateus). [Registrar](endpoints/follow-ups-registrar.md) grava, numa transação, o registro (paciente, cuidador da sessão, `visitedAt` informado — padrão agora, nunca no futuro — e o envio em `submittedAt`, observações), a resposta (formulário e **versão vigente** respondidos; um formulário por registro) e um item por campo preenchido; falha em qualquer passo não deixa nada gravado. Só o `caregiver` registra, e só para paciente **ativo** com vínculo de cuidador vigente, em formulário **ativo** que valha para ele; o cliente envia `formVersionId`, e versão substituída durante o preenchimento é recusada (`409 FOLLOW_UP_FORM_VERSION_OUTDATED`). Envio sem nenhum valor é `422 FOLLOW_UP_EMPTY` (`0` e `false` são valores; as observações sozinhas não bastam); tipo, casas, escala, opções, campo desabilitado ou alheio e obrigatório ausente saem em `422 FOLLOW_UP_INVALID_ANSWERS` por campo; **valor fora de faixa clínica é gravado**, nunca recusado. Cancelar é não enviar. A avaliação de alertas é do BE-15 e não roda na transação: o registro nasce marcado como ainda não avaliado, sem risco de perder o dado clínico. Correção é por [anulação com motivo](endpoints/follow-ups-anular.md): o registro continua no histórico como `annulled`; o autor anula os próprios e `admin`/`professional` (permissão nova `follow_ups:annul`) anulam qualquer um, sem prazo e uma única vez. [Listar](endpoints/follow-ups-listar.md) (por `patientId`, filtro `status`) e [consultar](endpoints/follow-ups-consultar.md) exigem `patient_history:read`: `admin` e `professional` leem a organização inteira; `caregiver` e `family`, só pacientes vinculados (o familiar recebe o registro completo até o BE-19). Cada resposta sai com os metadados do campo **na versão respondida**. Filtros do histórico (UC12) são do BE-18. Auditoria `follow_up.created` (`formId`, `formVersionId`, `itemCount`) e `follow_up.annulled` (`ownRecord`, `reasonLength`), sem valores clínicos nem o texto do motivo.
 
+### Anexos de registro
+
+O cuidador anexa fotos e documentos ao registro de acompanhamento pelas rotas `/api/v1/follow-ups/:followUpId/attachments` (BE-13, 2026-11-05; RF009/RF016; UC11; decisões de Mateus). O TCC previa S3; por decisão de Mateus o arquivo fica num **volume Docker privado** da API (`vitacare-storage`, montado em `STORAGE_PATH`), sem URL pública: todo download passa pela API e é reautorizado a cada chamada. [Enviar](endpoints/follow-up-attachments-enviar.md) é `multipart/form-data` com uma única parte `file`, **depois** do registro, só pelo `caregiver` **autor** do registro, com vínculo vigente, registro válido (não anulado) e paciente ativo, sem prazo. Aceita **JPEG, PNG, WEBP e PDF** reconhecidos pelo **conteúdo** (não pela extensão), até **10 MB** (10 485 760 bytes), **5 anexos ativos** por registro. O arquivo só é gravado depois de todas as checagens, dentro da transação, e é apagado se a transação falhar. [Listar](endpoints/follow-up-attachments-listar.md) e [baixar](endpoints/follow-up-attachments-baixar.md) exigem `patient_history:read` no alcance do registro (familiar vinculado incluído até o BE-19). O download é binário, `Content-Disposition: attachment` e `Cache-Control: private, no-store`. [Remover](endpoints/follow-up-attachments-remover.md) (`204`) cabe ao autor ou a `admin`/`professional` (`follow_ups:annul`): a linha recebe `deleted_at` e o arquivo é apagado do volume. Anexos de registro anulado ou de paciente inativo continuam legíveis. Auditoria `follow_up_attachment.created` e `follow_up_attachment.removed` com o **nome do arquivo** (decisão de Mateus).
+
 ### Administração da plataforma
 
 Existe uma única **organização de plataforma** (`kind = platform`), sem plano e sempre ativa. Os usuários dela com perfil `platform_admin` são os **administradores master**: cadastram, listam, consultam, editam, inativam e reativam as organizações clientes pelas rotas `/api/v1/organizations`. O master faz login como qualquer usuário, com o código da organização de plataforma. A primeira conta nasce de `npm run seed:platform`.
@@ -170,6 +178,8 @@ Todo evento de acesso é gravado em `audit_events`, sempre dentro de uma organiz
 | `form.published` | Rascunho publicado; `after_values` com `versionNumber` e `impactConfirmed`. |
 | `form.deactivated` | Formulário desativado. |
 | `form.reactivated` | Formulário reativado. |
+| `follow_up_attachment.created` | Anexo enviado; `entity_type = follow_up_attachment`, `after_values` com `followUpId`, `fileName`, `contentType`, `sizeBytes`. |
+| `follow_up_attachment.removed` | Anexo removido; `after_values` com `followUpId`, `fileName`, `contentType`, `sizeBytes`, `ownAttachment`. |
 | `plan_change_request.created` | Solicitação registrada pelo administrador; `after_values.requestedPlanId`. |
 | `plan_change_request.cancelled` | Solicitação cancelada pelo administrador. |
 | `plan_change_request.approved` | Solicitação aprovada pelo master. |
@@ -177,7 +187,7 @@ Todo evento de acesso é gravado em `audit_events`, sempre dentro de uma organiz
 
 Ação do master sobre outra organização gera **duas** linhas com o mesmo `request_id`: uma na organização alvo, como evento de sistema com `after_values.platformActorUserId`, porque a FK de autoria só aceita autor da própria organização; e outra na organização de plataforma, com o master como autor.
 
-O evento guarda organização, autor, ação, entidade, `request_id` e o momento. **Nada digitado na requisição entra ali**: nem e-mail, nem senha, nem IP. Para investigar uma tentativa, correlacione o `request_id` do evento com o log estruturado da mesma requisição. O log HTTP mascara o parâmetro de query `search` (na URL e na query interpretada) como `[Redacted]`, porque a busca de usuários recebe nome ou e-mail.
+O evento guarda organização, autor, ação, entidade, `request_id` e o momento. **Nada digitado na requisição entra ali**: nem e-mail, nem senha, nem IP. A única exceção é o nome original do arquivo nos eventos de anexo, por decisão de Mateus (2026-11-05), mesmo sendo texto livre. Para investigar uma tentativa, correlacione o `request_id` do evento com o log estruturado da mesma requisição. O log HTTP mascara o parâmetro de query `search` (na URL e na query interpretada) como `[Redacted]`, porque a busca de usuários recebe nome ou e-mail.
 
 ## Contrato transversal
 
@@ -220,7 +230,7 @@ Escrita pode acrescentar `meta.message`:
 
 | Propriedade | Tipo | Significado |
 | --- | --- | --- |
-| `data` | objeto, lista ou `null` | Conteúdo da operação. Operação sem conteúdo devolve `200` com `data: null`, não `204`. |
+| `data` | objeto, lista ou `null` | Conteúdo da operação. Operação sem conteúdo devolve `200` com `data: null`, não `204`; a única exceção é a remoção de anexo (`DELETE`, `204` sem corpo), decidida por Mateus em 2026-11-05. |
 | `meta.requestId` | texto | Identificador de correlação com o log. Sempre presente. Um `X-Request-Id` recebido no formato `[A-Za-z0-9-]{16,64}` (por exemplo o de um proxy nginx) é adotado, para correlacionar com o log do proxy; header ausente ou fora do formato gera um UUID. |
 | `meta.timestamp` | texto ISO 8601 | Momento em que a resposta foi construída. Sempre presente. |
 | `meta.message` | texto, opcional | Confirmação amigável definida pelo caso de uso. |
@@ -234,6 +244,8 @@ Escrita pode acrescentar `meta.message`:
 | `GET /health/ready` | Mantém o relatório de dependências, com `status`, `info`, `error` e `details`. |
 | `GET /api/docs` | HTML da interface Swagger. |
 | `GET /api/docs-json` | Documento OpenAPI, formato fixado pela especificação. |
+| `GET /api/v1/follow-ups/:followUpId/attachments/:attachmentId/content` | Conteúdo binário do anexo; os erros continuam no formato JSON. |
+| `DELETE /api/v1/follow-ups/:followUpId/attachments/:attachmentId` | `204 No Content`, sem corpo. |
 
 ### Formato de erro
 
@@ -300,6 +312,8 @@ Erro inesperado suprime o `detail` e não expõe a causa:
 | `403` | Autenticado sem permissão de perfil ou sem vínculo com o paciente. |
 | `404` | Recurso inexistente **ou** pertencente a outra organização. A API não distingue os dois casos de propósito. |
 | `409` | Conflito de estado: duplicidade, transição inválida, limite de plano atingido. |
+| `413` | Arquivo acima do limite (anexos). |
+| `415` | Conteúdo de arquivo fora dos tipos aceitos (anexos). |
 | `422` | Validação de campo. O JSON está correto; os valores não. |
 | `429` | Limite de requisições excedido. |
 | `500` | Erro inesperado. `detail` é `null`. |

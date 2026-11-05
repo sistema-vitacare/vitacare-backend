@@ -12,6 +12,7 @@ import { ApplyPlanCatalogRules1790600000000 } from '@/database/migrations/179060
 import { CreatePatients1790700000000 } from '@/database/migrations/1790700000000-CreatePatients';
 import { CreateFollowUpForms1790900000000 } from '@/database/migrations/1790900000000-CreateFollowUpForms';
 import { CreateFollowUpRecords1791000000000 } from '@/database/migrations/1791000000000-CreateFollowUpRecords';
+import { CreateFollowUpAttachments1791100000000 } from '@/database/migrations/1791100000000-CreateFollowUpAttachments';
 import { SnakeNamingStrategy } from '@/database/snakeNaming.strategy';
 import { ChangePasswordUseCase } from '@/modules/Auth/ChangePassword/changePassword.useCase';
 import { CompleteFirstAccessUseCase } from '@/modules/Auth/CompleteFirstAccess/completeFirstAccess.useCase';
@@ -246,6 +247,7 @@ describeWithDatabase('autenticacao em PostgreSQL descartavel', () => {
         CreatePatients1790700000000,
         CreateFollowUpForms1790900000000,
         CreateFollowUpRecords1791000000000,
+        CreateFollowUpAttachments1791100000000,
       ],
       namingStrategy: new SnakeNamingStrategy(),
       synchronize: false,
@@ -264,7 +266,7 @@ describeWithDatabase('autenticacao em PostgreSQL descartavel', () => {
     }
 
     migrated = (await dataSource.runMigrations()).length;
-    expect(migrated).toBe(11);
+    expect(migrated).toBe(12);
 
     passwords = new PasswordHasher();
     tokens = new TokenService();
@@ -1035,13 +1037,14 @@ describeWithDatabase('autenticacao em PostgreSQL descartavel', () => {
   });
 
   describe('schema completo', () => {
-    it('mapeia as vinte tabelas nas entidades TypeORM', () => {
+    it('mapeia as vinte e uma tabelas nas entidades TypeORM', () => {
       expect(
         dataSource.entityMetadatas.map((metadata) => metadata.tableName).sort(),
       ).toEqual([
         'access_profiles',
         'audit_events',
         'auth_sessions',
+        'follow_up_attachments',
         'follow_up_form_fields',
         'follow_up_form_patients',
         'follow_up_form_versions',

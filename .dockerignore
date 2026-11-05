@@ -16,3 +16,4 @@ docs
 tests
 compose.yaml
 docker-compose*.yml
+storage

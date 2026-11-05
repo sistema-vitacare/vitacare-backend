@@ -97,4 +97,7 @@ export const environmentValidationSchema = Joi.object({
   REDIS_CONNECT_TIMEOUT_MS: Joi.number().integer().min(1000).default(10000),
   REDIS_KEY_PREFIX: Joi.string().allow('').default('vitacare:'),
   QUEUE_PREFIX: Joi.string().default('vitacare'),
+
+  // Arquivos privados (anexos): diretorio local, volume Docker na imagem
+  STORAGE_PATH: Joi.string().trim().default('./storage'),
 });

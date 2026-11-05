@@ -1,4 +1,4 @@
-import { CallHandler, ExecutionContext } from '@nestjs/common';
+import { CallHandler, ExecutionContext, StreamableFile } from '@nestjs/common';
 import { lastValueFrom, of } from 'rxjs';
 import { ResponseEnvelopeInterceptor } from '@/common/http/responseEnvelope.interceptor';
 
@@ -49,6 +49,15 @@ describe('ResponseEnvelopeInterceptor', () => {
     );
 
     expect(result).toEqual({ openapi: '3.0.0' });
+  });
+
+  it('mantem arquivo binario fora do envelope', async () => {
+    const file = new StreamableFile(Buffer.from('conteudo'));
+    const result = await lastValueFrom(
+      interceptor.intercept(contextFor('/api/v1/arquivo'), handlerOf(file)),
+    );
+
+    expect(result).toBe(file);
   });
 
   it('ignora contextos que nao sao HTTP', async () => {

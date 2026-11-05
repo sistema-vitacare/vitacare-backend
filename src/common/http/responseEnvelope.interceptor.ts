@@ -3,6 +3,7 @@ import {
   ExecutionContext,
   Injectable,
   NestInterceptor,
+  StreamableFile,
 } from '@nestjs/common';
 import type { Observable } from 'rxjs';
 import { map } from 'rxjs/operators';
@@ -13,7 +14,8 @@ import { resolveRequestId } from './requestId';
 /**
  * Envelopa toda resposta de sucesso em `{ data, meta }`. As rotas listadas em
  * `excludedPaths` passam intactas: health mantem o formato do Terminus e a
- * documentacao mantem HTML e OpenAPI puros.
+ * documentacao mantem HTML e OpenAPI puros. Arquivo (`StreamableFile`) sai
+ * binario, com os proprios headers.
  */
 @Injectable()
 export class ResponseEnvelopeInterceptor implements NestInterceptor {
@@ -38,6 +40,12 @@ export class ResponseEnvelopeInterceptor implements NestInterceptor {
 
     return next
       .handle()
-      .pipe(map((result) => buildEnvelope(result, requestId)));
+      .pipe(
+        map((result) =>
+          result instanceof StreamableFile
+            ? result
+            : buildEnvelope(result, requestId),
+        ),
+      );
   }
 }

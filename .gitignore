@@ -16,3 +16,6 @@ compose.override.yml
 
 # Copia local do TCC; a fonte oficial fica no vault (ver CLAUDE.md)
 docs/*.pdf
+
+# Arquivos privados gravados pela API em desenvolvimento (STORAGE_PATH)
+/storage/

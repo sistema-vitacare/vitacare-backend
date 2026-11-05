@@ -35,6 +35,11 @@ COPY --from=build --chown=node:node /app/dist ./dist
 COPY --chown=node:node package.json ./package.json
 COPY --chmod=755 docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 
+# Ponto de montagem do volume de arquivos privados. Criado com dono `node`:
+# um volume nomeado novo herda o dono deste diretorio na primeira montagem.
+RUN mkdir -p /app/storage && chown node:node /app/storage
+ENV STORAGE_PATH=/app/storage
+
 USER node
 EXPOSE 1050
 
