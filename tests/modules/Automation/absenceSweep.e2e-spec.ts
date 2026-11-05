@@ -62,7 +62,8 @@ describeWithDatabase('varredura de ausencia em PostgreSQL (e2e)', () => {
     dataSource.query(
       `UPDATE follow_up_absence_monitors
           SET started_at = now() - $2::interval,
-              checked_through = now() - $2::interval
+              checked_through = now() - $2::interval,
+              next_due_at = NULL
         WHERE patient_id = $1 AND form_id = $3 AND deleted_at IS NULL`,
       [patientId, ago, formId],
     );
@@ -256,7 +257,7 @@ describeWithDatabase('varredura de ausencia em PostgreSQL (e2e)', () => {
 
     await dataSource.query(
       `UPDATE follow_up_records
-          SET status = 'annulled', deleted_at = now(),
+          SET status = 'annulled', deleted_at = now(), updated_at = now(),
               annulled_by_user_id = author_user_id, annulment_reason = 'Erro'
         WHERE id = $1`,
       [record],
@@ -349,6 +350,46 @@ describeWithDatabase('varredura de ausencia em PostgreSQL (e2e)', () => {
     ).toEqual({ kind: 'skipped' });
     expect(await absencesOf(patient, form.id)).toHaveLength(0);
     expect((await monitorsOf(patient, form.id))[0].status).toBe('ended');
+  });
+
+  it('par sem prazo vencido fica fora da varredura seguinte', async () => {
+    const { patient, form } = await monitoredPatient(A, '1 hour');
+    const repository = new AbsenceMonitorRepository(dataSource);
+    const [monitor] = await monitorsOf(patient, form.id);
+
+    await sweep.execute();
+
+    const due = await repository.findDue(await repository.now(), 1000, []);
+
+    expect(due.map((item) => item.id)).not.toContain(monitor.id);
+  });
+
+  it('frequencia encurtada vale logo, sem esperar o prazo antigo', async () => {
+    const { patient, form } = await monitoredPatient(A, '25 hours', {
+      interval: 1,
+      unit: 'weeks',
+    });
+
+    await sweep.execute();
+    expect(await absencesOf(patient, form.id)).toHaveLength(0);
+
+    // Passa meia hora e o profissional encurta a frequencia para 1 hora: o
+    // prazo novo dentro dessa meia hora sai sem esperar o vencimento semanal.
+    await dataSource.query(
+      `UPDATE follow_up_absence_monitors
+          SET checked_through = checked_through - interval '30 minutes'
+        WHERE patient_id = $1 AND form_id = $2`,
+      [patient, form.id],
+    );
+    await dataSource.query(
+      `UPDATE follow_up_forms
+          SET frequency_interval = 1, frequency_unit = 'hours', updated_at = now()
+        WHERE id = $1`,
+      [form.id],
+    );
+    await sweep.execute();
+
+    expect(await absencesOf(patient, form.id)).toHaveLength(1);
   });
 
   it('depois de uma queda de tres dias gera os tres periodos vencidos', async () => {

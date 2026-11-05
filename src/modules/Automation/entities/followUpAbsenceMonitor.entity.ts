@@ -17,7 +17,7 @@ import type { AbsenceMonitorStatus } from '../types/automation.types';
  * Par paciente x formulario monitorado para ausencia (acrescimo ao MER,
  * BE-16). Vale enquanto o par for elegivel; deixar de ser encerra a linha, e
  * voltar abre outra com contagem do zero. `checkedThrough` e o cursor: prazos
- * ate ali ja foram avaliados.
+ * ate ali ja foram avaliados. `nextDueAt` e o proximo prazo (nulo = calcular).
  */
 @Entity('follow_up_absence_monitors')
 @Index('follow_up_absence_monitors_active_unique', { synchronize: false })
@@ -71,6 +71,9 @@ export class FollowUpAbsenceMonitor {
 
   @Column('timestamptz')
   checkedThrough!: Date;
+
+  @Column({ type: 'timestamptz', nullable: true })
+  nextDueAt!: Date | null;
 
   @Column({ type: 'varchar', length: 16, default: 'active' })
   status!: AbsenceMonitorStatus;

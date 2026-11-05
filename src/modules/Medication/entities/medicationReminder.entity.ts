@@ -19,7 +19,8 @@ import { Medication } from './medication.entity';
  * vale de `createdAt` ate `deletedAt`; mudar a agenda encerra a linha e cria
  * outra, entao um disparo so e valido se cair nesse intervalo.
  * `dispatchedThrough` e o cursor do BE-16: horarios ate ali ja geraram
- * lembrete (nulo = desde `createdAt`).
+ * lembrete (nulo = desde `createdAt`); `nextDispatchAt` e o proximo horario
+ * (nulo = calcular; `infinity` = agenda encerrada).
  */
 @Entity('medication_reminders')
 @Index('medication_reminders_active_time_unique', { synchronize: false })
@@ -73,6 +74,9 @@ export class MedicationReminder {
 
   @Column({ type: 'timestamptz', nullable: true })
   dispatchedThrough!: Date | null;
+
+  @Column({ type: 'timestamptz', nullable: true })
+  nextDispatchAt!: Date | null;
 
   @Column({ type: 'timestamptz', default: () => 'now()' })
   createdAt!: Date;

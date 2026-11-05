@@ -6,7 +6,8 @@ import type { MigrationInterface, QueryRunner } from 'typeorm';
  * (MER `alertas.id_lembrete_medicamento`). O estado mora aqui, nao no Redis:
  * `follow_up_absence_monitors` guarda o par paciente x formulario monitorado e
  * o cursor `checked_through`; `medication_reminders.dispatched_through` e o
- * cursor de cada linha da agenda. Os `UNIQUE` de prazo e de horario impedem
+ * cursor de cada linha da agenda. `next_due_at` e `next_dispatch_at` guardam o
+ * proximo vencimento (nulo = calcular), para a varredura so tocar o que venceu. Os `UNIQUE` de prazo e de horario impedem
  * evento repetido. As linhas vigentes da agenda comecam a contar daqui, para a
  * implantacao nao gerar lembretes do passado. O `down` falha se ja houver
  * alertas das origens novas, de proposito.
@@ -26,6 +27,7 @@ export class CreateScheduledAlerts1791400000000 implements MigrationInterface {
         form_id uuid NOT NULL,
         started_at timestamptz NOT NULL,
         checked_through timestamptz NOT NULL,
+        next_due_at timestamptz,
         status varchar(16) NOT NULL DEFAULT 'active',
         created_at timestamptz NOT NULL DEFAULT now(),
         updated_at timestamptz NOT NULL DEFAULT now(),
@@ -45,11 +47,11 @@ export class CreateScheduledAlerts1791400000000 implements MigrationInterface {
       `CREATE UNIQUE INDEX follow_up_absence_monitors_active_unique ON ${table('follow_up_absence_monitors')} (patient_id, form_id) WHERE deleted_at IS NULL`,
     );
     await queryRunner.query(
-      `CREATE INDEX follow_up_absence_monitors_due_idx ON ${table('follow_up_absence_monitors')} (checked_through) WHERE deleted_at IS NULL`,
+      `CREATE INDEX follow_up_absence_monitors_due_idx ON ${table('follow_up_absence_monitors')} (next_due_at) WHERE deleted_at IS NULL`,
     );
 
     await queryRunner.query(
-      `ALTER TABLE ${table('medication_reminders')} ADD COLUMN dispatched_through timestamptz`,
+      `ALTER TABLE ${table('medication_reminders')} ADD COLUMN dispatched_through timestamptz, ADD COLUMN next_dispatch_at timestamptz`,
     );
     await queryRunner.query(
       `UPDATE ${table('medication_reminders')} SET dispatched_through = now() WHERE deleted_at IS NULL`,
@@ -58,7 +60,7 @@ export class CreateScheduledAlerts1791400000000 implements MigrationInterface {
       `ALTER TABLE ${table('medication_reminders')} ADD CONSTRAINT medication_reminders_id_org_unique UNIQUE (id, organization_id)`,
     );
     await queryRunner.query(
-      `CREATE INDEX medication_reminders_due_idx ON ${table('medication_reminders')} ((coalesce(dispatched_through, created_at))) WHERE deleted_at IS NULL`,
+      `CREATE INDEX medication_reminders_due_idx ON ${table('medication_reminders')} (next_dispatch_at) WHERE deleted_at IS NULL`,
     );
 
     await queryRunner.query(`
@@ -123,7 +125,7 @@ export class CreateScheduledAlerts1791400000000 implements MigrationInterface {
       `ALTER TABLE ${table('medication_reminders')} DROP CONSTRAINT medication_reminders_id_org_unique`,
     );
     await queryRunner.query(
-      `ALTER TABLE ${table('medication_reminders')} DROP COLUMN dispatched_through`,
+      `ALTER TABLE ${table('medication_reminders')} DROP COLUMN dispatched_through, DROP COLUMN next_dispatch_at`,
     );
     await queryRunner.query(
       `DROP TABLE ${table('follow_up_absence_monitors')}`,

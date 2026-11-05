@@ -9,6 +9,7 @@ import { reminderOccurrences } from '../policies/scheduledOccurrences.policy';
 import {
   type DispatchOutcome,
   type DueItem,
+  FAR_FUTURE,
   REMINDER_SEVERITY,
   REMINDER_TITLE,
   SWEEP_OCCURRENCE_LIMIT,
@@ -56,18 +57,19 @@ export class MedicationReminderDispatchRepository {
         WHERE r.deleted_at IS NULL
           AND m.status = 'active'
           AND m.reminders_enabled
-          AND coalesce(r.dispatched_through, r.created_at) < $1
+          AND (r.next_dispatch_at IS NULL OR r.next_dispatch_at <= $1)
           AND NOT (r.id = ANY($3::uuid[]))
-        ORDER BY coalesce(r.dispatched_through, r.created_at), r.id
+        ORDER BY r.next_dispatch_at NULLS FIRST, r.id
         LIMIT $2`,
       [now, limit, exclude],
     );
   }
 
   /**
-   * Gera um lembrete por horario da linha em `(cursor, now]` e avanca o
-   * cursor. Paciente inativo consome os horarios sem gerar. Sem horario
-   * vencido nada e gravado. Bateu o limite: o cursor para no ultimo gerado.
+   * Gera um lembrete por horario da linha em `(cursor, now]`, avanca o cursor
+   * e grava o proximo horario (`infinity` se a agenda acabou). Paciente
+   * inativo consome os horarios sem gerar. Bateu o limite: o cursor para no
+   * ultimo gerado e a linha continua vencida.
    */
   dispatch(
     organizationId: string,
@@ -122,22 +124,20 @@ export class MedicationReminderDispatchRepository {
 
       if (!reminder) return { kind: 'skipped' };
 
+      const schedule = {
+        startDate: reminder.startDate,
+        endDate: reminder.endDate,
+        intervalDays: reminder.intervalDays,
+        times: [reminder.timeOfDay],
+      };
       const occurrences = reminderOccurrences(
-        {
-          startDate: reminder.startDate,
-          endDate: reminder.endDate,
-          intervalDays: reminder.intervalDays,
-          times: [reminder.timeOfDay],
-        },
+        schedule,
         reminder.cursor,
         now,
         SWEEP_OCCURRENCE_LIMIT,
       );
-
-      if (occurrences.length === 0) return { kind: 'dispatched', alerts: 0 };
-
       const alerts =
-        reminder.patientStatus === 'active'
+        occurrences.length > 0 && reminder.patientStatus === 'active'
           ? await this.insertAlerts(
               manager,
               organizationId,
@@ -147,15 +147,20 @@ export class MedicationReminderDispatchRepository {
             )
           : 0;
       const cursor =
-        occurrences.length === SWEEP_OCCURRENCE_LIMIT
-          ? occurrences[occurrences.length - 1]
-          : now;
+        occurrences.length === 0
+          ? reminder.cursor
+          : occurrences.length === SWEEP_OCCURRENCE_LIMIT
+            ? occurrences[occurrences.length - 1]
+            : now;
+      const [next] = reminderOccurrences(schedule, cursor, FAR_FUTURE, 1);
 
       await manager.query(
         `UPDATE medication_reminders
-            SET dispatched_through = $3, updated_at = now()
+            SET dispatched_through = $3,
+                next_dispatch_at = coalesce($4::timestamptz, 'infinity'),
+                updated_at = now()
           WHERE organization_id = $1 AND id = $2`,
-        [organizationId, reminderId, cursor],
+        [organizationId, reminderId, cursor, next ?? null],
       );
 
       return { kind: 'dispatched', alerts };

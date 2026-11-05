@@ -261,6 +261,30 @@ describeWithDatabase(
       expect(await remindersOf(medication)).toHaveLength(0);
     });
 
+    it('linha sem horario vencido e agenda encerrada ficam fora da varredura seguinte', async () => {
+      const patient = await seed.patient(A);
+      const current = await seed.medication(A, patient);
+      const finished = await seed.medication(A, patient, {
+        startDate: '2026-01-01',
+      });
+      const repository = new MedicationReminderDispatchRepository(dataSource);
+
+      await dataSource.query(
+        "UPDATE medication_reminders SET end_date = '2026-01-10' WHERE id = $1",
+        [finished.reminder],
+      );
+      await pendingSince(current.medication, '24 hours');
+      await dispatch.execute();
+
+      const due = (
+        await repository.findDue(await repository.now(), 1000, [])
+      ).map((item) => item.id);
+
+      expect(due).not.toContain(current.reminder);
+      expect(due).not.toContain(finished.reminder);
+      expect(await remindersOf(current.medication)).toHaveLength(1);
+    });
+
     it('lembretes desligados nao geram nada', async () => {
       const patient = await seed.patient(A);
       const { medication } = await seed.medication(A, patient, {

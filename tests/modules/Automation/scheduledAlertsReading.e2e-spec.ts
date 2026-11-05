@@ -104,7 +104,8 @@ describeWithDatabase(
       await dataSource.query(
         `UPDATE follow_up_absence_monitors
           SET started_at = now() - interval '25 hours',
-              checked_through = now() - interval '25 hours'
+              checked_through = now() - interval '25 hours',
+              next_due_at = NULL
         WHERE patient_id = $1`,
         [patient],
       );

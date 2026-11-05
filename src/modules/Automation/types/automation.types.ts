@@ -14,6 +14,9 @@ export const REMINDER_TITLE = 'Lembrete de medicamento';
 export const SWEEP_ITEM_LIMIT = 200;
 export const SWEEP_OCCURRENCE_LIMIT = 50;
 
+/** Fim da busca do proximo vencimento: o maior instante de `Date`. */
+export const FAR_FUTURE = new Date(8.64e15);
+
 export interface AbsenceMessageInput {
   formName: string;
   since: Date;

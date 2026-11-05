@@ -11,6 +11,7 @@ import {
   ABSENCE_TITLE,
   type DispatchOutcome,
   type DueItem,
+  FAR_FUTURE,
   SWEEP_OCCURRENCE_LIMIT,
 } from '../types/automation.types';
 
@@ -103,15 +104,35 @@ export class AbsenceMonitorRepository {
     return rows.length;
   }
 
-  /** Pares ainda nao conferidos ate `now`, os mais atrasados primeiro. */
+  /**
+   * Pares com prazo vencido (ou ainda sem calculo). Tambem voltam os pares
+   * cujo prazo pode ter antecipado: formulario alterado (frequencia) ou
+   * registro anulado depois da ultima conferencia.
+   */
   findDue(now: Date, limit: number, exclude: string[]): Promise<DueItem[]> {
     return this.dataSource.query<DueItem[]>(
-      `SELECT organization_id AS "organizationId", id
-         FROM follow_up_absence_monitors
-        WHERE deleted_at IS NULL
-          AND checked_through < $1
-          AND NOT (id = ANY($3::uuid[]))
-        ORDER BY checked_through, id
+      `SELECT m.organization_id AS "organizationId", m.id
+         FROM follow_up_absence_monitors m
+         JOIN follow_up_forms f
+           ON f.id = m.form_id
+          AND f.organization_id = m.organization_id
+        WHERE m.deleted_at IS NULL
+          AND NOT (m.id = ANY($3::uuid[]))
+          AND (m.next_due_at IS NULL
+               OR m.next_due_at <= $1
+               OR f.updated_at > m.updated_at
+               OR EXISTS (
+                    SELECT 1
+                      FROM follow_up_records r
+                      JOIN follow_up_responses resp
+                        ON resp.record_id = r.id
+                       AND resp.organization_id = r.organization_id
+                     WHERE r.organization_id = m.organization_id
+                       AND r.patient_id = m.patient_id
+                       AND resp.form_id = m.form_id
+                       AND r.status = 'annulled'
+                       AND r.updated_at > m.updated_at))
+        ORDER BY m.next_due_at NULLS FIRST, m.id
         LIMIT $2`,
       [now, limit, exclude],
     );
@@ -175,12 +196,21 @@ export class AbsenceMonitorRepository {
         dueDates.length === SWEEP_OCCURRENCE_LIMIT
           ? dueDates[dueDates.length - 1]
           : now;
+      const [nextDue] = absenceDueDates(
+        anchor,
+        frequency,
+        cursor,
+        FAR_FUTURE,
+        1,
+      );
 
       await manager.query(
         `UPDATE follow_up_absence_monitors
-            SET checked_through = greatest(checked_through, $3), updated_at = now()
+            SET checked_through = greatest(checked_through, $3),
+                next_due_at = $4,
+                updated_at = now()
           WHERE organization_id = $1 AND id = $2`,
-        [organizationId, monitorId, cursor],
+        [organizationId, monitorId, cursor, nextDue],
       );
 
       return { kind: 'dispatched', alerts };
