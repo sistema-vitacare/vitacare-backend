@@ -37,6 +37,7 @@ import { FollowUpResponse } from './followUpResponse.entity';
   { name: 'follow_up_response_items_field_tenant_fk', onDelete: 'RESTRICT' },
 )
 @Unique('follow_up_response_items_field_unique', ['responseId', 'fieldId'])
+@Unique('follow_up_response_items_id_org_unique', ['id', 'organizationId'])
 @Check('follow_up_response_items_value_check', "btrim(value) <> ''")
 export class FollowUpResponseItem {
   @PrimaryColumn('uuid', { default: () => 'gen_random_uuid()' })

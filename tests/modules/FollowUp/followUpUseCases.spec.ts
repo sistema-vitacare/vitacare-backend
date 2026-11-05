@@ -1,5 +1,6 @@
 import { ProfileCode } from '@/common/context/requestContext.type';
 import { DomainException } from '@/common/errors/domain.exception';
+import type { EvaluateFollowUpAlertsUseCase } from '@/modules/Alert/EvaluateFollowUpAlerts/evaluateFollowUpAlerts.useCase';
 import { AnnulFollowUpUseCase } from '@/modules/FollowUp/AnnulFollowUp/annulFollowUp.useCase';
 import type { CreateFollowUpDto } from '@/modules/FollowUp/CreateFollowUp/createFollowUp.dto';
 import { CreateFollowUpUseCase } from '@/modules/FollowUp/CreateFollowUp/createFollowUp.useCase';
@@ -23,6 +24,8 @@ const repository = {
   findById: jest.fn(),
 };
 const followUps = repository as unknown as FollowUpRepository;
+const evaluator = { afterSubmit: jest.fn() };
+const alerts = evaluator as unknown as EvaluateFollowUpAlertsUseCase;
 
 const caregiver = sessionOf(ProfileCode.CAREGIVER);
 const professional = sessionOf(ProfileCode.PROFESSIONAL);
@@ -58,7 +61,7 @@ const codeOf = async (promise: Promise<unknown>) => {
 beforeEach(() => jest.resetAllMocks());
 
 describe('CreateFollowUpUseCase', () => {
-  const useCase = new CreateFollowUpUseCase(followUps);
+  const useCase = new CreateFollowUpUseCase(followUps, alerts);
 
   it('autoria, organizacao e escopo do cuidador vem da sessao', async () => {
     repository.create.mockResolvedValue({
@@ -82,6 +85,29 @@ describe('CreateFollowUpUseCase', () => {
         notes: 'Visita',
       }),
     );
+  });
+
+  it('avalia os alertas do registro gravado, na organizacao da sessao', async () => {
+    repository.create.mockResolvedValue({
+      kind: 'created',
+      followUp: followUpDetail(),
+    });
+
+    await useCase.execute(body(), caregiver);
+
+    expect(evaluator.afterSubmit).toHaveBeenCalledWith(
+      caregiver.organizationId,
+      FOLLOW_UP_ID,
+    );
+  });
+
+  it('nao avalia alertas quando o registro nao e gravado', async () => {
+    repository.create.mockResolvedValue({ kind: 'empty' });
+
+    await expect(useCase.execute(body(), caregiver)).rejects.toThrow(
+      DomainException,
+    );
+    expect(evaluator.afterSubmit).not.toHaveBeenCalled();
   });
 
   it('sem visitedAt usa o momento do envio', async () => {

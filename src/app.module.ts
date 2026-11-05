@@ -20,6 +20,7 @@ import { REDIS_CLIENT } from './redis/redis.constants';
 import { RedisThrottlerStorage } from './redis/redisThrottler.storage';
 import { HealthModule } from './health/health.module';
 import { AccessModule } from './modules/Access/access.module';
+import { AlertModule } from './modules/Alert/alert.module';
 import { AuditModule } from './modules/Audit/audit.module';
 import { AuthModule } from './modules/Auth/auth.module';
 import { FollowUpModule } from './modules/FollowUp/followUp.module';
@@ -116,6 +117,7 @@ function prettyTransport() {
     FollowUpModule,
     AttachmentModule,
     MedicationModule,
+    AlertModule,
     AuditModule,
     AuthModule,
     RedisModule,

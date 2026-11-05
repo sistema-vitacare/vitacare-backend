@@ -16,6 +16,7 @@ import { AuthErrors } from '@/modules/Auth/auth.errors';
 import { PermissionsGuard } from '@/modules/Auth/guards/permissions.guard';
 import type { AuthenticatedRequest } from '@/modules/Auth/types/authenticatedRequest.type';
 import { FollowUpController } from '@/modules/FollowUp/followUp.controller';
+import { EvaluateFollowUpAlertsUseCase } from '@/modules/Alert/EvaluateFollowUpAlerts/evaluateFollowUpAlerts.useCase';
 import { FOLLOW_UP_USE_CASES } from '@/modules/FollowUp/followUp.module';
 import { FollowUpRepository } from '@/modules/FollowUp/repositories/followUp.repository';
 
@@ -110,6 +111,10 @@ describe('FollowUp HTTP (e2e)', () => {
       controllers: [FollowUpController],
       providers: [
         ...FOLLOW_UP_USE_CASES,
+        {
+          provide: EvaluateFollowUpAlertsUseCase,
+          useValue: { afterSubmit: jest.fn().mockResolvedValue(undefined) },
+        },
         { provide: FollowUpRepository, useValue: followUps },
         { provide: APP_GUARD, useClass: StubAuthGuard },
         { provide: APP_GUARD, useClass: PermissionsGuard },
