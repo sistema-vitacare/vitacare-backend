@@ -85,6 +85,12 @@ export const nextOccurrence = (
   now: Date,
 ): Date | null => {
   const times = [...schedule.times].sort();
+
+  // Agenda sem horario ou sem inicio valido nunca ocorre (e travaria o laco).
+  if (times.length === 0 || !Number.isFinite(toDay(schedule.startDate))) {
+    return null;
+  }
+
   let day = firstScheduledDayFrom(schedule, toDay(todayInBrazil(now)));
 
   while (day !== null) {

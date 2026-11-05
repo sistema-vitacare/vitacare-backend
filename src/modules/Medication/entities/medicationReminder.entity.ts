@@ -20,7 +20,7 @@ import { Medication } from './medication.entity';
  */
 @Entity('medication_reminders')
 @Index('medication_reminders_active_time_unique', { synchronize: false })
-@Index('medication_reminders_active_idx', { synchronize: false })
+@Index('medication_reminders_medication_idx', { synchronize: false })
 @ForeignKey(() => Organization, ['organizationId'], ['id'], {
   name: 'medication_reminders_organization_fk',
   onDelete: 'RESTRICT',

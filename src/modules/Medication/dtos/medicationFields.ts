@@ -78,7 +78,7 @@ export const IsStartDate =
 
 /**
  * Fim ate 2100-12-31 e nao anterior ao inicio do mesmo corpo (ou a hoje,
- * quando o inicio e omitido na criacao). No `PATCH` sem inicio, o caso de uso
+ * quando o inicio e omitido ou nulo na criacao). No `PATCH` sem inicio, o caso de uso
  * compara com o inicio gravado.
  */
 export const IsEndDate =
@@ -99,7 +99,7 @@ export const IsEndDate =
           const { startDate } = args?.object as { startDate?: unknown };
           const start = isCalendarDate(startDate)
             ? startDate
-            : startDefaultsToToday && startDate === undefined
+            : startDefaultsToToday && startDate == null
               ? todayInBrazil()
               : null;
 

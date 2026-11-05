@@ -107,7 +107,7 @@ intervalo `[created_at, deleted_at)`; o BE-16 só dispara ocorrência dentro del
 
 CHECK `(status = 'active') = (deleted_at IS NULL)`. Índice único parcial
 `(medication_id, time_of_day) WHERE deleted_at IS NULL`. Índice
-`(organization_id, medication_id) WHERE deleted_at IS NULL`.
+`(organization_id, medication_id, deleted_at)` (serve as linhas vigentes e as encerradas).
 
 **Versionamento da agenda.** Mudar `startDate`, `endDate`, `intervalDays`,
 `times` ou `remindersEnabled` encerra todas as linhas ativas

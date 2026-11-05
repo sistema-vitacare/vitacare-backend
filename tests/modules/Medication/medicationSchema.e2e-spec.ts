@@ -368,6 +368,14 @@ describeWithDatabase('schema de medicamentos em PostgreSQL descartavel', () => {
     ).toBe('medication_reminders_active_time_unique');
   });
 
+  it('indexa a agenda por medicamento tambem nas linhas encerradas', async () => {
+    expect(
+      await scalar(
+        "SELECT indexdef AS value FROM pg_indexes WHERE indexname = 'medication_reminders_medication_idx'",
+      ),
+    ).toContain('(organization_id, medication_id, deleted_at)');
+  });
+
   it('entidades nao pedem criar ou remover tabela ou coluna', async () => {
     const changes = await dataSource.driver.createSchemaBuilder().log();
 

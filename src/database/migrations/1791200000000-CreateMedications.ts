@@ -115,7 +115,7 @@ export class CreateMedications1791200000000 implements MigrationInterface {
       `CREATE UNIQUE INDEX medication_reminders_active_time_unique ON ${table('medication_reminders')} (medication_id, time_of_day) WHERE deleted_at IS NULL`,
     );
     await queryRunner.query(
-      `CREATE INDEX medication_reminders_active_idx ON ${table('medication_reminders')} (organization_id, medication_id) WHERE deleted_at IS NULL`,
+      `CREATE INDEX medication_reminders_medication_idx ON ${table('medication_reminders')} (organization_id, medication_id, deleted_at)`,
     );
 
     await queryRunner.query(

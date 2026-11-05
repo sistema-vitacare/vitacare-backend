@@ -94,6 +94,21 @@ describe('nextOccurrence', () => {
     expect(nextOccurrence(ending, new Date('2026-11-05T23:00:00Z'))).toBeNull();
   });
 
+  it('agenda sem horarios nao tem proxima ocorrencia (sem laco infinito)', () => {
+    expect(
+      nextOccurrence({ ...daily, times: [] }, new Date('2026-11-05T12:00:00Z')),
+    ).toBeNull();
+  });
+
+  it('agenda sem inicio valido nao tem proxima ocorrencia', () => {
+    expect(
+      nextOccurrence(
+        { ...daily, startDate: null as unknown as string },
+        new Date('2026-11-05T12:00:00Z'),
+      ),
+    ).toBeNull();
+  });
+
   it('dia alinhado depois do fim nao conta', () => {
     const sparse = {
       ...daily,

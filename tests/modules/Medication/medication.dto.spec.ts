@@ -84,6 +84,10 @@ describe('CreateMedicationDto', () => {
     ['fim depois de 2100', { endDate: '2101-01-01' }],
     ['fim antes do inicio', { startDate: '2026-11-10', endDate: '2026-11-09' }],
     ['fim antes de hoje com inicio padrao', { endDate: '2001-01-01' }],
+    [
+      'fim antes de hoje com inicio nulo (= hoje)',
+      { startDate: null, endDate: '2001-01-01' },
+    ],
     ['lembrete em texto', { remindersEnabled: 'sim' }],
   ])('recusa %s', async (_label, override) => {
     expect(
