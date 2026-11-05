@@ -28,6 +28,7 @@ import { CreateFollowUpRecords1791000000000 } from '@/database/migrations/179100
 import { CreateFollowUpAttachments1791100000000 } from '@/database/migrations/1791100000000-CreateFollowUpAttachments';
 import { CreateMedications1791200000000 } from '@/database/migrations/1791200000000-CreateMedications';
 import { CreateAlerts1791300000000 } from '@/database/migrations/1791300000000-CreateAlerts';
+import { CreateScheduledAlerts1791400000000 } from '@/database/migrations/1791400000000-CreateScheduledAlerts';
 import { runPlatformSeed } from '@/database/seeds/platformSeed';
 import { SnakeNamingStrategy } from '@/database/snakeNaming.strategy';
 import type { TenantProfileCode } from '@/modules/Access/access.permissions';
@@ -82,10 +83,11 @@ const MIGRATIONS = [
   CreateFollowUpAttachments1791100000000,
   CreateMedications1791200000000,
   CreateAlerts1791300000000,
+  CreateScheduledAlerts1791400000000,
 ];
 
 const TRUNCATE_ALL =
-  'TRUNCATE alerts, alert_rules, medication_reminders, medications, follow_up_attachments, follow_up_response_items, follow_up_responses, follow_up_records, follow_up_form_patients, follow_up_form_fields, follow_up_form_versions, follow_up_forms, user_patients, patients, organization_plan_terms, plan_change_requests, audit_events, auth_sessions, password_reset_tokens, users, profile_permissions, permissions, access_profiles, organizations, usage_plans';
+  'TRUNCATE alerts, follow_up_absence_monitors, alert_rules, medication_reminders, medications, follow_up_attachments, follow_up_response_items, follow_up_responses, follow_up_records, follow_up_form_patients, follow_up_form_fields, follow_up_form_versions, follow_up_forms, user_patients, patients, organization_plan_terms, plan_change_requests, audit_events, auth_sessions, password_reset_tokens, users, profile_permissions, permissions, access_profiles, organizations, usage_plans';
 
 const SETTINGS: Record<string, number> = {
   'auth.sessionIdleSeconds': 1800,

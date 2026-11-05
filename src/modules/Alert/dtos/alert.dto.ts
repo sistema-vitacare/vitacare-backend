@@ -2,7 +2,13 @@ import { ApiProperty } from '@nestjs/swagger';
 
 import { UserRefDto } from '@/modules/FollowUp/dtos/followUp.dto';
 
-import { ALERT_RULE_OPERATORS, ALERT_SEVERITIES } from '../types/alert.types';
+import { FREQUENCY_UNITS } from '@/modules/Form/types/form.types';
+
+import {
+  ALERT_RULE_OPERATORS,
+  ALERT_SEVERITIES,
+  ALERT_SOURCES,
+} from '../types/alert.types';
 
 export class AlertRuleRefDto {
   @ApiProperty({ format: 'uuid' })
@@ -44,6 +50,63 @@ export class AlertFieldDto {
   unit!: string | null;
 }
 
+export class AlertOriginRefDto {
+  @ApiProperty({ format: 'uuid' })
+  id!: string;
+
+  @ApiProperty({ example: 'Sinais vitais', description: 'Nome atual.' })
+  name!: string;
+}
+
+export class AlertFrequencyDto {
+  @ApiProperty({ example: 1, minimum: 1, maximum: 365 })
+  interval!: number;
+
+  @ApiProperty({ enum: [...FREQUENCY_UNITS], example: 'days' })
+  unit!: string;
+}
+
+export class AlertAbsenceDto {
+  @ApiProperty({
+    type: AlertOriginRefDto,
+    description: 'Formulario sem registro.',
+  })
+  form!: AlertOriginRefDto;
+
+  @ApiProperty({
+    format: 'date-time',
+    description:
+      'Inicio da contagem: ultimo envio valido do formulario ou inicio do monitoramento.',
+  })
+  since!: string;
+
+  @ApiProperty({
+    format: 'date-time',
+    description: 'Prazo vencido sem registro (since + k x frequencia).',
+  })
+  dueAt!: string;
+
+  @ApiProperty({
+    type: AlertFrequencyDto,
+    description: 'Frequencia esperada no disparo.',
+  })
+  frequency!: AlertFrequencyDto;
+}
+
+export class AlertMedicationReminderDto {
+  @ApiProperty({ type: AlertOriginRefDto })
+  medication!: AlertOriginRefDto;
+
+  @ApiProperty({ format: 'uuid', description: 'Linha da agenda que disparou.' })
+  reminderId!: string;
+
+  @ApiProperty({
+    format: 'date-time',
+    description: 'Horario programado (pode ser anterior a generatedAt).',
+  })
+  scheduledAt!: string;
+}
+
 export class AlertDto {
   @ApiProperty({ format: 'uuid' })
   id!: string;
@@ -52,9 +115,10 @@ export class AlertDto {
   patient!: UserRefDto;
 
   @ApiProperty({
-    enum: ['reading'],
+    enum: [...ALERT_SOURCES],
     example: 'reading',
-    description: 'reading = valor registrado em acompanhamento.',
+    description:
+      'reading = valor registrado; absence = ausencia de registro; medication_reminder = horario de medicamento. So o bloco da origem vem preenchido.',
   })
   source!: string;
 
@@ -79,30 +143,64 @@ export class AlertDto {
   })
   message!: string;
 
-  @ApiProperty({ type: AlertRuleRefDto })
-  rule!: AlertRuleRefDto;
-
-  @ApiProperty({ type: AlertFollowUpRefDto })
-  followUp!: AlertFollowUpRefDto;
-
-  @ApiProperty({ type: AlertFieldDto })
-  field!: AlertFieldDto;
+  @ApiProperty({
+    type: AlertRuleRefDto,
+    nullable: true,
+    description: 'So em reading.',
+  })
+  rule!: AlertRuleRefDto | null;
 
   @ApiProperty({
-    example: '250',
-    description: 'Valor registrado, texto decimal canonico.',
+    type: AlertFollowUpRefDto,
+    nullable: true,
+    description: 'So em reading.',
   })
-  value!: string;
+  followUp!: AlertFollowUpRefDto | null;
+
+  @ApiProperty({
+    type: AlertFieldDto,
+    nullable: true,
+    description: 'So em reading.',
+  })
+  field!: AlertFieldDto | null;
+
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    example: '250',
+    description: 'Valor registrado, texto decimal canonico. So em reading.',
+  })
+  value!: string | null;
 
   @ApiProperty({
     enum: [...ALERT_RULE_OPERATORS],
+    nullable: true,
     example: 'gt',
-    description: 'Operador no disparo.',
+    description: 'Operador no disparo. So em reading.',
   })
-  operator!: string;
+  operator!: string | null;
 
-  @ApiProperty({ example: 180, description: 'Referencia no disparo.' })
-  referenceValue!: number;
+  @ApiProperty({
+    type: Number,
+    nullable: true,
+    example: 180,
+    description: 'Referencia no disparo. So em reading.',
+  })
+  referenceValue!: number | null;
+
+  @ApiProperty({
+    type: AlertAbsenceDto,
+    nullable: true,
+    description: 'So em absence.',
+  })
+  absence!: AlertAbsenceDto | null;
+
+  @ApiProperty({
+    type: AlertMedicationReminderDto,
+    nullable: true,
+    description: 'So em medication_reminder.',
+  })
+  medicationReminder!: AlertMedicationReminderDto | null;
 
   @ApiProperty({ format: 'date-time' })
   generatedAt!: string;

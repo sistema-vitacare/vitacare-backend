@@ -231,6 +231,36 @@ describeWithDatabase(
       }
     });
 
+    it('disparo e edicao travam na mesma ordem: sem deadlock, a edicao vence', async () => {
+      const patient = await seed.patient(A);
+      const { medication, reminder } = await seed.medication(A, patient);
+
+      await pendingSince(medication, '24 hours');
+
+      // Mesmos passos da edicao: trava o medicamento, depois encerra a linha.
+      const edit = dataSource.createQueryRunner();
+
+      await edit.startTransaction();
+      await edit.query('SELECT 1 FROM medications WHERE id = $1 FOR UPDATE', [
+        medication,
+      ]);
+
+      const running = dispatch.execute();
+
+      await new Promise((resolve) => setTimeout(resolve, 300));
+      await edit.query(
+        `UPDATE medication_reminders
+          SET status = 'ended', deleted_at = now(), updated_at = now()
+        WHERE id = $1`,
+        [reminder],
+      );
+      await edit.commitTransaction();
+      await edit.release();
+
+      expect((await running).failed).toBe(0);
+      expect(await remindersOf(medication)).toHaveLength(0);
+    });
+
     it('lembretes desligados nao geram nada', async () => {
       const patient = await seed.patient(A);
       const { medication } = await seed.medication(A, patient, {

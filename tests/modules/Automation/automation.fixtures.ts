@@ -96,38 +96,38 @@ export const seeder = (dataSource: DataSource) => {
     scalar,
 
     async organization(code: string): Promise<Org> {
-      const plan = (await scalar(
+      const plan = await scalar(
         "SELECT id AS value FROM usage_plans WHERE code = 'basic'",
-      ))!;
-      const id = (await scalar(
+      );
+      const id = await scalar(
         `INSERT INTO organizations (code, legal_name, trade_name, usage_plan_id)
          VALUES ($1, $1, $1, $2) RETURNING id AS value`,
         [code, plan],
-      ))!;
+      );
       await dataSource.query(
         `INSERT INTO access_profiles (organization_id, code, name)
          VALUES ($1, 'professional', 'professional')`,
         [id],
       );
-      const user = (await scalar(
+      const user = await scalar(
         `INSERT INTO users (organization_id, profile_id, name, email, cpf, status, must_change_password)
          SELECT $1, id, 'Profissional', $2, $3, 'active', false
            FROM access_profiles WHERE organization_id = $1
          RETURNING id AS value`,
         [id, `p@${code}.test`, cpf()],
-      ))!;
+      );
 
       return { id, user };
     },
 
     patient: async (org: Org, status: 'active' | 'inactive' = 'active') =>
-      (await scalar(
+      await scalar(
         `INSERT INTO patients (organization_id, name, birth_date, status, deleted_at)
          VALUES ($1, 'Paciente Sintetico', '1948-03-12', $2::varchar,
                  CASE WHEN $2::varchar = 'inactive' THEN now() END)
          RETURNING id AS value`,
         [org.id, status],
-      ))!,
+      ),
 
     /** Formulario ativo com versao publicada; `patients` restringe o publico. */
     async form(
@@ -144,7 +144,7 @@ export const seeder = (dataSource: DataSource) => {
         name?: string;
       } = {},
     ): Promise<{ id: string; version: string }> {
-      const id = (await scalar(
+      const id = await scalar(
         `INSERT INTO follow_up_forms
            (organization_id, name, status, audience, frequency_interval, frequency_unit)
          VALUES ($1, $2, 'active', $3, $4, $5) RETURNING id AS value`,
@@ -155,13 +155,13 @@ export const seeder = (dataSource: DataSource) => {
           interval,
           interval === null ? null : unit,
         ],
-      ))!;
-      const version = (await scalar(
+      );
+      const version = await scalar(
         `INSERT INTO follow_up_form_versions
            (organization_id, form_id, version_number, status, published_at, published_by_user_id)
          VALUES ($1, $2, 1, 'published', now(), $3) RETURNING id AS value`,
         [org.id, id, org.user],
-      ))!;
+      );
 
       for (const patient of patients ?? []) {
         await dataSource.query(
@@ -181,13 +181,13 @@ export const seeder = (dataSource: DataSource) => {
       form: { id: string; version: string },
       ago: string,
     ): Promise<string> {
-      const record = (await scalar(
+      const record = await scalar(
         `INSERT INTO follow_up_records
            (organization_id, patient_id, author_user_id, visited_at, created_at, alerts_evaluated_at)
          VALUES ($1, $2, $3, now() - $4::interval, now() - $4::interval, now())
          RETURNING id AS value`,
         [org.id, patient, org.user, ago],
-      ))!;
+      );
       await dataSource.query(
         `INSERT INTO follow_up_responses (organization_id, record_id, form_id, form_version_id)
          VALUES ($1, $2, $3, $4)`,
@@ -213,19 +213,19 @@ export const seeder = (dataSource: DataSource) => {
         remindersEnabled?: boolean;
       } = {},
     ): Promise<{ medication: string; reminder: string }> {
-      const medication = (await scalar(
+      const medication = await scalar(
         `INSERT INTO medications
            (organization_id, patient_id, created_by_user_id, name, dose_amount,
             dose_unit, reminders_enabled)
          VALUES ($1, $2, $3, 'Losartana', 50, 'mg', $4) RETURNING id AS value`,
         [org.id, patient, org.user, remindersEnabled],
-      ))!;
-      const reminder = (await scalar(
+      );
+      const reminder = await scalar(
         `INSERT INTO medication_reminders
            (organization_id, medication_id, start_date, interval_days, time_of_day)
          VALUES ($1, $2, $3, $4, $5) RETURNING id AS value`,
         [org.id, medication, startDate, intervalDays, time],
-      ))!;
+      );
 
       return { medication, reminder };
     },

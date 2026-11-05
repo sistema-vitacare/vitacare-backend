@@ -51,6 +51,8 @@ export const alertRow = (overrides: Partial<AlertRow> = {}): AlertRow => ({
   value: '250',
   operator: 'gt',
   referenceValue: 180,
+  absence: null,
+  medicationReminder: null,
   generatedAt: new Date('2026-11-05T12:01:00.000Z'),
   ...overrides,
 });

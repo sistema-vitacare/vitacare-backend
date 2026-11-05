@@ -75,6 +75,23 @@ export class MedicationReminderDispatchRepository {
     now: Date,
   ): Promise<DispatchOutcome> {
     return this.dataSource.transaction(async (manager) => {
+      // Medicamento antes da linha, na ordem da edicao (BE-14): o INSERT do
+      // alerta pede KEY SHARE no medicamento e, na ordem inversa, disputaria
+      // com uma edicao em curso ate o deadlock.
+      const [medication] = await manager.query<unknown[]>(
+        `SELECT 1
+           FROM medications m
+           JOIN medication_reminders r
+             ON r.medication_id = m.id
+            AND r.organization_id = m.organization_id
+          WHERE r.organization_id = $1
+            AND r.id = $2
+          FOR KEY SHARE OF m SKIP LOCKED`,
+        [organizationId, reminderId],
+      );
+
+      if (!medication) return { kind: 'skipped' };
+
       const [reminder] = await manager.query<LockedReminder[]>(
         `SELECT m.id AS "medicationId",
                 m.patient_id AS "patientId",

@@ -35,6 +35,7 @@ interface SchemaObject {
   $ref?: string;
   type?: string;
   enum?: string[];
+  nullable?: boolean;
   required?: string[];
   items?: SchemaObject;
   properties?: Record<string, SchemaObject>;
@@ -433,6 +434,34 @@ describe('Alert HTTP (e2e)', () => {
       'string',
     );
     expect(schemas.AlertDto.properties?.status.enum).toEqual(['open']);
+    expect(schemas.AlertDto.properties?.source.enum).toEqual([
+      'reading',
+      'absence',
+      'medication_reminder',
+    ]);
+    for (const property of [
+      'rule',
+      'followUp',
+      'field',
+      'value',
+      'operator',
+      'referenceValue',
+      'absence',
+      'medicationReminder',
+    ]) {
+      expect(schemas.AlertDto.properties?.[property].nullable).toBe(true);
+    }
+    expect(schemas.AlertAbsenceDto.required?.sort()).toEqual([
+      'dueAt',
+      'form',
+      'frequency',
+      'since',
+    ]);
+    expect(schemas.AlertMedicationReminderDto.required?.sort()).toEqual([
+      'medication',
+      'reminderId',
+      'scheduledAt',
+    ]);
     expect(schemas.AlertRuleDto.properties?.status.enum).toEqual([
       'active',
       'inactive',
