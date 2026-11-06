@@ -38,7 +38,8 @@ export const ALERT_REPOSITORIES = [AlertRuleRepository, AlertRepository];
 
 /**
  * Regras e alertas por valor registrado (BE-15); resolucao (BE-17). Exporta a avaliacao para o
- * envio do registro de acompanhamento chamar logo apos o commit.
+ * envio do registro de acompanhamento chamar logo apos o commit e a listagem
+ * para a visao consolidada do paciente (BE-18).
  */
 @Module({
   imports: [
@@ -52,6 +53,6 @@ export const ALERT_REPOSITORIES = [AlertRuleRepository, AlertRepository];
     EvaluateFollowUpAlertsUseCase,
     AlertSweepProcessor,
   ],
-  exports: [EvaluateFollowUpAlertsUseCase],
+  exports: [EvaluateFollowUpAlertsUseCase, AlertRepository],
 })
 export class AlertModule {}

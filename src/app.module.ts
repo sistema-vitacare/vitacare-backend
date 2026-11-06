@@ -28,6 +28,7 @@ import { AuthModule } from './modules/Auth/auth.module';
 import { FollowUpModule } from './modules/FollowUp/followUp.module';
 import { AttachmentModule } from './modules/Attachment/attachment.module';
 import { FormModule } from './modules/Form/form.module';
+import { HistoryModule } from './modules/History/history.module';
 import { MedicationModule } from './modules/Medication/medication.module';
 import { NotificationModule } from './modules/Notification/notification.module';
 import { OrganizationModule } from './modules/Organization/organization.module';
@@ -121,6 +122,7 @@ function prettyTransport() {
     FollowUpModule,
     AttachmentModule,
     MedicationModule,
+    HistoryModule,
     AlertModule,
     NotificationModule,
     AutomationModule,

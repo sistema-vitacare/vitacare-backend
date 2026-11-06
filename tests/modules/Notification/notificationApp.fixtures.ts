@@ -1,4 +1,4 @@
-import { INestApplication } from '@nestjs/common';
+import { INestApplication, type Provider, type Type } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { APP_GUARD } from '@nestjs/core';
 import type { NestExpressApplication } from '@nestjs/platform-express';
@@ -99,9 +99,13 @@ export interface Tenant {
  * BE-17 de ponta a ponta com guards e login reais: organizacoes A e B com um
  * usuario de cada perfil (e um segundo cuidador sem vinculo) e o master da
  * plataforma. Pacientes, vinculos e alertas entram direto no banco; o push e
- * um canal falso cujo `enabled` o teste liga e desliga.
+ * um canal falso cujo `enabled` o teste liga e desliga. `extra` acrescenta
+ * controllers e providers de outros modulos ao mesmo app.
  */
-export const bootNotificationApp = async (databaseUrl: string) => {
+export const bootNotificationApp = async (
+  databaseUrl: string,
+  extra: { controllers?: Type[]; providers?: Provider[] } = {},
+) => {
   const parsed = new URL(databaseUrl);
 
   if (
@@ -136,7 +140,11 @@ export const bootNotificationApp = async (databaseUrl: string) => {
 
   const push = { enabled: false, send: jest.fn() };
   const moduleRef = await Test.createTestingModule({
-    controllers: [NotificationController, AlertController],
+    controllers: [
+      NotificationController,
+      AlertController,
+      ...(extra.controllers ?? []),
+    ],
     providers: [
       { provide: DataSource, useValue: dataSource },
       { provide: ConfigService, useValue: config },
@@ -157,6 +165,7 @@ export const bootNotificationApp = async (databaseUrl: string) => {
       ...ALERT_REPOSITORIES,
       ...NOTIFICATION_USE_CASES,
       ...NOTIFICATION_REPOSITORIES,
+      ...(extra.providers ?? []),
 
       { provide: APP_GUARD, useClass: AuthGuard },
       { provide: APP_GUARD, useClass: PermissionsGuard },
