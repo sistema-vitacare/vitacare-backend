@@ -1,17 +1,17 @@
 ---
-title: Listar registros de acompanhamento do paciente
+title: Listar e filtrar o histórico de registros do paciente
 status: atual
-updated: 2026-11-04
+updated: 2026-11-06
 method: GET
 path: /api/v1/follow-ups
 source: src/modules/FollowUp/followUp.controller.ts
 ---
 
-# GET /api/v1/follow-ups — lista os registros de acompanhamento de um paciente
+# GET /api/v1/follow-ups — histórico de registros de acompanhamento de um paciente
 
 ## Propósito e acesso
 
-Consulta autorizada dos registros do UC11 (RF009; BE-12), base do histórico do UC12. Devolve os registros de **um paciente**, válidos e anulados, com as respostas e os metadados dos campos da versão respondida. Os filtros do histórico por período, parâmetro e responsável (UC12) e a visão simplificada do familiar são dos cards BE-18 e BE-19 e **não** existem aqui.
+Histórico do paciente do UC12 (RF010; BE-18) sobre os registros do UC11 (RF009; BE-12). Devolve os registros de **um paciente**, válidos e anulados, com autoria, as respostas e os metadados dos campos da versão respondida, filtráveis por período, parâmetro, categoria (seção), responsável, formulário e situação (decisão de Mateus, 2026-11-06). A visão simplificada do familiar é do BE-19 e **não** existe aqui. A visão consolidada (contadores e últimas medições) está em [GET /patients/{patientId}/overview](patients-visao-consolidada.md).
 
 Autenticação: `Authorization: Bearer <token>` de sessão normal com `patient_history:read` — `admin`, `professional`, `caregiver` e `family` (decisão de Mateus, 2026-11-04). Alcance pelo paciente:
 
@@ -30,11 +30,17 @@ Path: nenhum. Body: nenhum.
 | --- | --- | --- | --- | --- |
 | `patientId` | UUID | sim | — | Paciente dos registros. |
 | `status` | `valid` \| `annulled` | não | todos | Filtra por situação do registro. |
+| `from` | data `AAAA-MM-DD` | não | sem limite | Primeiro dia do período, **inclusivo**, pela data da visita (`visitedAt`) no fuso `America/Sao_Paulo`. |
+| `to` | data `AAAA-MM-DD` | não | sem limite; ≥ `from` | Último dia do período, **inclusivo**, pela data da visita no fuso `America/Sao_Paulo`. |
+| `formId` | UUID | não | — | Tipo de formulário: só registros que responderam este formulário (qualquer versão). |
+| `authorUserId` | UUID | não | — | Responsável: só registros deste autor. |
+| `fieldKey` | UUID | não | — | Parâmetro: só registros com resposta neste campo, pela identidade que atravessa as versões (`answers[].fieldKey`). |
+| `section` | texto | não | 1–60 caracteres, aparado | Categoria de informação: só registros com resposta em campo desta seção (`answers[].section`), sem diferenciar maiúsculas. |
 | `page` | inteiro | não | `1`; ≥ 1 | Página. |
 | `limit` | inteiro | não | `20`; 1–100 | Itens por página. |
 
 ```bash
-curl -i 'https://api.example.com/api/v1/follow-ups?patientId=3c9e2a71-5b1d-4e8f-9a2c-7d6e5f4a3b21&status=valid&page=1&limit=20' \
+curl -i 'https://api.example.com/api/v1/follow-ups?patientId=3c9e2a71-5b1d-4e8f-9a2c-7d6e5f4a3b21&status=valid&from=2026-11-01&to=2026-11-06&section=Sinais%20vitais&page=1&limit=20' \
   -H 'Accept: application/json' \
   -H 'Authorization: Bearer F3dQ2p...Zc9'
 ```
@@ -85,9 +91,15 @@ curl -i 'https://api.example.com/api/v1/follow-ups?patientId=3c9e2a71-5b1d-4e8f-
 
 As propriedades de cada item estão descritas em [follow-ups-consultar.md](follow-ups-consultar.md). `meta.pagination`: `page`, `limit`, `total` (registros que passam no filtro) e `totalPages`.
 
-## Ordem, paginação e datas
+## Filtros, ordem, paginação e datas
 
-Ordem: `visitedAt` decrescente (visita mais recente primeiro), depois `submittedAt` decrescente e `id`. Instantes em ISO 8601 UTC. Registros anulados continuam na lista (sem filtro) com `status = "annulled"` e `annulment` preenchido.
+- Os filtros são opcionais e se **combinam com E**; `total` conta só o que passa em todos.
+- **Período:** `from` e `to` são dias do calendário de Brasília, inclusivos nas duas pontas, aplicados à data da **visita** (`visitedAt`), não ao envio. Uma visita em `2026-10-01T02:30:00Z` (30/09 às 23:30 em Brasília) entra em `to=2026-09-30`. Pode-se informar só uma das pontas.
+- **Parâmetro e categoria:** `fieldKey` e `section` selecionam registros que têm **alguma** resposta no campo ou na seção; o registro sai **completo**, com todas as respostas (chamada do agente, pendente de confirmação: o registro é a unidade auditável). Campo desabilitado ou de versão antiga conta pela resposta gravada.
+- **Período ou filtro sem registro:** `200` com `data: []` e `total: 0`; a mensagem informativa do UC12 fica com o frontend.
+- **Ordem:** `visitedAt` decrescente (visita mais recente primeiro), depois `submittedAt` decrescente e `id`. Instantes em ISO 8601 UTC.
+- Registros anulados continuam na lista (sem filtro de `status`) com `status = "annulled"` e `annulment` preenchido.
+- Paciente inativo continua com o histórico inteiro legível.
 
 ## Erros
 
@@ -96,7 +108,7 @@ Ordem: `visitedAt` decrescente (visita mais recente primeiro), depois `submitted
 | `401` | `AUTH_UNAUTHENTICATED` | Sessão ausente ou inválida. |
 | `403` | `AUTH_FORBIDDEN` | Sessão sem `patient_history:read` (master). |
 | `404` | `PATIENT_NOT_FOUND` | Paciente inexistente, de outra organização ou fora do alcance. |
-| `422` | `VALIDATION_FAILED` | `patientId` ausente ou não UUID, `status` fora do enum, paginação inválida, query desconhecida. |
+| `422` | `VALIDATION_FAILED` | `patientId` ausente ou não UUID, `status` fora do enum, `from`/`to` fora de `AAAA-MM-DD` ou inexistente, `to` anterior a `from` (campo `to`), `formId`/`authorUserId`/`fieldKey` não UUID, `section` vazia ou acima de 60, paginação inválida, query desconhecida. |
 
 ```json
 {
@@ -118,4 +130,4 @@ Ordem: `visitedAt` decrescente (visita mais recente primeiro), depois `submitted
 
 ## Origem e validação
 
-Controller `src/modules/FollowUp/followUp.controller.ts`; caso de uso `src/modules/FollowUp/ListFollowUps/listFollowUps.useCase.ts`; DTO `src/modules/FollowUp/ListFollowUps/listFollowUps.dto.ts`; repositório `src/modules/FollowUp/repositories/followUp.repository.ts` (alcance por `findPatientInScope` e `PATIENT_SCOPE_WHERE`). Testes: `tests/modules/FollowUp/followUpManagement.e2e-spec.ts` (ordem, filtro de status, quatro perfis, sem vínculo e outra organização) e `tests/modules/FollowUp/followUp.e2e-spec.ts` (contrato OpenAPI). Conferido em 2026-11-04. Vault: [[2026-10-29-be-12-followups]], [[2026-11-04-registros-acompanhamento]]. Requisitos: RF009; UC11; UC12 (parcial). Versão: `v1`, criada no BE-12 (2026-11-04).
+Controller `src/modules/FollowUp/followUp.controller.ts`; caso de uso `src/modules/FollowUp/ListFollowUps/listFollowUps.useCase.ts`; DTO `src/modules/FollowUp/ListFollowUps/listFollowUps.dto.ts`; repositório `src/modules/FollowUp/repositories/followUp.repository.ts` (alcance por `findPatientInScope` e `PATIENT_SCOPE_WHERE`). Testes: `tests/modules/FollowUp/followUpManagement.e2e-spec.ts` (ordem, filtro de status, quatro perfis, sem vínculo e outra organização), `tests/modules/History/historyManagement.e2e-spec.ts` (filtros combinados, período em dia local, período vazio, paciente inativo, sem vínculo, vínculo revogado e outra organização em PostgreSQL), `tests/modules/FollowUp/listFollowUps.dto.spec.ts` (validação dos filtros) e `tests/modules/FollowUp/followUp.e2e-spec.ts` (repasse dos filtros e contrato OpenAPI). Conferido em 2026-11-06. Vault: [[2026-10-29-be-12-followups]], [[2026-11-04-registros-acompanhamento]], [[2026-10-29-be-18-history]], [[2026-11-06-historico-filtros-e-visao-consolidada]]. Requisitos: RF009; RF010; RF016; UC11; UC12. Versão: `v1`, criada no BE-12 (2026-11-04); filtros acrescentados no BE-18 (2026-11-06), sem quebra de contrato.
