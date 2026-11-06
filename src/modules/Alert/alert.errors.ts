@@ -56,4 +56,9 @@ export const AlertErrors = {
     status: HttpStatus.NOT_FOUND,
     message: 'Alerta não encontrado.',
   },
+  ALREADY_RESOLVED: {
+    code: 'ALERT_ALREADY_RESOLVED',
+    status: HttpStatus.CONFLICT,
+    message: 'O alerta já foi resolvido.',
+  },
 } as const;

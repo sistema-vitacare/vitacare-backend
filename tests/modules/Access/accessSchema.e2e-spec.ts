@@ -687,8 +687,8 @@ describeWithDatabase('perfis de acesso em PostgreSQL descartavel', () => {
       );
 
       // Concessoes acrescentadas depois pelas migrations
-      // 1790800000000-AddPatientCareLinks, 1791000000000-CreateFollowUpRecords
-      // e 1791200000000-CreateMedications.
+      // 1790800000000-AddPatientCareLinks, 1791000000000-CreateFollowUpRecords,
+      // 1791200000000-CreateMedications e 1791500000000-CreateAlertNotifications.
       expect(current).toEqual({
         ...SNAPSHOT_PROFILES,
         admin: {
@@ -696,6 +696,7 @@ describeWithDatabase('perfis de acesso em PostgreSQL descartavel', () => {
           permissions: [
             ...SNAPSHOT_PROFILES.admin.permissions,
             'follow_ups:annul',
+            'alerts:resolve',
           ].sort(),
         },
         professional: {
@@ -704,6 +705,7 @@ describeWithDatabase('perfis de acesso em PostgreSQL descartavel', () => {
             ...SNAPSHOT_PROFILES.professional.permissions,
             'patient_links:manage',
             'follow_ups:annul',
+            'alerts:resolve',
           ].sort(),
         },
         caregiver: {
@@ -711,6 +713,7 @@ describeWithDatabase('perfis de acesso em PostgreSQL descartavel', () => {
           permissions: [
             ...SNAPSHOT_PROFILES.caregiver.permissions,
             'medications:read',
+            'alerts:resolve',
           ].sort(),
         },
         family: {
@@ -722,16 +725,18 @@ describeWithDatabase('perfis de acesso em PostgreSQL descartavel', () => {
         },
       });
       // Rotulos trocados depois pelas migrations 1790700000000-CreatePatients
-      // e 1790900000000-CreateFollowUpForms; codigo novo da
-      // 1791000000000-CreateFollowUpRecords.
+      // e 1790900000000-CreateFollowUpForms; codigos novos da
+      // 1791000000000-CreateFollowUpRecords e da
+      // 1791500000000-CreateAlertNotifications.
       expect(PERMISSION_LABELS).toEqual({
         ...SNAPSHOT_LABELS,
         'patients:deactivate': 'Inativar e reativar pacientes',
         'forms:deactivate': 'Desativar e reativar formularios',
         'follow_ups:annul': 'Anular registro de acompanhamento',
+        'alerts:resolve': 'Resolver alertas',
       });
       expect([...TENANT_PERMISSION_CODES].sort()).toEqual(
-        [...SNAPSHOT_TENANT_CODES, 'follow_ups:annul'].sort(),
+        [...SNAPSHOT_TENANT_CODES, 'follow_ups:annul', 'alerts:resolve'].sort(),
       );
     });
 

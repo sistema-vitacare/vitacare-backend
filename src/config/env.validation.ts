@@ -71,6 +71,30 @@ export const environmentValidationSchema = Joi.object({
     .max(60000)
     .default(10000),
 
+  // Notificacoes: push do navegador (VAPID) e link do app
+  WEB_PUSH_ENABLED: bool.default(false),
+  WEB_PUSH_PUBLIC_KEY: Joi.when('WEB_PUSH_ENABLED', {
+    is: true,
+    then: Joi.string().trim().required(),
+    otherwise: Joi.string().allow('').optional(),
+  }),
+  WEB_PUSH_PRIVATE_KEY: Joi.when('WEB_PUSH_ENABLED', {
+    is: true,
+    then: Joi.string().trim().required(),
+    otherwise: Joi.string().allow('').optional(),
+  }),
+  WEB_PUSH_SUBJECT: Joi.when('WEB_PUSH_ENABLED', {
+    is: true,
+    then: Joi.string()
+      .uri({ scheme: ['mailto', 'https'] })
+      .required(),
+    otherwise: Joi.string().allow('').optional(),
+  }),
+  NOTIFICATION_APP_URL: Joi.string()
+    .uri({ scheme: ['http', 'https'] })
+    .allow('')
+    .optional(),
+
   // PostgreSQL externo
   DB_HOST: host.required(),
   DB_PORT: Joi.number().port().default(5432),

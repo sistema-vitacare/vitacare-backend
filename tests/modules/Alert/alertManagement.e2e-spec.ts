@@ -29,6 +29,7 @@ import { CreateFollowUpAttachments1791100000000 } from '@/database/migrations/17
 import { CreateMedications1791200000000 } from '@/database/migrations/1791200000000-CreateMedications';
 import { CreateAlerts1791300000000 } from '@/database/migrations/1791300000000-CreateAlerts';
 import { CreateScheduledAlerts1791400000000 } from '@/database/migrations/1791400000000-CreateScheduledAlerts';
+import { CreateAlertNotifications1791500000000 } from '@/database/migrations/1791500000000-CreateAlertNotifications';
 import { runPlatformSeed } from '@/database/seeds/platformSeed';
 import { SnakeNamingStrategy } from '@/database/snakeNaming.strategy';
 import type { TenantProfileCode } from '@/modules/Access/access.permissions';
@@ -84,10 +85,11 @@ const MIGRATIONS = [
   CreateMedications1791200000000,
   CreateAlerts1791300000000,
   CreateScheduledAlerts1791400000000,
+  CreateAlertNotifications1791500000000,
 ];
 
 const TRUNCATE_ALL =
-  'TRUNCATE alerts, follow_up_absence_monitors, alert_rules, medication_reminders, medications, follow_up_attachments, follow_up_response_items, follow_up_responses, follow_up_records, follow_up_form_patients, follow_up_form_fields, follow_up_form_versions, follow_up_forms, user_patients, patients, organization_plan_terms, plan_change_requests, audit_events, auth_sessions, password_reset_tokens, users, profile_permissions, permissions, access_profiles, organizations, usage_plans';
+  'TRUNCATE notification_deliveries, push_subscriptions, alert_notifications, notification_preferences, alerts, follow_up_absence_monitors, alert_rules, medication_reminders, medications, follow_up_attachments, follow_up_response_items, follow_up_responses, follow_up_records, follow_up_form_patients, follow_up_form_fields, follow_up_form_versions, follow_up_forms, user_patients, patients, organization_plan_terms, plan_change_requests, audit_events, auth_sessions, password_reset_tokens, users, profile_permissions, permissions, access_profiles, organizations, usage_plans';
 
 const SETTINGS: Record<string, number> = {
   'auth.sessionIdleSeconds': 1800,
@@ -434,6 +436,29 @@ describeWithDatabase('regras e alertas em PostgreSQL (e2e)', () => {
         ORDER BY operator, rule_id`,
       [followUpId],
     );
+
+  /** Apaga os alertas dos registros, com as notificacoes do BE-17. */
+  const dropAlertsOf = async (followUpIds: string[]) => {
+    await dataSource.query(
+      `DELETE FROM notification_deliveries d
+        USING alert_notifications n, alerts a
+        WHERE d.notification_id = n.id
+          AND n.alert_id = a.id
+          AND a.follow_up_record_id = ANY($1::uuid[])`,
+      [followUpIds],
+    );
+    await dataSource.query(
+      `DELETE FROM alert_notifications n
+        USING alerts a
+        WHERE n.alert_id = a.id
+          AND a.follow_up_record_id = ANY($1::uuid[])`,
+      [followUpIds],
+    );
+    await dataSource.query(
+      'DELETE FROM alerts WHERE follow_up_record_id = ANY($1::uuid[])',
+      [followUpIds],
+    );
+  };
 
   const markPending = (followUpId: string, ageSeconds = 0) =>
     dataSource.query(
@@ -1075,10 +1100,7 @@ describeWithDatabase('regras e alertas em PostgreSQL (e2e)', () => {
         'Glicemia capilar': 300,
       });
 
-      await dataSource.query(
-        'DELETE FROM alerts WHERE follow_up_record_id = $1',
-        [followUpId],
-      );
+      await dropAlertsOf([followUpId]);
       await markPending(followUpId);
 
       const annulled = await http(
@@ -1112,10 +1134,7 @@ describeWithDatabase('regras e alertas em PostgreSQL (e2e)', () => {
       });
       const recent = await submit(patientId, form, { 'Glicemia capilar': 300 });
 
-      await dataSource.query(
-        'DELETE FROM alerts WHERE follow_up_record_id = ANY($1::uuid[])',
-        [[old, recent]],
-      );
+      await dropAlertsOf([old, recent]);
       await markPending(old, 600);
       await markPending(recent);
       await createRule(form, 'Dor', 'gte', 5);
@@ -1155,10 +1174,7 @@ describeWithDatabase('regras e alertas em PostgreSQL (e2e)', () => {
         'Glicemia capilar': 300,
       });
 
-      await dataSource.query(
-        'DELETE FROM alerts WHERE follow_up_record_id = ANY($1::uuid[])',
-        [[failedRecently, failedLongAgo]],
-      );
+      await dropAlertsOf([failedRecently, failedLongAgo]);
       await markPending(failedRecently, 600);
       await markPending(failedLongAgo, 600);
       await dataSource.query(
@@ -1190,10 +1206,7 @@ describeWithDatabase('regras e alertas em PostgreSQL (e2e)', () => {
         'Glicemia capilar': 300,
       });
 
-      await dataSource.query(
-        'DELETE FROM alerts WHERE follow_up_record_id = $1',
-        [followUpId],
-      );
+      await dropAlertsOf([followUpId]);
       await markPending(followUpId);
       await dataSource.query(
         `UPDATE follow_up_records

@@ -46,18 +46,18 @@ Escrita a mao para nao adicionar dependencia. `organizationId` vira
 
 Fecha as pendencias P13 e P14. **Nao copiar os tipos do MER para o PostgreSQL.**
 
-| Uso | Tipo | Motivo |
-| --- | --- | --- |
-| Chave primaria | `uuid` com `gen_random_uuid()` | Nao revela volume entre tenants. Nativo no PostgreSQL 13+. |
-| Data e hora | `timestamptz` | Substitui `DATETIME` e os `INT` de timestamp do MER. |
-| Data sem hora | `date` | Nascimento, vigencia. |
-| Dinheiro | `numeric(12,2)` | `INT` do MER perde centavos. |
-| Dose e valor clinico | `numeric(10,3)` + coluna de unidade | `INT` do MER nao representa 2,5 mg. |
-| Status e opcoes | `varchar` + `CHECK` | Aceita valor novo sem `ALTER TYPE` travando a tabela. Substitui os `ENUM` vazios do MER. |
-| E-mail | `citext` + indice unico | Resolve case-insensitive no banco. |
-| Texto livre | `text` | `VARCHAR` sem tamanho do MER nao tem vantagem no PostgreSQL. |
-| Autoria e datas | `created_at`/`updated_at` `timestamptz` + `created_by`/`updated_by` `uuid` | Autoria vem da sessao, nunca do corpo da requisicao. |
-| Exclusao logica | `deleted_at timestamptz` nulo em toda tabela | Convencao de Mateus em 2026-09-18; substitui `deactivated_at`. |
+| Uso                  | Tipo                                                                       | Motivo                                                                                   |
+| -------------------- | -------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| Chave primaria       | `uuid` com `gen_random_uuid()`                                             | Nao revela volume entre tenants. Nativo no PostgreSQL 13+.                               |
+| Data e hora          | `timestamptz`                                                              | Substitui `DATETIME` e os `INT` de timestamp do MER.                                     |
+| Data sem hora        | `date`                                                                     | Nascimento, vigencia.                                                                    |
+| Dinheiro             | `numeric(12,2)`                                                            | `INT` do MER perde centavos.                                                             |
+| Dose e valor clinico | `numeric(10,3)` + coluna de unidade                                        | `INT` do MER nao representa 2,5 mg.                                                      |
+| Status e opcoes      | `varchar` + `CHECK`                                                        | Aceita valor novo sem `ALTER TYPE` travando a tabela. Substitui os `ENUM` vazios do MER. |
+| E-mail               | `citext` + indice unico                                                    | Resolve case-insensitive no banco.                                                       |
+| Texto livre          | `text`                                                                     | `VARCHAR` sem tamanho do MER nao tem vantagem no PostgreSQL.                             |
+| Autoria e datas      | `created_at`/`updated_at` `timestamptz` + `created_by`/`updated_by` `uuid` | Autoria vem da sessao, nunca do corpo da requisicao.                                     |
+| Exclusao logica      | `deleted_at timestamptz` nulo em toda tabela                               | Convencao de Mateus em 2026-09-18; substitui `deactivated_at`.                           |
 
 `citext` exige `CREATE EXTENSION IF NOT EXISTS citext` na primeira migration que
 o usar, e o `down` dessa migration **nao** remove a extensao.

@@ -19,11 +19,11 @@ const perms = (
 ) => TENANT_PROFILES[code].permissions as readonly string[];
 
 describe('matriz de permissoes dos perfis', () => {
-  it('catalogo de tenant tem 34 codigos validos e rotulados', () => {
-    expect(TENANT_PERMISSION_CODES).toHaveLength(34);
-    expect(new Set(TENANT_PERMISSION_CODES).size).toBe(34);
+  it('catalogo de tenant tem 35 codigos validos e rotulados', () => {
+    expect(TENANT_PERMISSION_CODES).toHaveLength(35);
+    expect(new Set(TENANT_PERMISSION_CODES).size).toBe(35);
     const all = Object.values(Permissions);
-    expect(all).toHaveLength(38);
+    expect(all).toHaveLength(39);
     for (const code of all) {
       expect(code).toMatch(/^[a-z][a-z0-9_]*:[a-z][a-z0-9_]*$/);
       expect(PERMISSION_LABELS[code]).toBeTruthy();
@@ -77,6 +77,7 @@ describe('matriz de permissoes dos perfis', () => {
   it('cuidador exatamente', () => {
     expect(sorted(perms(ProfileCode.CAREGIVER))).toEqual([
       'alerts:read',
+      'alerts:resolve',
       'follow_ups:create',
       'forms:read',
       'medications:read',
@@ -85,7 +86,7 @@ describe('matriz de permissoes dos perfis', () => {
     ]);
   });
 
-  it('profissional exatamente 19 codigos', () => {
+  it('profissional exatamente 20 codigos', () => {
     expect(sorted(perms(ProfileCode.PROFESSIONAL))).toEqual(
       sorted([
         'patients:read',
@@ -95,6 +96,7 @@ describe('matriz de permissoes dos perfis', () => {
         'patient_history:read',
         'patient_evolution:read',
         'alerts:read',
+        'alerts:resolve',
         'forms:read',
         'forms:create',
         'forms:update',
@@ -109,7 +111,7 @@ describe('matriz de permissoes dos perfis', () => {
         'patient_links:manage',
       ]),
     );
-    expect(perms(ProfileCode.ADMIN)).toHaveLength(33);
+    expect(perms(ProfileCode.ADMIN)).toHaveLength(34);
     for (const code of [
       'organization:read',
       'organization:update',

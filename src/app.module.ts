@@ -13,6 +13,7 @@ import databaseConfig from './config/database.config';
 import { environmentValidationSchema } from './config/env.validation';
 import redisConfig from './config/redis.config';
 import mailConfig from './config/mail.config';
+import notificationConfig from './config/notification.config';
 import securityConfig from './config/security.config';
 import storageConfig from './config/storage.config';
 import { DatabaseModule } from './database/database.module';
@@ -28,6 +29,7 @@ import { FollowUpModule } from './modules/FollowUp/followUp.module';
 import { AttachmentModule } from './modules/Attachment/attachment.module';
 import { FormModule } from './modules/Form/form.module';
 import { MedicationModule } from './modules/Medication/medication.module';
+import { NotificationModule } from './modules/Notification/notification.module';
 import { OrganizationModule } from './modules/Organization/organization.module';
 import { PlanModule } from './modules/Plan/plan.module';
 import { PatientModule } from './modules/Patient/patient.module';
@@ -62,6 +64,7 @@ function prettyTransport() {
         redisConfig,
         securityConfig,
         mailConfig,
+        notificationConfig,
         storageConfig,
       ],
       validationSchema: environmentValidationSchema,
@@ -119,6 +122,7 @@ function prettyTransport() {
     AttachmentModule,
     MedicationModule,
     AlertModule,
+    NotificationModule,
     AutomationModule,
     AuditModule,
     AuthModule,

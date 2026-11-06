@@ -17,6 +17,7 @@ import { GetAlertRuleUseCase } from './GetAlertRule/getAlertRule.useCase';
 import { ListAlertRulesUseCase } from './ListAlertRules/listAlertRules.useCase';
 import { ListAlertsUseCase } from './ListAlerts/listAlerts.useCase';
 import { ReactivateAlertRuleUseCase } from './ReactivateAlertRule/reactivateAlertRule.useCase';
+import { ResolveAlertUseCase } from './ResolveAlert/resolveAlert.useCase';
 import { AlertRepository } from './repositories/alert.repository';
 import { AlertRuleRepository } from './repositories/alertRule.repository';
 import { UpdateAlertRuleUseCase } from './UpdateAlertRule/updateAlertRule.useCase';
@@ -30,12 +31,13 @@ export const ALERT_USE_CASES = [
   ReactivateAlertRuleUseCase,
   ListAlertsUseCase,
   GetAlertUseCase,
+  ResolveAlertUseCase,
 ];
 
 export const ALERT_REPOSITORIES = [AlertRuleRepository, AlertRepository];
 
 /**
- * Regras e alertas por valor registrado (BE-15). Exporta a avaliacao para o
+ * Regras e alertas por valor registrado (BE-15); resolucao (BE-17). Exporta a avaliacao para o
  * envio do registro de acompanhamento chamar logo apos o commit.
  */
 @Module({

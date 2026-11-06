@@ -24,8 +24,10 @@ export const ALERT_SOURCES = [
 
 export type AlertSource = (typeof ALERT_SOURCES)[number];
 
-/** Leitura e resolucao ficam no BE-17. */
-export type AlertStatus = 'open';
+/** Resolver vale para todos e guarda autor e data (BE-17). */
+export const ALERT_STATUSES = ['open', 'resolved'] as const;
+
+export type AlertStatus = (typeof ALERT_STATUSES)[number];
 
 /** Tipos de campo que aceitam regra: os numericos. */
 export const RULE_FIELD_TYPES = ['number', 'scale'] as const;
@@ -149,11 +151,16 @@ export interface AlertRow {
     scheduledAt: Date;
   } | null;
   generatedAt: Date;
+  /** Resolvido: vale para todos, com autor e data (BE-17). */
+  resolution: { resolvedAt: Date; resolvedBy: NamedRef } | null;
+  /** Notificacao do proprio usuario da sessao, se ele foi destinatario. */
+  notification: { id: string; readAt: Date | null } | null;
 }
 
 export interface ListAlertsFilter {
   patientId: string;
   severity?: AlertSeverity;
+  status?: AlertStatus;
   skip: number;
   take: number;
 }
@@ -162,7 +169,15 @@ export type ListAlertsOutcome =
   | { kind: 'ok'; items: AlertRow[]; total: number }
   | { kind: 'patient_not_found' };
 
-export type AlertScope = PatientScope;
+/** Alcance de pacientes mais o usuario da sessao (`viewerId`). */
+export interface AlertScope extends PatientScope {
+  viewerId: string;
+}
+
+export type ResolveAlertOutcome =
+  | { kind: 'resolved'; alert: AlertRow }
+  | { kind: 'not_found' }
+  | { kind: 'already_resolved' };
 
 /** Par item x regra que bateu, base de um alerta. */
 export interface AlertMatch {

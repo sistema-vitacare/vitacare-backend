@@ -40,12 +40,14 @@ describeWithDatabase(
       organizationId: org.id,
       viewerUserId: null,
       viewerLinkRoles: [],
+      viewerId: org.user,
     });
 
     const caregiverScope = (userId: string): AlertScope => ({
       organizationId: A.id,
       viewerUserId: userId,
       viewerLinkRoles: ['caregiver'],
+      viewerId: userId,
     });
 
     const caregiver = async (label: string) =>
