@@ -13,6 +13,7 @@ import databaseConfig from './config/database.config';
 import { environmentValidationSchema } from './config/env.validation';
 import redisConfig from './config/redis.config';
 import mailConfig from './config/mail.config';
+import notificationConfig from './config/notification.config';
 import securityConfig from './config/security.config';
 import storageConfig from './config/storage.config';
 import { DatabaseModule } from './database/database.module';
@@ -62,6 +63,7 @@ function prettyTransport() {
         redisConfig,
         securityConfig,
         mailConfig,
+        notificationConfig,
         storageConfig,
       ],
       validationSchema: environmentValidationSchema,
