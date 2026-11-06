@@ -7,7 +7,8 @@ import { ProfileCode } from '@/common/context/requestContext.type';
  * so o cuidador registra acompanhamento. Desde o BE-10 (2026-11-04) o
  * profissional tambem gerencia vinculos com pacientes e, desde o BE-12, anula
  * registros de acompanhamento. Desde o BE-14 (2026-11-05) cuidador e familiar
- * consultam medicamentos dos pacientes vinculados. As quatro
+ * consultam medicamentos dos pacientes vinculados e, desde o BE-17
+ * (2026-11-06), cuidador e profissional resolvem alertas. As quatro
  * `platform_organizations:*` so valem na organizacao de plataforma.
  */
 export const Permissions = {
@@ -18,6 +19,7 @@ export const Permissions = {
   PATIENT_HISTORY_READ: 'patient_history:read',
   PATIENT_EVOLUTION_READ: 'patient_evolution:read',
   ALERTS_READ: 'alerts:read',
+  ALERTS_RESOLVE: 'alerts:resolve',
   FORMS_READ: 'forms:read',
   FORMS_CREATE: 'forms:create',
   FORMS_UPDATE: 'forms:update',
@@ -61,6 +63,7 @@ export const PERMISSION_LABELS: Readonly<Record<PermissionName, string>> = {
   'patient_history:read': 'Consultar historico do paciente',
   'patient_evolution:read': 'Consultar evolucao do paciente',
   'alerts:read': 'Consultar alertas',
+  'alerts:resolve': 'Resolver alertas',
   'forms:read': 'Consultar formularios',
   'forms:create': 'Criar formularios',
   'forms:update': 'Editar formularios',
@@ -120,6 +123,7 @@ const CAREGIVER_PERMISSIONS: readonly PermissionName[] = [
   P.PATIENTS_READ,
   P.PATIENT_HISTORY_READ,
   P.ALERTS_READ,
+  P.ALERTS_RESOLVE,
   P.FORMS_READ,
   P.FOLLOW_UPS_CREATE,
   P.MEDICATIONS_READ,
@@ -133,6 +137,7 @@ const PROFESSIONAL_PERMISSIONS: readonly PermissionName[] = [
   P.PATIENT_HISTORY_READ,
   P.PATIENT_EVOLUTION_READ,
   P.ALERTS_READ,
+  P.ALERTS_RESOLVE,
   P.FORMS_READ,
   P.FORMS_CREATE,
   P.FORMS_UPDATE,
@@ -207,7 +212,7 @@ export const TENANT_PROFILE_CODES: readonly TenantProfileCode[] = Object.keys(
   TENANT_PROFILES,
 ) as TenantProfileCode[];
 
-/** Os 34 codigos de tenant (sem `platform_*`). */
+/** Os 35 codigos de tenant (sem `platform_*`). */
 export const TENANT_PERMISSION_CODES: readonly PermissionName[] = (
   Object.values(Permissions) as PermissionName[]
 ).filter((code) => !isPlatformPermission(code));

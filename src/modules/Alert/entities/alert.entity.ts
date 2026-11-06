@@ -16,6 +16,7 @@ import { Medication } from '@/modules/Medication/entities/medication.entity';
 import { MedicationReminder } from '@/modules/Medication/entities/medicationReminder.entity';
 import { Organization } from '@/modules/Organization/entities/organization.entity';
 import { Patient } from '@/modules/Patient/entities/patient.entity';
+import { User } from '@/modules/User/entities/user.entity';
 
 import type {
   AlertRuleOperator,
@@ -32,7 +33,9 @@ import { AlertRule } from './alertRule.entity';
  * vencido (`dueAt`) e copia da frequencia. Origem `medication_reminder`
  * (`id_lembrete_medicamento`): medicamento, linha da agenda e horario
  * programado (`scheduledAt`). `generatedAt` e a `data_geracao`, quando o
- * evento saiu; leitura e resolucao (`data_visualizacao`) ficam para o BE-17.
+ * evento saiu. Resolver (BE-17) vale para todos e guarda autor e data; a
+ * leitura e individual, em `alert_notifications`, no lugar da
+ * `data_visualizacao` global do MER.
  */
 @Entity('alerts')
 @Index('alerts_patient_generated_idx', { synchronize: false })
@@ -83,6 +86,13 @@ import { AlertRule } from './alertRule.entity';
   ['id', 'organizationId'],
   { name: 'alerts_medication_reminder_tenant_fk', onDelete: 'RESTRICT' },
 )
+@ForeignKey(
+  () => User,
+  ['resolvedByUserId', 'organizationId'],
+  ['id', 'organizationId'],
+  { name: 'alerts_resolved_by_tenant_fk', onDelete: 'RESTRICT' },
+)
+@Unique('alerts_id_org_unique', ['id', 'organizationId'])
 @Unique('alerts_rule_item_unique', ['ruleId', 'responseItemId'])
 @Unique('alerts_absence_due_unique', ['patientId', 'formId', 'dueAt'])
 @Unique('alerts_reminder_occurrence_unique', [
@@ -117,7 +127,11 @@ import { AlertRule } from './alertRule.entity';
 @Check('alerts_message_check', "btrim(message) <> ''")
 @Check('alerts_severity_check', "severity IN ('critical', 'warning', 'info')")
 @Check('alerts_operator_check', "operator IN ('gt', 'gte', 'lt', 'lte')")
-@Check('alerts_status_check', "status IN ('open')")
+@Check('alerts_status_check', "status IN ('open', 'resolved')")
+@Check(
+  'alerts_resolution_check',
+  "(status = 'resolved') = (resolved_at IS NOT NULL AND resolved_by_user_id IS NOT NULL) AND (resolved_at IS NULL) = (resolved_by_user_id IS NULL)",
+)
 export class Alert {
   @PrimaryColumn('uuid', { default: () => 'gen_random_uuid()' })
   id!: string;
@@ -196,6 +210,12 @@ export class Alert {
 
   @Column({ type: 'timestamptz', default: () => 'now()' })
   generatedAt!: Date;
+
+  @Column({ type: 'timestamptz', nullable: true })
+  resolvedAt!: Date | null;
+
+  @Column({ type: 'uuid', nullable: true })
+  resolvedByUserId!: string | null;
 
   @Column({ type: 'timestamptz', default: () => 'now()' })
   createdAt!: Date;

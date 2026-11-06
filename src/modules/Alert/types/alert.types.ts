@@ -24,8 +24,10 @@ export const ALERT_SOURCES = [
 
 export type AlertSource = (typeof ALERT_SOURCES)[number];
 
-/** Leitura e resolucao ficam no BE-17. */
-export type AlertStatus = 'open';
+/** Resolver vale para todos e guarda autor e data (BE-17). */
+export const ALERT_STATUSES = ['open', 'resolved'] as const;
+
+export type AlertStatus = (typeof ALERT_STATUSES)[number];
 
 /** Tipos de campo que aceitam regra: os numericos. */
 export const RULE_FIELD_TYPES = ['number', 'scale'] as const;

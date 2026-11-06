@@ -16,6 +16,7 @@ import { CreateFollowUpAttachments1791100000000 } from '@/database/migrations/17
 import { CreateMedications1791200000000 } from '@/database/migrations/1791200000000-CreateMedications';
 import { CreateAlerts1791300000000 } from '@/database/migrations/1791300000000-CreateAlerts';
 import { CreateScheduledAlerts1791400000000 } from '@/database/migrations/1791400000000-CreateScheduledAlerts';
+import { CreateAlertNotifications1791500000000 } from '@/database/migrations/1791500000000-CreateAlertNotifications';
 import { SnakeNamingStrategy } from '@/database/snakeNaming.strategy';
 import { ChangePasswordUseCase } from '@/modules/Auth/ChangePassword/changePassword.useCase';
 import { CompleteFirstAccessUseCase } from '@/modules/Auth/CompleteFirstAccess/completeFirstAccess.useCase';
@@ -254,6 +255,7 @@ describeWithDatabase('autenticacao em PostgreSQL descartavel', () => {
         CreateMedications1791200000000,
         CreateAlerts1791300000000,
         CreateScheduledAlerts1791400000000,
+        CreateAlertNotifications1791500000000,
       ],
       namingStrategy: new SnakeNamingStrategy(),
       synchronize: false,
@@ -272,7 +274,7 @@ describeWithDatabase('autenticacao em PostgreSQL descartavel', () => {
     }
 
     migrated = (await dataSource.runMigrations()).length;
-    expect(migrated).toBe(15);
+    expect(migrated).toBe(16);
 
     passwords = new PasswordHasher();
     tokens = new TokenService();
@@ -1043,11 +1045,12 @@ describeWithDatabase('autenticacao em PostgreSQL descartavel', () => {
   });
 
   describe('schema completo', () => {
-    it('mapeia as vinte e seis tabelas nas entidades TypeORM', () => {
+    it('mapeia as trinta tabelas nas entidades TypeORM', () => {
       expect(
         dataSource.entityMetadatas.map((metadata) => metadata.tableName).sort(),
       ).toEqual([
         'access_profiles',
+        'alert_notifications',
         'alert_rules',
         'alerts',
         'audit_events',
@@ -1063,6 +1066,8 @@ describeWithDatabase('autenticacao em PostgreSQL descartavel', () => {
         'follow_up_responses',
         'medication_reminders',
         'medications',
+        'notification_deliveries',
+        'notification_preferences',
         'organization_plan_terms',
         'organizations',
         'password_reset_tokens',
@@ -1070,6 +1075,7 @@ describeWithDatabase('autenticacao em PostgreSQL descartavel', () => {
         'permissions',
         'plan_change_requests',
         'profile_permissions',
+        'push_subscriptions',
         'usage_plans',
         'user_patients',
         'users',
