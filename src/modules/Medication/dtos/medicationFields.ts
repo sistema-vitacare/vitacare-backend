@@ -23,6 +23,7 @@ import {
   type ValidationOptions,
 } from 'class-validator';
 
+import { isCalendarDate } from '@/common/validation/calendarDate';
 import { PatientText, TrimEach } from '@/modules/Patient/dtos/patientFields';
 
 import { todayInBrazil } from '../policies/medicationSchedule.policy';
@@ -40,19 +41,6 @@ export const MAX_DOSE_AMOUNT = 9_999_999.999;
 
 /** `HH:mm` de 00:00 a 23:59. */
 export const TIME_PATTERN = /^([01]\d|2[0-3]):[0-5]\d$/;
-
-const isCalendarDate = (value: unknown): value is string => {
-  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
-    return false;
-  }
-
-  const parsed = new Date(`${value}T00:00:00.000Z`);
-
-  return (
-    !Number.isNaN(parsed.getTime()) &&
-    parsed.toISOString().slice(0, 10) === value
-  );
-};
 
 const addDays = (date: string, days: number): string =>
   new Date(Date.parse(`${date}T00:00:00.000Z`) + days * 86_400_000)
