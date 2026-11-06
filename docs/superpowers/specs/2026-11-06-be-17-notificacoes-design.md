@@ -48,7 +48,7 @@ em `GET /alerts`, só não há notificação (alternativo do UC13).
 
 ## 3. Chamadas do agente (pendentes de confirmação)
 
-- **Momento da escolha dos destinatários:** quando o alerta é gerado, na mesma
+- **Momento da escolha dos destinatários** (confirmado por Mateus em 2026-11-06: só alertas novos, qualquer que seja a idade da regra): quando o alerta é gerado, na mesma
   transação que o grava. Quem ganha vínculo depois não recebe notificação de
   alerta antigo, mas o lê em `GET /alerts`. Alertas anteriores à migration não
   geram notificação.

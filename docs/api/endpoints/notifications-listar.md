@@ -16,7 +16,7 @@ Caixa interna de notificações do **próprio usuário** (BE-17; UC13 passos 3 e
 - os usuários com vínculo vigente e autorizado com o paciente (profissional responsável, cuidadores e familiares, usuário ativo com perfil compatível com o papel);
 - os administradores ativos que ligaram `organizationAlerts` nas [preferências](notifications-preferencias-atualizar.md).
 
-Cada destinatário recebe a notificação conforme as preferências dele, por origem × canal. A notificação só aparece aqui se o canal "caixa interna" (`inApp`) estava ligado na geração. Quem ganha vínculo depois não recebe notificação de alerta antigo, mas o lê em [GET /alerts](alerts-listar.md). Alertas anteriores à migration `1791500000000` não têm notificação.
+Cada destinatário recebe a notificação conforme as preferências dele, por origem × canal. A notificação só aparece aqui se o canal "caixa interna" (`inApp`) estava ligado na geração. Decisão de Mateus (2026-11-06): quem ganha vínculo — por exemplo, o novo profissional responsável numa troca — recebe todo alerta gerado **depois** do vínculo, inclusive de regra configurada antes, e quem perdeu o vínculo deixa de receber. Alertas gerados antes do vínculo não viram notificação, mas ficam visíveis em [GET /alerts](alerts-listar.md). Alertas anteriores à migration `1791500000000` não têm notificação.
 
 **Alcance:** só aparecem notificações de pacientes que continuam ao alcance da sessão (mesmo alcance de `GET /patients`). Revogar o vínculo esconde também as notificações antigas daquele paciente.
 

@@ -281,6 +281,77 @@ describeWithDatabase('destinatarios na geracao do alerta (e2e)', () => {
     expect(await notificationsOf(alert)).toEqual([]);
   });
 
+  it('troca de responsavel: o novo recebe alerta de regra antiga gerado depois; o antigo nao', async () => {
+    const patient = await seed.patient(A);
+    const previous = await seed.user(A, 'professional');
+    const previousLink = await seed.link(
+      A,
+      previous,
+      patient,
+      'responsible_professional',
+    );
+    const form = await seed.form(A, { interval: null, name: 'Troca' });
+    const fieldKey = await seed.scalar(
+      `INSERT INTO follow_up_form_fields
+         (organization_id, form_id, version_id, field_key, name, field_type,
+          required, active, position, unit, decimal_places)
+       VALUES ($1, $2, $3, gen_random_uuid(), 'Glicemia', 'number', false,
+               true, 0, 'mg/dL', 0)
+       RETURNING field_key::text AS value`,
+      [A.id, form.id, form.version],
+    );
+
+    await dataSource.query(
+      `INSERT INTO alert_rules
+         (organization_id, form_id, field_key, created_by_user_id, name,
+          operator, reference_value, severity, created_at)
+       VALUES ($1, $2, $3, $4, 'Regra antiga', 'gt', 180, 'warning',
+               now() - interval '90 days')`,
+      [A.id, form.id, fieldKey, previous],
+    );
+
+    const before = await seed.alert(A, patient);
+
+    await fanOut(A, [before]);
+    await seed.revokeLink(previousLink);
+
+    const next = await seed.user(A, 'professional');
+
+    await seed.link(A, next, patient, 'responsible_professional');
+
+    const record = await seed.record(A, patient, form, '1 minute');
+
+    await dataSource.query(
+      `INSERT INTO follow_up_response_items
+         (organization_id, response_id, form_version_id, field_id, value)
+       SELECT $1, resp.id, $3, f.id, '250'
+         FROM follow_up_responses resp
+         JOIN follow_up_form_fields f ON f.version_id = $3
+        WHERE resp.record_id = $2`,
+      [A.id, record, form.version],
+    );
+    await dataSource.query(
+      'UPDATE follow_up_records SET alerts_evaluated_at = NULL WHERE id = $1',
+      [record],
+    );
+    await new AlertRepository(dataSource).evaluateRecord(A.id, record);
+
+    const after = await seed.scalar(
+      'SELECT id AS value FROM alerts WHERE follow_up_record_id = $1',
+      [record],
+    );
+
+    const linked = async (alert: string) =>
+      usersOf(
+        (await notificationsOf(alert)).filter(
+          (row) => row.reason === 'patient_link',
+        ),
+      );
+
+    expect(await linked(after)).toEqual([next]);
+    expect(await linked(before)).toEqual([previous]);
+  });
+
   it('organizacao inativada nao notifica ninguem', async () => {
     const inactive = await seed.organization('destinatarios-inativa');
     const { patient } = await linkedPatient(inactive);
