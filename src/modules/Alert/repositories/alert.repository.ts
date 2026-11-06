@@ -3,6 +3,7 @@ import { DataSource, type EntityManager } from 'typeorm';
 
 import { translatePgError } from '@/common/errors/pgError.translator';
 import { insertAuditEvent } from '@/modules/Audit/repositories/auditEvent.repository';
+import { insertAlertNotifications } from '@/modules/Notification/repositories/alertNotification.query';
 import type { FrequencyUnit } from '@/modules/Form/types/form.types';
 import { findPatientInScope } from '@/modules/PatientAccess/repositories/patientAccess.query';
 import { PATIENT_SCOPE_WHERE } from '@/modules/Patient/repositories/patientScope.query';
@@ -441,6 +442,12 @@ export class AlertRepository {
         requestId: null,
       });
     }
+
+    await insertAlertNotifications(
+      manager,
+      organizationId,
+      inserted.map((alert) => alert.id),
+    );
 
     return inserted.length;
   }

@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { DataSource, type EntityManager } from 'typeorm';
 
 import { insertAuditEvent } from '@/modules/Audit/repositories/auditEvent.repository';
+import { insertAlertNotifications } from '@/modules/Notification/repositories/alertNotification.query';
 import type { MedicationDoseUnit } from '@/modules/Medication/types/medication.types';
 
 import { reminderMessage } from '../policies/scheduledAlertMessage.policy';
@@ -223,6 +224,12 @@ export class MedicationReminderDispatchRepository {
         requestId: null,
       });
     }
+
+    await insertAlertNotifications(
+      manager,
+      organizationId,
+      inserted.map((alert) => alert.id),
+    );
 
     return inserted.length;
   }

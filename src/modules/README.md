@@ -32,17 +32,17 @@ src/modules/
     └── DeactivatePatient/
 ```
 
-| Sufixo | Papel | Restricao |
-| --- | --- | --- |
-| `*.useCase.ts` | A regra de negocio. Classe `XUseCase` com `execute(input, ctx)`. | Nao conhece HTTP. Nao injeta `Repository<T>`. |
-| `*.controller.ts` | HTTP: rota, status, Swagger, DTO. | Nenhuma regra de dominio, nenhum acesso a repositorio. |
-| `*.dto.ts` | Fronteira HTTP. `class-validator` + `@ApiProperty`. | Nunca e entidade. |
-| `*.type.ts` | Tipos internos do caso de uso (`Input`, `Result`). | Sem decorator. |
-| `*.parser.ts` | Conversao DTO <-> dominio <-> response. Funcoes puras. | Sem I/O, sem injecao. |
-| `*.query.ts` | Consultas TypeORM isoladas. | Sempre escopada por organizacao. |
-| `*.entity.ts` | Mapeamento TypeORM. O glob `**/*.entity.{ts,js}` ja as encontra. | Registrada via `TypeOrmModule.forFeature([...])`. |
-| `*.errors.ts` | Catalogo congelado de codigos do modulo. | Consumido pelo Swagger e por `docs/api/`. |
-| `*.service.ts` | Opcional: orquestracao ou integracao reutilizavel. | So quando for camada util de verdade. |
+| Sufixo            | Papel                                                            | Restricao                                              |
+| ----------------- | ---------------------------------------------------------------- | ------------------------------------------------------ |
+| `*.useCase.ts`    | A regra de negocio. Classe `XUseCase` com `execute(input, ctx)`. | Nao conhece HTTP. Nao injeta `Repository<T>`.          |
+| `*.controller.ts` | HTTP: rota, status, Swagger, DTO.                                | Nenhuma regra de dominio, nenhum acesso a repositorio. |
+| `*.dto.ts`        | Fronteira HTTP. `class-validator` + `@ApiProperty`.              | Nunca e entidade.                                      |
+| `*.type.ts`       | Tipos internos do caso de uso (`Input`, `Result`).               | Sem decorator.                                         |
+| `*.parser.ts`     | Conversao DTO <-> dominio <-> response. Funcoes puras.           | Sem I/O, sem injecao.                                  |
+| `*.query.ts`      | Consultas TypeORM isoladas.                                      | Sempre escopada por organizacao.                       |
+| `*.entity.ts`     | Mapeamento TypeORM. O glob `**/*.entity.{ts,js}` ja as encontra. | Registrada via `TypeOrmModule.forFeature([...])`.      |
+| `*.errors.ts`     | Catalogo congelado de codigos do modulo.                         | Consumido pelo Swagger e por `docs/api/`.              |
+| `*.service.ts`    | Opcional: orquestracao ou integracao reutilizavel.               | So quando for camada util de verdade.                  |
 
 Nenhum `*.spec.ts` mora em `src/`. Ver "Testes" abaixo.
 
@@ -145,10 +145,10 @@ especificos em vez de `*_FAILED` genericos.
 
 ```ts
 throw new DomainException({
-  code: PatientErrors.DUPLICATE_DOCUMENT,      // de patient.errors.ts
+  code: PatientErrors.DUPLICATE_DOCUMENT, // de patient.errors.ts
   status: HttpStatus.CONFLICT,
-  message: 'Ja existe um paciente com este documento.',  // amigavel
-  detail: 'Documento duplicado na organizacao atual.',   // tecnico, escrito por nos
+  message: 'Ja existe um paciente com este documento.', // amigavel
+  detail: 'Documento duplicado na organizacao atual.', // tecnico, escrito por nos
   fields: [{ field: 'document', code: 'DUPLICATE' }],
 });
 ```

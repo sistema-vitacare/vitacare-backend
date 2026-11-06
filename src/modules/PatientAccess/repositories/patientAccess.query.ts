@@ -36,10 +36,26 @@ export const findPatientInScope = async (
 };
 
 /**
- * Vinculos vigentes autorizados de um paciente: usuario ativo cujo perfil
- * corresponde ao papel (o admin herda o profissional no papel de
- * responsavel). Define quem pode ser notificado; preferencias e canais ficam
- * com o modulo de notificacoes.
+ * Usuario do vinculo `link` ativo e com perfil que corresponde ao papel (o
+ * admin herda o profissional no papel de responsavel); aliases `u` e `ap`. A
+ * vigencia (`link.deleted_at IS NULL`) fica com quem usa.
+ */
+export const AUTHORIZED_LINK_JOIN = `
+       JOIN users u
+         ON u.id = link.user_id
+        AND u.organization_id = link.organization_id
+        AND u.status = 'active'
+       JOIN access_profiles ap
+         ON ap.id = u.profile_id
+        AND ap.organization_id = u.organization_id
+        AND (link.role = ap.code
+             OR (link.role = 'responsible_professional'
+                 AND ap.code IN ('professional', 'admin')))`;
+
+/**
+ * Vinculos vigentes autorizados de um paciente. Define quem pode ser
+ * notificado; preferencias e canais ficam com o modulo de notificacoes, que
+ * usa `AUTHORIZED_LINK_JOIN` para aplicar a mesma regra em lote.
  */
 export const listPatientRecipients = (
   manager: EntityManager,
@@ -49,19 +65,10 @@ export const listPatientRecipients = (
   manager.query(
     `SELECT link.user_id AS "userId", link.role
        FROM user_patients link
-       JOIN users u
-         ON u.id = link.user_id
-        AND u.organization_id = link.organization_id
-       JOIN access_profiles ap
-         ON ap.id = u.profile_id
-        AND ap.organization_id = u.organization_id
+     ${AUTHORIZED_LINK_JOIN}
       WHERE link.organization_id = $1
         AND link.patient_id = $2
         AND link.deleted_at IS NULL
-        AND u.status = 'active'
-        AND (link.role = ap.code
-             OR (link.role = 'responsible_professional'
-                 AND ap.code IN ('professional', 'admin')))
       ORDER BY link.role, link.user_id`,
     [organizationId, patientId],
   );
