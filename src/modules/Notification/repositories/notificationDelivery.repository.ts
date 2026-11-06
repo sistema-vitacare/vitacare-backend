@@ -52,7 +52,7 @@ const PREFERENCE_ON = `CASE a.source ${ALERT_SOURCES.map(
 
 /**
  * Reserva ate `$1` entregas vencidas e reconfere cada uma antes do envio:
- * alerta ainda aberto, destinatario ativo com vinculo autorizado ou admin com
+ * organizacao ativa, alerta ainda aberto, destinatario ativo com vinculo autorizado ou admin com
  * opt-in, preferencia do canal ligada e inscricao de push ativa. A que nao
  * passa fica `skipped` com o motivo; a que passa ganha uma tentativa e o prazo
  * da reserva (`$2` s), e sai para o envio fora da transacao.
@@ -70,6 +70,7 @@ const CLAIM = `
   checked AS (
     SELECT p.id,
            CASE
+             WHEN org.status <> 'active' THEN 'ORGANIZATION_INACTIVE'
              WHEN a.status = 'resolved' THEN 'ALERT_RESOLVED'
              WHEN owner.status <> 'active'
                OR NOT (
@@ -94,6 +95,8 @@ const CLAIM = `
       FROM picked p
       JOIN alert_notifications n
         ON n.id = p.notification_id
+      JOIN organizations org
+        ON org.id = n.organization_id
       JOIN alerts a
         ON a.id = n.alert_id
        AND a.organization_id = n.organization_id

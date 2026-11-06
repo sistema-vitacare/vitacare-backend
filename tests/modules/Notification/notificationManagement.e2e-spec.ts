@@ -362,6 +362,8 @@ describeWithDatabase('caixa, preferencias e push em PostgreSQL (e2e)', () => {
         { ...ALL_ON, sms: true },
         { ...ALL_ON, absence: { ...ALL_ON.absence, sms: true } },
         { ...ALL_ON, absence: { ...ALL_ON.absence, push: 'sim' } },
+        { ...ALL_ON, reading: [ALL_ON.reading] },
+        { ...ALL_ON, absence: [] },
       ]) {
         const response = await t.http(
           'put',
@@ -419,6 +421,45 @@ describeWithDatabase('caixa, preferencias e push em PostgreSQL (e2e)', () => {
         expect.objectContaining({ id, reason: 'organization_admin' }),
       ]);
     });
+  });
+
+  it('admin rebaixado nao ve nem recebe pelo opt-in que deixou de valer', async () => {
+    const { B } = t.tenants;
+
+    await t.http('put', '/notifications/preferences', B.tokens.admin, {
+      ...ALL_ON,
+      organizationAlerts: true,
+    });
+    await t.dataSource.query(
+      `UPDATE users SET profile_id = (
+         SELECT id FROM access_profiles WHERE organization_id = $1 AND code = 'professional')
+        WHERE id = $2`,
+      [B.id, B.users.admin],
+    );
+
+    try {
+      const { updatedAt: _, ...shown } = dataOf<{
+        organizationAlerts: boolean;
+        updatedAt: string;
+      }>(await t.http('get', '/notifications/preferences', B.tokens.admin));
+
+      expect(shown.organizationAlerts).toBe(false);
+      expect(
+        (
+          await t.http('put', '/notifications/preferences', B.tokens.admin, {
+            ...ALL_ON,
+            ...shown,
+          })
+        ).status,
+      ).toBe(200);
+    } finally {
+      await t.dataSource.query(
+        `UPDATE users SET profile_id = (
+           SELECT id FROM access_profiles WHERE organization_id = $1 AND code = 'admin')
+          WHERE id = $2`,
+        [B.id, B.users.admin],
+      );
+    }
   });
 
   describe('push do navegador', () => {
@@ -479,6 +520,8 @@ describeWithDatabase('caixa, preferencias e push em PostgreSQL (e2e)', () => {
         { endpoint: ENDPOINT, keys: { p256dh: 'com espaço', auth: KEYS.auth } },
         { endpoint: ENDPOINT, keys: { ...KEYS, extra: 'x' } },
         { endpoint: `${ENDPOINT}/${'a'.repeat(1000)}`, keys: KEYS },
+        { endpoint: ENDPOINT, keys: [] },
+        { endpoint: ENDPOINT, keys: [KEYS] },
       ]) {
         const response = await t.http(
           'post',

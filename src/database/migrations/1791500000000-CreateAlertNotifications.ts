@@ -89,6 +89,9 @@ export class CreateAlertNotifications1791500000000 implements MigrationInterface
     await queryRunner.query(
       `CREATE INDEX alert_notifications_inbox_idx ON ${table('alert_notifications')} (organization_id, user_id, created_at DESC, id) WHERE in_app`,
     );
+    await queryRunner.query(
+      `CREATE INDEX alert_notifications_unread_idx ON ${table('alert_notifications')} (organization_id, user_id) WHERE read_at IS NULL`,
+    );
 
     await queryRunner.query(`
       CREATE TABLE ${table('push_subscriptions')} (

@@ -81,6 +81,11 @@ describe('isAllowedPushEndpoint', () => {
     'https://user@fcm.googleapis.com/abc',
     'https://fcm.googleapis.com:8443/abc',
     'https://127.0.0.1/abc',
+    'https://127.0.0.1;.push.apple.com/x',
+    "https://db'.notify.windows.com/x",
+    'https://a{b}.push.apple.com/x',
+    'https://a"b.push.apple.com/x',
+    'https://a`b.notify.windows.com/x',
     'nao e url',
     '',
   ])('recusa %p', (endpoint) => {

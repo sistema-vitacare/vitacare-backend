@@ -13,6 +13,7 @@ export class GetNotificationPreferencesUseCase {
   async execute(ctx: RequestContext): Promise<NotificationPreferencesDto> {
     return toPreferencesResponse(
       await this.notifications.getPreferences(ctx.organizationId, ctx.userId),
+      ctx,
     );
   }
 }

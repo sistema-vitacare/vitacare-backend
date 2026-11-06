@@ -399,6 +399,21 @@ describeWithDatabase('schema de notificacoes em PostgreSQL descartavel', () => {
     ).toBe('notification_deliveries_push_unique');
   });
 
+  it('indices da caixa, das nao lidas e das entregas pendentes existem', async () => {
+    const indexes = await dataSource.query<Array<{ name: string }>>(
+      `SELECT indexname AS name FROM pg_indexes
+          WHERE tablename IN ('alert_notifications', 'notification_deliveries')`,
+    );
+
+    expect(indexes.map((row) => row.name)).toEqual(
+      expect.arrayContaining([
+        'alert_notifications_inbox_idx',
+        'alert_notifications_unread_idx',
+        'notification_deliveries_due_idx',
+      ]),
+    );
+  });
+
   it('down e up de novo ficam limpos', async () => {
     await dataSource.query(
       'TRUNCATE notification_deliveries, push_subscriptions, alert_notifications, notification_preferences',

@@ -1,4 +1,7 @@
-import type { RequestContext } from '@/common/context/requestContext.type';
+import {
+  ProfileCode,
+  type RequestContext,
+} from '@/common/context/requestContext.type';
 import { patientScope } from '@/modules/Patient/policies/patient.policy';
 
 import type { NotificationDto } from '../dtos/notification.dto';
@@ -40,10 +43,13 @@ export const toNotificationResponse = (
   createdAt: row.createdAt.toISOString(),
 });
 
+/** O opt-in so vale para admin: rebaixado, aparece desligado. */
 export const toPreferencesResponse = (
   row: NotificationPreferencesRow,
+  ctx: RequestContext,
 ): NotificationPreferencesDto => ({
-  organizationAlerts: row.organizationAlerts,
+  organizationAlerts:
+    row.organizationAlerts && ctx.profile === ProfileCode.ADMIN,
   reading: { ...row.reading },
   absence: { ...row.absence },
   medicationReminder: { ...row.medicationReminder },

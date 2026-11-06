@@ -51,7 +51,7 @@ curl -i 'https://api.example.com/api/v1/notifications/preferences' \
 
 | Propriedade JSON | Tipo | Null | Significado |
 | --- | --- | --- | --- |
-| `data.organizationAlerts` | booleano | não | Admin recebe os alertas de todos os pacientes da organização. Só pode ser `true` para `admin`; vale enquanto o perfil for admin. |
+| `data.organizationAlerts` | booleano | não | Admin recebe os alertas de todos os pacientes da organização. Só pode ser `true` para `admin`. Vale enquanto o perfil for admin: rebaixado, aparece `false` e deixa de receber. |
 | `data.reading` | objeto | não | Canais para alerta de valor registrado fora da regra. |
 | `data.absence` | objeto | não | Canais para ausência de registro no prazo. |
 | `data.medicationReminder` | objeto | não | Canais para lembrete de horário de medicamento. |

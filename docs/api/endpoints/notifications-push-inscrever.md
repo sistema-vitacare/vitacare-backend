@@ -21,7 +21,7 @@ Cada inscrição ativa recebe um push por notificação gerada **depois** do reg
 
 - **Repetir** o mesmo `endpoint` pelo mesmo usuário atualiza as chaves e devolve a mesma inscrição (`201`, mesmo `id`, sem nova auditoria).
 - **Navegador compartilhado:** o mesmo `endpoint` ativo de **outro** usuário, inclusive de outra organização, é revogado (`replaced`) e passa a este usuário. Assim um navegador só recebe push de uma conta.
-- O `endpoint` precisa ser `https` de serviço de push conhecido: `fcm.googleapis.com` (Chrome, Edge, Android), `*.push.services.mozilla.com` (Firefox), `*.notify.windows.com` (Windows) e `*.push.apple.com` (Safari, iOS). A lista fechada impede que a API faça requisições a endereço arbitrário (SSRF).
+- O `endpoint` precisa ser `https`, sem usuário, senha ou porta, com host só de letras, dígitos, hífen e ponto, igual nos dois leitores de URL do Node (o da lib `web-push` é o legado), e de serviço de push conhecido: `fcm.googleapis.com` (Chrome, Edge, Android), `*.push.services.mozilla.com` (Firefox), `*.notify.windows.com` (Windows) e `*.push.apple.com` (Safari, iOS). A lista fechada impede que a API faça requisições a endereço arbitrário (SSRF).
 - O frontend deve [revogar](notifications-push-revogar.md) antes do logout: a sessão expira por inatividade sem revogar a inscrição, para o push chegar com o app fechado.
 
 O push leva `title` (tipo e severidade) e `body` (`Paciente: <nome> · Severidade: <...>`), sem valor clínico, parâmetro, regra, formulário ou medicamento. Leva também `notificationId`, `alertId` e `url` (link do app, `NOTIFICATION_APP_URL`, ou `null`). O payload vai cifrado (aes128gcm) com VAPID e TTL de 24 h no serviço de push.

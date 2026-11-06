@@ -281,6 +281,19 @@ describeWithDatabase('destinatarios na geracao do alerta (e2e)', () => {
     expect(await notificationsOf(alert)).toEqual([]);
   });
 
+  it('organizacao inativada nao notifica ninguem', async () => {
+    const inactive = await seed.organization('destinatarios-inativa');
+    const { patient } = await linkedPatient(inactive);
+    const alert = await seed.alert(inactive, patient);
+
+    await dataSource.query(
+      "UPDATE organizations SET status = 'inactive', deleted_at = now() WHERE id = $1",
+      [inactive.id],
+    );
+
+    expect(await fanOut(inactive, [alert])).toBe(0);
+  });
+
   describe('as tres origens notificam ao gerar', () => {
     const notifiedUsers = (where: string, parameters: unknown[]) =>
       dataSource.query<Array<{ userId: string }>>(

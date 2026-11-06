@@ -45,6 +45,7 @@ export class UpdateNotificationPreferencesUseCase {
         absence: { ...body.absence },
         medicationReminder: { ...body.medicationReminder },
       }),
+      ctx,
     );
   }
 }

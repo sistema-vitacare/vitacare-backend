@@ -22,6 +22,7 @@ import type { NotificationReason } from '../types/notification.types';
  */
 @Entity('alert_notifications')
 @Index('alert_notifications_inbox_idx', { synchronize: false })
+@Index('alert_notifications_unread_idx', { synchronize: false })
 @Unique('alert_notifications_id_org_unique', ['id', 'organizationId'])
 @Unique('alert_notifications_alert_user_unique', ['alertId', 'userId'])
 @ForeignKey(() => Organization, ['organizationId'], ['id'], {

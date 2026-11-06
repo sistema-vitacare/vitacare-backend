@@ -17,7 +17,7 @@ const preferenceOf = (channel: NotificationChannel) =>
 
 /**
  * Destinatarios dos alertas `$2` da organizacao `$1`, na transacao que os
- * gravou (UC13 passo 3): vinculos vigentes autorizados do paciente e admins
+ * gravou (UC13 passo 3), se a organizacao esta ativa: vinculos vigentes autorizados do paciente e admins
  * ativos com opt-in, um por usuario com o vinculo a frente. Cria a
  * notificacao para quem tem algum canal ligado na origem e as entregas
  * pendentes de push (uma por inscricao ativa) e e-mail. Repetir nao duplica.
@@ -26,6 +26,9 @@ const FAN_OUT = `
   WITH new_alerts AS (
     SELECT a.id, a.organization_id, a.patient_id, a.source
       FROM alerts a
+      JOIN organizations o
+        ON o.id = a.organization_id
+       AND o.status = 'active'
      WHERE a.organization_id = $1
        AND a.id = ANY($2::uuid[])
   ),

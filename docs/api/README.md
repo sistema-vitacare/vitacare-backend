@@ -202,6 +202,7 @@ Profissional sem vínculo não é notificado, mas lê os alertas da organizaçã
 - a preferência foi desligada (`PREFERENCE_DISABLED`);
 - a inscrição foi revogada (`PUSH_SUBSCRIPTION_REVOKED`);
 - o alerta foi resolvido (`ALERT_RESOLVED`);
+- a organização foi inativada (`ORGANIZATION_INACTIVE`; organização inativa também não gera notificação nova);
 - o canal está desligado no servidor (`CHANNEL_DISABLED`). Hoje o SMTP está desligado e o push só liga com chaves VAPID.
 
 Falha temporária (rede, `429`, `5xx`, SMTP `4xx`) tenta de novo após 1 min, 5 min, 30 min e 2 h, até 5 tentativas; falha definitiva fica `failed`. Inscrição expirada (`404`/`410`) é revogada. Não há promessa de exatamente uma vez: uma queda entre o envio e a gravação pode repetir um push ou e-mail.

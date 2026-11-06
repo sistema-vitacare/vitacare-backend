@@ -2,6 +2,7 @@ import { ApiProperty } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
   IsDefined,
+  IsObject,
   IsString,
   Matches,
   MaxLength,
@@ -46,6 +47,7 @@ export class RegisterPushSubscriptionDto {
 
   @ApiProperty({ type: PushSubscriptionKeysDto })
   @IsDefined({ message: 'Informe as chaves da inscricao.' })
+  @IsObject({ message: 'Informe as chaves da inscricao como objeto.' })
   @ValidateNested()
   @Type(() => PushSubscriptionKeysDto)
   keys!: PushSubscriptionKeysDto;

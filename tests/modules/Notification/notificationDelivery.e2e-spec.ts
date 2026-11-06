@@ -368,6 +368,23 @@ describeWithDatabase('entrega das notificacoes (e2e)', () => {
       await expectSkipped(alert, 'RECIPIENT_REVOKED');
     });
 
+    it('organizacao inativada depois da geracao', async () => {
+      const original = A;
+
+      A = await seed.organization(`entrega-inativa-${Date.now()}`);
+      try {
+        const { alert } = await notifiedAlert();
+
+        await dataSource.query(
+          "UPDATE organizations SET status = 'inactive', deleted_at = now() WHERE id = $1",
+          [A.id],
+        );
+        await expectSkipped(alert, 'ORGANIZATION_INACTIVE');
+      } finally {
+        A = original;
+      }
+    });
+
     it('inscricao de push revogada; o e-mail segue', async () => {
       const { alert, subscription } = await notifiedAlert();
 

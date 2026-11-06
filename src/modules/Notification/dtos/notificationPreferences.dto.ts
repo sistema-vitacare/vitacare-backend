@@ -1,6 +1,11 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { Type } from 'class-transformer';
-import { IsBoolean, IsDefined, ValidateNested } from 'class-validator';
+import { plainToInstance, Transform } from 'class-transformer';
+import {
+  IsBoolean,
+  IsDefined,
+  IsObject,
+  ValidateNested,
+} from 'class-validator';
 
 const BOOLEAN = { message: 'Informe true ou false.' };
 
@@ -24,8 +29,14 @@ const Channels = (description: string): PropertyDecorator => {
   const decorators = [
     ApiProperty({ type: NotificationChannelsDto, description }),
     IsDefined({ message: 'Informe os tres canais.' }),
+    IsObject({ message: 'Informe os tres canais como objeto.' }),
     ValidateNested(),
-    Type(() => NotificationChannelsDto),
+    // Sem `@Type`: com uma lista, o class-transformer chamaria `.push` dela.
+    Transform(({ value }: { value: unknown }) =>
+      value !== null && typeof value === 'object' && !Array.isArray(value)
+        ? plainToInstance(NotificationChannelsDto, value)
+        : value,
+    ),
   ];
 
   return (target, key) => decorators.forEach((apply) => apply(target, key));
