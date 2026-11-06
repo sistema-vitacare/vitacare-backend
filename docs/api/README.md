@@ -48,6 +48,7 @@ O corpo das rotas de negócio é JSON quando aplicável. Autenticação usa Bear
 | `POST /api/v1/patients` | Cadastra paciente com o profissional responsável | [patients-criar.md](endpoints/patients-criar.md) |
 | `GET /api/v1/patients` | Lista os pacientes ao alcance da sessão (ativos por padrão) | [patients-listar.md](endpoints/patients-listar.md) |
 | `GET /api/v1/patients/:patientId` | Consulta um paciente, ativo ou inativo | [patients-consultar.md](endpoints/patients-consultar.md) |
+| `GET /api/v1/patients/:patientId/overview` | Visão consolidada: contadores, últimas medições, medicamentos ativos e alertas recentes | [patients-visao-consolidada.md](endpoints/patients-visao-consolidada.md) |
 | `PATCH /api/v1/patients/:patientId` | Edita dados ou troca o responsável de paciente ativo | [patients-atualizar.md](endpoints/patients-atualizar.md) |
 | `POST /api/v1/patients/:patientId/deactivate` | Inativa o paciente, preservando vínculo e histórico | [patients-inativar.md](endpoints/patients-inativar.md) |
 | `POST /api/v1/patients/:patientId/reactivate` | Reativa o paciente, respeitando o limite do plano | [patients-reativar.md](endpoints/patients-reativar.md) |
@@ -67,7 +68,7 @@ O corpo das rotas de negócio é JSON quando aplicável. Autenticação usa Bear
 | `POST /api/v1/forms/:formId/deactivate` | Desativa o formulário, preservando versões e histórico | [forms-desativar.md](endpoints/forms-desativar.md) |
 | `POST /api/v1/forms/:formId/reactivate` | Reativa o formulário (volta a ativo ou a rascunho) | [forms-reativar.md](endpoints/forms-reativar.md) |
 | `POST /api/v1/follow-ups` | Registra acompanhamento: registro, resposta e itens numa transação (cuidador vinculado) | [follow-ups-registrar.md](endpoints/follow-ups-registrar.md) |
-| `GET /api/v1/follow-ups` | Lista os registros de um paciente ao alcance, da visita mais recente para a mais antiga | [follow-ups-listar.md](endpoints/follow-ups-listar.md) |
+| `GET /api/v1/follow-ups` | Histórico de um paciente ao alcance, da visita mais recente para a mais antiga, com filtros de período, parâmetro, seção, responsável, formulário e status | [follow-ups-listar.md](endpoints/follow-ups-listar.md) |
 | `GET /api/v1/follow-ups/:followUpId` | Consulta um registro com as respostas e os campos da versão respondida | [follow-ups-consultar.md](endpoints/follow-ups-consultar.md) |
 | `POST /api/v1/follow-ups/:followUpId/annul` | Anula um registro com motivo, preservando-o no histórico | [follow-ups-anular.md](endpoints/follow-ups-anular.md) |
 | `POST /api/v1/follow-ups/:followUpId/attachments` | Anexa um arquivo (JPEG, PNG, WEBP ou PDF, até 10 MB) ao registro; só o cuidador autor, até 5 por registro | [follow-up-attachments-enviar.md](endpoints/follow-up-attachments-enviar.md) |
@@ -157,7 +158,29 @@ Profissionais e administradores montam os formulários que o cuidador preencher�
 
 ### Registros de acompanhamento
 
-O cuidador registra a visita pelas rotas `/api/v1/follow-ups` (BE-12, 2026-11-04; RF009; UC11; decisões de Mateus). [Registrar](endpoints/follow-ups-registrar.md) grava, numa transação, o registro (paciente, cuidador da sessão, `visitedAt` informado — padrão agora, nunca no futuro — e o envio em `submittedAt`, observações), a resposta (formulário e **versão vigente** respondidos; um formulário por registro) e um item por campo preenchido; falha em qualquer passo não deixa nada gravado. Só o `caregiver` registra, e só para paciente **ativo** com vínculo de cuidador vigente, em formulário **ativo** que valha para ele; o cliente envia `formVersionId`, e versão substituída durante o preenchimento é recusada (`409 FOLLOW_UP_FORM_VERSION_OUTDATED`). Envio sem nenhum valor é `422 FOLLOW_UP_EMPTY` (`0` e `false` são valores; as observações sozinhas não bastam); tipo, casas, escala, opções, campo desabilitado ou alheio e obrigatório ausente saem em `422 FOLLOW_UP_INVALID_ANSWERS` por campo; **valor fora de faixa clínica é gravado**, nunca recusado. Cancelar é não enviar. Os valores passam pelas regras de alerta (BE-15) logo depois do commit, fora da transação: falha na avaliação não desfaz o registro, que fica pendente para uma varredura. Correção é por [anulação com motivo](endpoints/follow-ups-anular.md): o registro continua no histórico como `annulled`; o autor anula os próprios e `admin`/`professional` (permissão nova `follow_ups:annul`) anulam qualquer um, sem prazo e uma única vez. [Listar](endpoints/follow-ups-listar.md) (por `patientId`, filtro `status`) e [consultar](endpoints/follow-ups-consultar.md) exigem `patient_history:read`: `admin` e `professional` leem a organização inteira; `caregiver` e `family`, só pacientes vinculados (o familiar recebe o registro completo até o BE-19). Cada resposta sai com os metadados do campo **na versão respondida**. Filtros do histórico (UC12) são do BE-18. Auditoria `follow_up.created` (`formId`, `formVersionId`, `itemCount`) e `follow_up.annulled` (`ownRecord`, `reasonLength`), sem valores clínicos nem o texto do motivo.
+O cuidador registra a visita pelas rotas `/api/v1/follow-ups` (BE-12, 2026-11-04; RF009; UC11; decisões de Mateus). [Registrar](endpoints/follow-ups-registrar.md) grava, numa transação, o registro (paciente, cuidador da sessão, `visitedAt` informado — padrão agora, nunca no futuro — e o envio em `submittedAt`, observações), a resposta (formulário e **versão vigente** respondidos; um formulário por registro) e um item por campo preenchido; falha em qualquer passo não deixa nada gravado. Só o `caregiver` registra, e só para paciente **ativo** com vínculo de cuidador vigente, em formulário **ativo** que valha para ele; o cliente envia `formVersionId`, e versão substituída durante o preenchimento é recusada (`409 FOLLOW_UP_FORM_VERSION_OUTDATED`). Envio sem nenhum valor é `422 FOLLOW_UP_EMPTY` (`0` e `false` são valores; as observações sozinhas não bastam); tipo, casas, escala, opções, campo desabilitado ou alheio e obrigatório ausente saem em `422 FOLLOW_UP_INVALID_ANSWERS` por campo; **valor fora de faixa clínica é gravado**, nunca recusado. Cancelar é não enviar. Os valores passam pelas regras de alerta (BE-15) logo depois do commit, fora da transação: falha na avaliação não desfaz o registro, que fica pendente para uma varredura. Correção é por [anulação com motivo](endpoints/follow-ups-anular.md): o registro continua no histórico como `annulled`; o autor anula os próprios e `admin`/`professional` (permissão nova `follow_ups:annul`) anulam qualquer um, sem prazo e uma única vez. [Listar](endpoints/follow-ups-listar.md) (por `patientId`, filtro `status`) e [consultar](endpoints/follow-ups-consultar.md) exigem `patient_history:read`: `admin` e `professional` leem a organização inteira; `caregiver` e `family`, só pacientes vinculados (o familiar recebe o registro completo até o BE-19). Cada resposta sai com os metadados do campo **na versão respondida**. Os filtros do histórico (UC12) vieram no BE-18; ver "Histórico e visão consolidada". Auditoria `follow_up.created` (`formId`, `formVersionId`, `itemCount`) e `follow_up.annulled` (`ownRecord`, `reasonLength`), sem valores clínicos nem o texto do motivo.
+
+### Histórico e visão consolidada
+
+O histórico do UC12 (BE-18, 2026-11-06; RF010/RF016; decisões de Mateus) é a [listagem de registros](endpoints/follow-ups-listar.md) com filtros opcionais, combinados com E:
+- `from`/`to`: dias `AAAA-MM-DD` inclusivos, pela data da **visita** no fuso `America/Sao_Paulo`;
+- `fieldKey`: parâmetro, pela identidade do campo entre versões;
+- `section`: categoria de informação, a seção do campo, sem diferenciar maiúsculas;
+- `authorUserId`: responsável;
+- `formId`: tipo de formulário;
+- `status`: situação do registro.
+
+O registro filtrado sai completo. Período sem registro é `200` com lista vazia e `total: 0`.
+
+A [visão consolidada](endpoints/patients-visao-consolidada.md) (`GET /patients/:patientId/overview`, Figura 36) reúne numa chamada:
+- os contadores: registros válidos, alertas abertos e medicamentos ativos;
+- a última visita;
+- os 5 últimos valores de cada campo `number`/`scale` de registros válidos, sem classificação clínica;
+- até 10 medicamentos ativos e os 5 alertas mais recentes, nos formatos de `GET /medications` e `GET /alerts`.
+
+Blocos de medicamento e alerta saem `null` para quem não tem `medications:read` ou `alerts:read`.
+
+As duas rotas exigem `patient_history:read` e o mesmo alcance de paciente: admin e profissional na organização inteira, cuidador e familiar só com vínculo vigente. O familiar recebe tudo até o BE-19. Fora do alcance, a resposta é `404 PATIENT_NOT_FOUND` antes de qualquer contagem. O histórico de paciente inativo continua legível.
 
 ### Anexos de registro
 

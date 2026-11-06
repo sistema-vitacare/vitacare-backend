@@ -47,6 +47,7 @@ interface OpenApiDocument {
       {
         summary?: string;
         security?: unknown[];
+        parameters?: Array<{ name: string; in: string; required?: boolean }>;
         responses: Record<
           string,
           { content?: Record<string, { schema?: SchemaObject }> }
@@ -214,6 +215,65 @@ describe('FollowUp HTTP (e2e)', () => {
 
     expect(response.status).toBe(422);
     expect(followUps.list).not.toHaveBeenCalled();
+  });
+
+  it('repassa os filtros do historico ao repositorio; periodo vazio e 200 com total zero', async () => {
+    followUps.list.mockResolvedValue([[], 0]);
+
+    const query = new URLSearchParams({
+      patientId: FOLLOW_UP_PATIENT_ID,
+      from: '2026-10-01',
+      to: '2026-10-31',
+      formId: FOLLOW_UP_FORM_ID,
+      authorUserId: FOLLOW_UP_ID,
+      fieldKey: GLICEMIA_FIELD_ID.toUpperCase(),
+      section: '  Sinais vitais ',
+      status: 'valid',
+    });
+    const response = await call('get', `?${query}`, 'family');
+
+    expect(response.status).toBe(200);
+    expect(response.body as object).toMatchObject({
+      data: [],
+      meta: { pagination: { total: 0 } },
+    });
+    expect(followUps.list).toHaveBeenCalledWith(expect.anything(), {
+      patientId: FOLLOW_UP_PATIENT_ID,
+      status: 'valid',
+      from: '2026-10-01',
+      to: '2026-10-31',
+      formId: FOLLOW_UP_FORM_ID,
+      authorUserId: FOLLOW_UP_ID,
+      fieldKey: GLICEMIA_FIELD_ID,
+      section: 'Sinais vitais',
+      skip: 0,
+      take: 20,
+    });
+  });
+
+  it('publica os filtros do historico como query opcionais', async () => {
+    const document = (await request(server()).get('/api/docs-json'))
+      .body as OpenApiDocument;
+    const parameters = document.paths['/api/v1/follow-ups'].get.parameters!;
+
+    expect(
+      parameters
+        .filter((parameter) => parameter.in === 'query' && !parameter.required)
+        .map((parameter) => parameter.name)
+        .sort(),
+    ).toEqual(
+      [
+        'authorUserId',
+        'fieldKey',
+        'formId',
+        'from',
+        'limit',
+        'page',
+        'section',
+        'status',
+        'to',
+      ].sort(),
+    );
   });
 
   it('publica as quatro rotas no OpenAPI com bearer, envelope e erros', async () => {

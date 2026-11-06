@@ -25,5 +25,6 @@ export const MEDICATION_USE_CASES = [
   imports: [TypeOrmModule.forFeature([Medication, MedicationReminder])],
   controllers: [MedicationController],
   providers: [...MEDICATION_USE_CASES, MedicationRepository],
+  exports: [MedicationRepository],
 })
 export class MedicationModule {}

@@ -315,20 +315,42 @@ export class FollowUpRepository {
 
       const where = `
           AND r.patient_id = $4
-          AND ($5::varchar IS NULL OR r.status = $5)`;
+          AND ($5::varchar IS NULL OR r.status = $5)
+          AND ($6::date IS NULL
+               OR r.visited_at >= $6::date::timestamp AT TIME ZONE 'America/Sao_Paulo')
+          AND ($7::date IS NULL
+               OR r.visited_at < ($7::date + 1)::timestamp AT TIME ZONE 'America/Sao_Paulo')
+          AND ($8::uuid IS NULL OR resp.form_id = $8)
+          AND ($9::uuid IS NULL OR r.author_user_id = $9)
+          AND (($10::uuid IS NULL AND $11::varchar IS NULL) OR EXISTS (
+                SELECT 1
+                  FROM follow_up_response_items i
+                  JOIN follow_up_form_fields ff
+                    ON ff.id = i.field_id
+                   AND ff.organization_id = i.organization_id
+                 WHERE i.response_id = resp.id
+                   AND i.organization_id = resp.organization_id
+                   AND ($10::uuid IS NULL OR ff.field_key = $10)
+                   AND ($11::varchar IS NULL OR lower(ff.section) = lower($11))))`;
       const parameters = [
         scope.organizationId,
         scope.viewerUserId,
         scope.viewerLinkRoles,
         filter.patientId,
         filter.status ?? null,
+        filter.from ?? null,
+        filter.to ?? null,
+        filter.formId ?? null,
+        filter.authorUserId ?? null,
+        filter.fieldKey ?? null,
+        filter.section ?? null,
       ];
 
       const [rows, [{ total }]] = await Promise.all([
         manager.query<RecordRow[]>(
           `${RECORD_SELECT} ${where}
             ORDER BY r.visited_at DESC, r.created_at DESC, r.id
-            LIMIT $6 OFFSET $7`,
+            LIMIT $12 OFFSET $13`,
           [...parameters, filter.take, filter.skip],
         ),
         manager.query<Array<{ total: number }>>(

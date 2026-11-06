@@ -11,7 +11,10 @@ import { toFollowUpResponse } from '../parsers/followUp.parser';
 import { FollowUpRepository } from '../repositories/followUp.repository';
 import type { ListFollowUpsQueryDto } from './listFollowUps.dto';
 
-/** Registros do paciente, da visita mais recente para a mais antiga. */
+/**
+ * Historico do paciente (UC12): registros da visita mais recente para a mais
+ * antiga, com os filtros combinados. Periodo sem registro e lista vazia.
+ */
 @Injectable()
 export class ListFollowUpsUseCase {
   constructor(private readonly followUps: FollowUpRepository) {}
@@ -23,6 +26,12 @@ export class ListFollowUpsUseCase {
     const result = await this.followUps.list(patientScope(ctx), {
       patientId: query.patientId,
       status: query.status,
+      from: query.from,
+      to: query.to,
+      formId: query.formId,
+      authorUserId: query.authorUserId,
+      fieldKey: query.fieldKey,
+      section: query.section,
       skip: query.skip,
       take: query.limit,
     });

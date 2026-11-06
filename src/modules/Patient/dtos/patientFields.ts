@@ -8,6 +8,7 @@ import {
   type ValidationOptions,
 } from 'class-validator';
 
+import { isCalendarDate } from '@/common/validation/calendarDate';
 import { Trim } from '@/modules/Organization/dtos/organizationFields';
 
 export const BRAZILIAN_STATES = [
@@ -72,15 +73,6 @@ export const TrimEach = (): PropertyDecorator =>
       : value,
   );
 
-const isCalendarDate = (value: string): boolean => {
-  const parsed = new Date(`${value}T00:00:00.000Z`);
-
-  return (
-    !Number.isNaN(parsed.getTime()) &&
-    parsed.toISOString().slice(0, 10) === value
-  );
-};
-
 /** Hoje no fuso de Brasilia, como `YYYY-MM-DD`. */
 const todayInBrazil = (): string =>
   new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(
@@ -98,8 +90,6 @@ export const IsBirthDate =
       options,
       validator: {
         validate: (value: unknown) =>
-          typeof value === 'string' &&
-          /^\d{4}-\d{2}-\d{2}$/.test(value) &&
           isCalendarDate(value) &&
           value >= MIN_BIRTH_DATE &&
           value <= todayInBrazil(),
