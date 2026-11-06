@@ -4,8 +4,8 @@ import type { AlertDto } from '../dtos/alert.dto';
 import type { AlertRow } from '../types/alert.types';
 
 /**
- * Alerta -> resposta. O `ctx` e onde a visao simplificada do familiar
- * entrara (BE-19).
+ * Alerta -> resposta, igual para todos os perfis: o familiar le o alerta
+ * completo (BE-19, decisao de 2026-11-06).
  */
 export const toAlertResponse = (
   row: AlertRow,

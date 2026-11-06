@@ -26,8 +26,8 @@ export const notificationActor = (ctx: RequestContext): NotificationActor => ({
 });
 
 /**
- * Notificacao -> resposta. O `ctx` e onde a visao simplificada do familiar
- * entrara (BE-19).
+ * Notificacao -> resposta, igual para todos os perfis: o familiar le o alerta
+ * completo (BE-19, decisao de 2026-11-06).
  */
 export const toNotificationResponse = (
   row: NotificationRow,

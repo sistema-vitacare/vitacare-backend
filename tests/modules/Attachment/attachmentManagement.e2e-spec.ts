@@ -696,8 +696,12 @@ describeWithDatabase('anexos de registro em PostgreSQL (e2e)', () => {
       expect(response.status).toBe(409);
       expect(errorCode(response)).toBe('ATTACHMENT_FOLLOW_UP_ANNULLED');
       expect(
-        (await download(recordId, id, tenants.A.tokens.family)).status,
+        (await download(recordId, id, tenants.A.tokens.caregiver)).status,
       ).toBe(200);
+      // Para o familiar, o registro anulado e seus anexos nao existem (BE-19).
+      expect(
+        (await download(recordId, id, tenants.A.tokens.family)).status,
+      ).toBe(404);
     });
 
     it('paciente inativo nao recebe anexo, mas os existentes continuam legiveis', async () => {

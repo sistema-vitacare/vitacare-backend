@@ -61,6 +61,7 @@ export type AnnulFollowUpOutcome =
 export interface ListFollowUpsFilter {
   patientId: string;
   status?: FollowUpStatus;
+  includeAnnulled: boolean;
   /** Dias `YYYY-MM-DD` inclusivos da visita, no fuso de Brasilia. */
   from?: string;
   to?: string;

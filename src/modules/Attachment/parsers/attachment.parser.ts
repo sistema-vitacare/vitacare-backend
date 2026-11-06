@@ -4,8 +4,8 @@ import type { AttachmentDto } from '../dtos/attachment.dto';
 import type { AttachmentRow } from '../types/attachment.types';
 
 /**
- * Familiar e cuidador vinculados veem os anexos ate o BE-19 (visao
- * simplificada); o `ctx` fica na assinatura para essa regra.
+ * Anexo -> resposta, igual para todos os perfis; o familiar so alcanca os de
+ * registros validos (BE-19).
  */
 export const toAttachmentResponse = (
   row: AttachmentRow,

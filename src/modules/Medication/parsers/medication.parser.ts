@@ -75,8 +75,8 @@ export const toMedicationPatch = (
 
 /**
  * Medicamento -> resposta. `others` sao os ativos do paciente (o proprio e
- * ignorado); inativo nao tem proximo horario nem conflito. O `ctx` e onde a
- * visao simplificada do familiar entrara (BE-19).
+ * ignorado); inativo nao tem proximo horario nem conflito. O familiar le o
+ * medicamento completo (BE-19, decisao de 2026-11-06).
  */
 export const toMedicationResponse = (
   row: MedicationRow,

@@ -587,8 +587,13 @@ describeWithDatabase('historico e visao consolidada do paciente (e2e)', () => {
       [s.patientId],
     );
 
-    for (const token of [A.tokens.admin, A.tokens.caregiver, A.tokens.family]) {
-      expect((await history(token, s.patientId)).ids).toHaveLength(4);
+    for (const [token, records] of [
+      [A.tokens.admin, 4],
+      [A.tokens.caregiver, 4],
+      // O familiar nao ve o anulado (BE-19).
+      [A.tokens.family, 3],
+    ] as const) {
+      expect((await history(token, s.patientId)).ids).toHaveLength(records);
 
       const response = await overview(token, s.patientId);
 

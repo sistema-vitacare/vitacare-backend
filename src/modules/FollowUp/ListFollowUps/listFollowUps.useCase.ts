@@ -8,12 +8,14 @@ import { patientScope } from '@/modules/Patient/policies/patient.policy';
 
 import type { FollowUpDto } from '../dtos/followUp.dto';
 import { toFollowUpResponse } from '../parsers/followUp.parser';
+import { readsAnnulledFollowUps } from '../policies/followUpVisibility.policy';
 import { FollowUpRepository } from '../repositories/followUp.repository';
 import type { ListFollowUpsQueryDto } from './listFollowUps.dto';
 
 /**
  * Historico do paciente (UC12): registros da visita mais recente para a mais
- * antiga, com os filtros combinados. Periodo sem registro e lista vazia.
+ * antiga, com os filtros combinados. Periodo sem registro e lista vazia; o
+ * familiar nao ve anulados.
  */
 @Injectable()
 export class ListFollowUpsUseCase {
@@ -26,6 +28,7 @@ export class ListFollowUpsUseCase {
     const result = await this.followUps.list(patientScope(ctx), {
       patientId: query.patientId,
       status: query.status,
+      includeAnnulled: readsAnnulledFollowUps(ctx),
       from: query.from,
       to: query.to,
       formId: query.formId,

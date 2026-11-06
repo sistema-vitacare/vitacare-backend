@@ -1000,12 +1000,7 @@ describeWithDatabase('registros de acompanhamento em PostgreSQL (e2e)', () => {
         { reason: 'Registro duplicado.' },
       );
 
-      for (const role of [
-        'admin',
-        'professional',
-        'caregiver',
-        'family',
-      ] as const) {
+      for (const role of ['admin', 'professional', 'caregiver'] as const) {
         const response = await http(
           'get',
           `/api/v1/follow-ups?patientId=${patientId}`,
@@ -1027,11 +1022,22 @@ describeWithDatabase('registros de acompanhamento em PostgreSQL (e2e)', () => {
       const valid = await http(
         'get',
         `/api/v1/follow-ups?patientId=${patientId}&status=valid`,
-        tenants.A.tokens.family,
+        tenants.A.tokens.caregiver,
       );
 
       expect(
         (valid.body as { data: FollowUpBody[] }).data.map((item) => item.id),
+      ).toEqual([newer.id]);
+
+      // O familiar so ve registros validos (BE-19), com ou sem filtro.
+      const family = await http(
+        'get',
+        `/api/v1/follow-ups?patientId=${patientId}`,
+        tenants.A.tokens.family,
+      );
+
+      expect(
+        (family.body as { data: FollowUpBody[] }).data.map((item) => item.id),
       ).toEqual([newer.id]);
     });
 

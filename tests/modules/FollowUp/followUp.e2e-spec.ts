@@ -240,6 +240,7 @@ describe('FollowUp HTTP (e2e)', () => {
     expect(followUps.list).toHaveBeenCalledWith(expect.anything(), {
       patientId: FOLLOW_UP_PATIENT_ID,
       status: 'valid',
+      includeAnnulled: false,
       from: '2026-10-01',
       to: '2026-10-31',
       formId: FOLLOW_UP_FORM_ID,
