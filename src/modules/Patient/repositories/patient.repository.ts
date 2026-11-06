@@ -57,7 +57,10 @@ const RESPONSIBLE_ROLE = 'responsible_professional';
 /** Perfis aceitos como profissional responsavel (admin herda o profissional). */
 const RESPONSIBLE_PROFILES = [ProfileCode.PROFESSIONAL, ProfileCode.ADMIN];
 
-/** Pacientes do tenant `$1`; com `$2`, so os vinculados a ele num papel de `$3`. */
+/**
+ * Pacientes do tenant `$1`; com `$2`, so os vinculados a ele num papel de `$3`,
+ * com esse vinculo (unico vigente por par, `user_patients_care_link_unique`).
+ */
 const PATIENT_SELECT = `
   SELECT p.id,
          p.name,
@@ -81,6 +84,8 @@ const PATIENT_SELECT = `
          r.id AS "responsibleId",
          r.name AS "responsibleName",
          r.status AS "responsibleStatus",
+         viewer_link.role AS "viewerLinkRole",
+         viewer_link.link_type AS "viewerLinkType",
          p.created_at AS "createdAt",
          p.updated_at AS "updatedAt",
          p.deleted_at AS "deletedAt"
@@ -92,7 +97,13 @@ const PATIENT_SELECT = `
      AND link.deleted_at IS NULL
     LEFT JOIN users r
       ON r.id = link.user_id
-     AND r.organization_id = link.organization_id`;
+     AND r.organization_id = link.organization_id
+    LEFT JOIN user_patients viewer_link
+      ON viewer_link.patient_id = p.id
+     AND viewer_link.organization_id = p.organization_id
+     AND viewer_link.user_id = $2
+     AND viewer_link.role = ANY($3::varchar[])
+     AND viewer_link.deleted_at IS NULL`;
 
 /** `%`, `_` e `\` digitados na busca sao texto, nao curinga do ILIKE. */
 const escapeLike = (value: string): string => value.replace(/[\\%_]/g, '\\$&');
@@ -145,7 +156,8 @@ export class PatientRepository {
             OR EXISTS (
                  SELECT 1 FROM unnest(p.secondary_conditions) AS condition
                   WHERE condition ILIKE $7 ESCAPE '\\'))`;
-    const cpfDigits = filter.search ? cpfDigitsOf(filter.search) : null;
+    const cpfDigits =
+      filter.search && filter.searchCpf ? cpfDigitsOf(filter.search) : null;
     const parameters = [
       scope.organizationId,
       scope.viewerUserId,

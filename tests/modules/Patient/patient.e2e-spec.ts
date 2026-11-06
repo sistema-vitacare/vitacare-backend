@@ -280,5 +280,19 @@ describe('Patient HTTP (e2e)', () => {
     expect(
       document.components.schemas.PatientDto.properties?.status.enum,
     ).toEqual(['active', 'inactive']);
+
+    const viewerLink = document.components.schemas.PatientDto.properties
+      ?.viewerLink as SchemaObject & {
+      nullable?: boolean;
+      allOf?: Array<{ $ref: string }>;
+    };
+
+    expect(viewerLink.nullable).toBe(true);
+    expect(viewerLink.allOf?.[0].$ref ?? viewerLink.$ref).toBe(
+      '#/components/schemas/PatientViewerLinkDto',
+    );
+    expect(
+      document.components.schemas.PatientViewerLinkDto.properties?.role.enum,
+    ).toEqual(['caregiver', 'family']);
   });
 });

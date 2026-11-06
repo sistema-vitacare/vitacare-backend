@@ -1,5 +1,8 @@
 import { ProfileCode } from '@/common/context/requestContext.type';
-import { patientScope } from '@/modules/Patient/policies/patient.policy';
+import {
+  patientScope,
+  readsFullPatientRecord,
+} from '@/modules/Patient/policies/patient.policy';
 
 import { ACTOR_ID, ORGANIZATION_ID, sessionOf } from './patient.fixtures';
 
@@ -28,4 +31,15 @@ describe('patientScope', () => {
       });
     },
   );
+});
+
+describe('readsFullPatientRecord', () => {
+  it.each([
+    [ProfileCode.ADMIN, true],
+    [ProfileCode.PROFESSIONAL, true],
+    [ProfileCode.CAREGIVER, true],
+    [ProfileCode.FAMILY, false],
+  ] as const)('%s le o cadastro completo: %s', (profile, expected) => {
+    expect(readsFullPatientRecord(sessionOf(profile))).toBe(expected);
+  });
 });

@@ -39,3 +39,10 @@ export const patientScope = (ctx: RequestContext): PatientScope =>
         viewerUserId: ctx.userId,
         viewerLinkRoles: LINK_ROLES_BY_PROFILE[ctx.profile] ?? [],
       };
+
+/**
+ * O familiar le o recorte da Figura 37 (BE-19, decisao de 2026-11-06): sem
+ * CPF, contato, endereco, plano de saude e observacoes.
+ */
+export const readsFullPatientRecord = (ctx: RequestContext): boolean =>
+  ctx.profile !== ProfileCode.FAMILY;

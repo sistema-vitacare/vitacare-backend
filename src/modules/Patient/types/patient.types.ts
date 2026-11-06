@@ -33,13 +33,18 @@ export interface PatientFields {
 
 export type PatientPatch = Partial<PatientFields>;
 
-/** Paciente com o responsavel vigente, como sai das consultas. */
+/**
+ * Paciente com o responsavel vigente e o vinculo de cuidado vigente de quem le
+ * (nulo para quem le a organizacao inteira), como sai das consultas.
+ */
 export interface PatientRow extends PatientFields {
   id: string;
   status: PatientStatus;
   responsibleId: string | null;
   responsibleName: string | null;
   responsibleStatus: string | null;
+  viewerLinkRole: CareLinkRole | null;
+  viewerLinkType: string | null;
   createdAt: Date;
   updatedAt: Date;
   deletedAt: Date | null;
@@ -64,6 +69,8 @@ export interface PatientActor extends PatientScope {
 export interface ListPatientsFilter {
   status: PatientStatus;
   search?: string;
+  /** Falso para quem nao ve o CPF: a busca nao pode revela-lo por tentativa. */
+  searchCpf: boolean;
   condition?: string;
   skip: number;
   take: number;

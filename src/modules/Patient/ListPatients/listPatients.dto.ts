@@ -27,7 +27,7 @@ export class ListPatientsQueryDto extends PaginationQueryDto {
   @ApiPropertyOptional({
     maxLength: 100,
     description:
-      'Trecho do nome, sem diferenciar maiusculas, ou trecho do CPF (so digitos e pontuacao).',
+      'Trecho do nome, sem diferenciar maiusculas, ou trecho do CPF (so digitos e pontuacao). Para o familiar, so o nome.',
   })
   @IsOptional()
   @Trim()
