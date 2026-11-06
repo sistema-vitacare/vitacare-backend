@@ -201,6 +201,19 @@ describe('ListAttachmentsUseCase', () => {
         viewerUserId: ACTOR_ID,
       }),
       FOLLOW_UP_ID,
+      true,
+    );
+  });
+
+  it('familiar so alcanca anexos de registro valido', async () => {
+    repository.list.mockResolvedValue([]);
+
+    await useCase.execute(FOLLOW_UP_ID, sessionOf(ProfileCode.FAMILY));
+
+    expect(repository.list).toHaveBeenCalledWith(
+      expect.objectContaining({ viewerLinkRoles: ['family'] }),
+      FOLLOW_UP_ID,
+      false,
     );
   });
 });

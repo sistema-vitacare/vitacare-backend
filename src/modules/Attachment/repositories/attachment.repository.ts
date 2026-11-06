@@ -181,10 +181,14 @@ export class AttachmentRepository {
     });
   }
 
-  /** `null` quando o registro nao existe ou o paciente esta fora do alcance. */
+  /**
+   * `null` quando o registro nao existe, o paciente esta fora do alcance ou,
+   * sem `includeAnnulled`, o registro foi anulado.
+   */
   async list(
     scope: PatientScope,
     followUpId: string,
+    includeAnnulled: boolean,
   ): Promise<AttachmentRow[] | null> {
     try {
       const manager = this.dataSource.manager;
@@ -192,8 +196,9 @@ export class AttachmentRepository {
         `SELECT patient_id AS "patientId"
            FROM follow_up_records
           WHERE organization_id = $1
-            AND id = $2`,
-        [scope.organizationId, followUpId],
+            AND id = $2
+            AND ($3::boolean OR status = 'valid')`,
+        [scope.organizationId, followUpId, includeAnnulled],
       );
 
       if (
@@ -218,11 +223,14 @@ export class AttachmentRepository {
     scope: PatientScope,
     followUpId: string,
     attachmentId: string,
+    includeAnnulled: boolean,
   ): Promise<(AttachmentRow & { storageKey: string }) | null> {
     try {
       const [row] = await this.dataSource.manager.query<AttachmentQueryRow[]>(
-        `${ATTACHMENT_SELECT} AND a.id = $5`,
-        [...scopeParameters(scope), followUpId, attachmentId],
+        `${ATTACHMENT_SELECT}
+            AND a.id = $5
+            AND ($6::boolean OR r.status = 'valid')`,
+        [...scopeParameters(scope), followUpId, attachmentId, includeAnnulled],
       );
 
       return row ? { ...toRow(row), storageKey: row.storageKey } : null;

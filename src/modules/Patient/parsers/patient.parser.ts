@@ -4,6 +4,7 @@ import { maskCpf } from '@/modules/User/parsers/user.parser';
 import type { CreatePatientDto } from '../CreatePatient/createPatient.dto';
 import type { PatientDto } from '../dtos/patient.dto';
 import type { PatientAddressInputDto } from '../dtos/patientAddress.dto';
+import { readsFullPatientRecord } from '../policies/patient.policy';
 import type { UpdatePatientDto } from '../UpdatePatient/updatePatient.dto';
 import type {
   PatientFields,
@@ -86,43 +87,64 @@ export const toPatientPatch = (input: UpdatePatientDto): PatientPatch => ({
   }),
 });
 
+/**
+ * Mascara dos campos fora do recorte do familiar. Fixa e aplicada mesmo ao
+ * campo vazio, para nao revelar tamanho nem se o dado foi preenchido.
+ */
+export const HIDDEN_PATIENT_VALUE = '********';
+
+/**
+ * Paciente -> resposta. Para o familiar, os campos fora do recorte da
+ * Figura 37 saem mascarados, no mesmo formato.
+ */
 export const toPatientResponse = (
   patient: PatientRow,
-  _ctx: RequestContext,
+  ctx: RequestContext,
   options: { maskCpf?: boolean } = {},
-): PatientDto => ({
-  id: patient.id,
-  name: patient.name,
-  birthDate: patient.birthDate,
-  sex: patient.sex,
-  cpf: patient.cpf && options.maskCpf ? maskCpf(patient.cpf) : patient.cpf,
-  phone: patient.phone,
-  email: patient.email,
-  address: {
-    zipCode: patient.zipCode,
-    street: patient.street,
-    number: patient.addressNumber,
-    complement: patient.addressComplement,
-    district: patient.district,
-    city: patient.city,
-    state: patient.state,
-  },
-  mainCondition: patient.mainCondition,
-  secondaryConditions: patient.secondaryConditions,
-  healthPlan: patient.healthPlan,
-  notes: patient.notes,
-  status: patient.status,
-  responsible:
-    patient.responsibleId &&
-    patient.responsibleName &&
-    patient.responsibleStatus
-      ? {
-          id: patient.responsibleId,
-          name: patient.responsibleName,
-          status: patient.responsibleStatus,
-        }
+): PatientDto => {
+  const full = readsFullPatientRecord(ctx);
+  const visible = (value: string | null): string | null =>
+    full ? value : HIDDEN_PATIENT_VALUE;
+
+  return {
+    id: patient.id,
+    name: patient.name,
+    birthDate: patient.birthDate,
+    sex: patient.sex,
+    cpf: visible(
+      patient.cpf && options.maskCpf ? maskCpf(patient.cpf) : patient.cpf,
+    ),
+    phone: visible(patient.phone),
+    email: visible(patient.email),
+    address: {
+      zipCode: visible(patient.zipCode),
+      street: visible(patient.street),
+      number: visible(patient.addressNumber),
+      complement: visible(patient.addressComplement),
+      district: visible(patient.district),
+      city: visible(patient.city),
+      state: visible(patient.state),
+    },
+    mainCondition: patient.mainCondition,
+    secondaryConditions: patient.secondaryConditions,
+    healthPlan: visible(patient.healthPlan),
+    notes: visible(patient.notes),
+    status: patient.status,
+    responsible:
+      patient.responsibleId &&
+      patient.responsibleName &&
+      patient.responsibleStatus
+        ? {
+            id: patient.responsibleId,
+            name: patient.responsibleName,
+            status: patient.responsibleStatus,
+          }
+        : null,
+    viewerLink: patient.viewerLinkRole
+      ? { role: patient.viewerLinkRole, linkType: patient.viewerLinkType }
       : null,
-  createdAt: patient.createdAt.toISOString(),
-  updatedAt: patient.updatedAt.toISOString(),
-  deletedAt: patient.deletedAt?.toISOString() ?? null,
-});
+    createdAt: patient.createdAt.toISOString(),
+    updatedAt: patient.updatedAt.toISOString(),
+    deletedAt: patient.deletedAt?.toISOString() ?? null,
+  };
+};

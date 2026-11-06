@@ -1,5 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
 
+import { CARE_LINK_ROLES, type CareLinkRole } from '../types/patient.types';
+
 export const PATIENT_STATUSES = ['active', 'inactive'] as const;
 
 export const PATIENT_SEXES = ['female', 'male', 'other'] as const;
@@ -52,6 +54,24 @@ export class PatientResponsibleDto {
   status!: string;
 }
 
+export class PatientViewerLinkDto {
+  @ApiProperty({
+    enum: [...CARE_LINK_ROLES],
+    example: 'family',
+    description: 'Papel do vinculo de quem consulta, derivado do perfil.',
+  })
+  role!: CareLinkRole;
+
+  @ApiProperty({
+    example: 'Filha',
+    nullable: true,
+    type: String,
+    description:
+      'Tipo de vinculo em texto livre (`tipo_vinculo` do MER); e o parentesco da Figura 37.',
+  })
+  linkType!: string | null;
+}
+
 export class PatientDto {
   @ApiProperty({
     format: 'uuid',
@@ -78,21 +98,33 @@ export class PatientDto {
     nullable: true,
     type: String,
     description:
-      'CPF com 11 digitos. Na listagem sai mascarado (`***.982.247-**`).',
+      'CPF com 11 digitos. Na listagem sai mascarado (`***.982.247-**`). Para o familiar, sempre `********` (recorte da Figura 37), mesmo sem valor cadastrado.',
   })
   cpf!: string | null;
 
-  @ApiProperty({ example: '(11) 98765-4321', nullable: true, type: String })
+  @ApiProperty({
+    example: '(11) 98765-4321',
+    nullable: true,
+    type: String,
+    description:
+      'Para o familiar, sempre `********` (recorte da Figura 37), mesmo sem valor cadastrado.',
+  })
   phone!: string | null;
 
   @ApiProperty({
     example: 'paciente@example.test',
     nullable: true,
     type: String,
+    description:
+      'Para o familiar, sempre `********` (recorte da Figura 37), mesmo sem valor cadastrado.',
   })
   email!: string | null;
 
-  @ApiProperty({ type: PatientAddressDto })
+  @ApiProperty({
+    type: PatientAddressDto,
+    description:
+      'Para o familiar, todas as partes saem `********`, mesmo sem valor cadastrado.',
+  })
   address!: PatientAddressDto;
 
   @ApiProperty({
@@ -110,7 +142,7 @@ export class PatientDto {
     nullable: true,
     type: String,
     description:
-      'Plano de saude do paciente; nao e o plano comercial da organizacao.',
+      'Plano de saude do paciente; nao e o plano comercial da organizacao. Para o familiar, sempre `********` (recorte da Figura 37), mesmo sem valor cadastrado.',
   })
   healthPlan!: string | null;
 
@@ -118,6 +150,8 @@ export class PatientDto {
     nullable: true,
     type: String,
     example: 'Observacao sintetica.',
+    description:
+      'Para o familiar, sempre `********` (recorte da Figura 37), mesmo sem valor cadastrado.',
   })
   notes!: string | null;
 
@@ -135,6 +169,14 @@ export class PatientDto {
       'Profissional responsavel pelo acompanhamento (vinculo vigente).',
   })
   responsible!: PatientResponsibleDto | null;
+
+  @ApiProperty({
+    type: PatientViewerLinkDto,
+    nullable: true,
+    description:
+      'Vinculo de cuidado vigente de quem consulta (cuidador ou familiar); `null` para admin e profissional, que leem a organizacao inteira.',
+  })
+  viewerLink!: PatientViewerLinkDto | null;
 
   @ApiProperty({ format: 'date-time' })
   createdAt!: string;

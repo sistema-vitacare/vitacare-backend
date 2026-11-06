@@ -24,8 +24,8 @@ export const toAnswerValue = (
 };
 
 /**
- * Familiar e cuidador vinculados leem o registro completo ate o BE-19 (visao
- * simplificada); o `ctx` fica na assinatura para essa regra.
+ * Registro -> resposta, igual para todos os perfis: o familiar le o registro
+ * valido completo e nao alcanca o anulado (BE-19).
  */
 export const toFollowUpResponse = (
   detail: FollowUpDetail,

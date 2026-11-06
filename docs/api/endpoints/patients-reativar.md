@@ -13,7 +13,7 @@ source: src/modules/Patient/patient.controller.ts
 
 Desfaz a [inativação](patients-inativar.md) (decisão de Mateus em 2026-11-04). O paciente volta `active`, reaparece na listagem principal e ocupa de novo uma vaga do limite de pacientes ativos do plano. Dados e vínculo são os que já estavam.
 
-Autenticação: `Authorization: Bearer <token>` de sessão normal com `patients:deactivate` (rótulo "Inativar e reativar pacientes") — `professional` e `admin`. A organização vem **sempre** da sessão. `admin` e `professional` alcançam todos os pacientes da organização; `caregiver` e `family` só os pacientes a que estão vinculados por um papel de vínculo que conceda leitura ao perfil. O papel que dá leitura é `caregiver` para o cuidador e `family` para o familiar, criados em [POST /patient-links](patient-links-criar.md) (BE-10); o vínculo de profissional responsável **não** conta (um profissional rebaixado a cuidador ou familiar deixa de ver os pacientes de que era responsável). A [revogação](patient-links-revogar.md) vale na requisição seguinte. Cuidador e familiar vinculados leem o mesmo cadastro que o profissional (decisão de Mateus em 2026-11-04, até o BE-19), inclusive de paciente inativo, e não escrevem. Paciente de outra organização ou fora do alcance responde `404 PATIENT_NOT_FOUND`, igual a um inexistente. O master (`platform_admin`) não tem `patients:*` e recebe `403`.
+Autenticação: `Authorization: Bearer <token>` de sessão normal com `patients:deactivate` (rótulo "Inativar e reativar pacientes") — `professional` e `admin`. A organização vem **sempre** da sessão. `admin` e `professional` alcançam todos os pacientes da organização; `caregiver` e `family` só os pacientes a que estão vinculados por um papel de vínculo que conceda leitura ao perfil. O papel que dá leitura é `caregiver` para o cuidador e `family` para o familiar, criados em [POST /patient-links](patient-links-criar.md) (BE-10); o vínculo de profissional responsável **não** conta (um profissional rebaixado a cuidador ou familiar deixa de ver os pacientes de que era responsável). A [revogação](patient-links-revogar.md) vale na requisição seguinte. O cuidador vinculado lê o mesmo cadastro que o profissional; o familiar, o recorte da Figura 37 (BE-19, decisão de Mateus em 2026-11-06: `cpf`, `phone`, `email`, as partes de `address`, `healthPlan` e `notes` saem como `********`, mesmo vazios). Os dois leem paciente inativo e não escrevem. Paciente de outra organização ou fora do alcance responde `404 PATIENT_NOT_FOUND`, igual a um inexistente. O master (`platform_admin`) não tem `patients:*` e recebe `403`.
 
 ## Request
 
@@ -74,6 +74,7 @@ curl -i -X POST 'https://api.example.com/api/v1/patients/3c9e2a4b-1f6d-4e8a-9b7c
       "name": "Profissional Exemplo",
       "status": "active"
     },
+    "viewerLink": null,
     "createdAt": "2026-11-04T12:30:00.000Z",
     "updatedAt": "2026-11-04T12:45:00.000Z",
     "deletedAt": null
@@ -111,6 +112,9 @@ curl -i -X POST 'https://api.example.com/api/v1/patients/3c9e2a4b-1f6d-4e8a-9b7c
 | `data.responsible.id` | texto, UUID | não | Usuário responsável. |
 | `data.responsible.name` | texto | não | Nome do usuário responsável. |
 | `data.responsible.status` | texto, enum | não | `pending`, `active` ou `inactive` (o vínculo não muda se o usuário for inativado depois). |
+| `data.viewerLink` | objeto | sim | Vínculo de cuidado vigente de quem consulta (BE-19): o parentesco da Figura 37. `null` para `admin` e `professional`, que leem a organização inteira. |
+| `data.viewerLink.role` | texto, enum | não | `caregiver` ou `family`, derivado do perfil de quem consulta. |
+| `data.viewerLink.linkType` | texto, até 40 | sim | Tipo de vínculo em texto livre (`tipo_vinculo` do MER), como "Filha". |
 | `data.createdAt` | texto ISO 8601 (UTC) | não | Cadastro. |
 | `data.updatedAt` | texto ISO 8601 (UTC) | não | Última alteração dos dados do paciente. |
 | `data.deletedAt` | texto ISO 8601 (UTC) | sim | Momento da inativação; `null` enquanto ativo. |

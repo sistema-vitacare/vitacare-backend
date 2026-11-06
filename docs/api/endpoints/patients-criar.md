@@ -97,6 +97,7 @@ curl -i -X POST 'https://api.example.com/api/v1/patients' \
       "name": "Profissional Exemplo",
       "status": "active"
     },
+    "viewerLink": null,
     "createdAt": "2026-11-04T12:30:00.000Z",
     "updatedAt": "2026-11-04T12:30:00.000Z",
     "deletedAt": null
@@ -134,6 +135,9 @@ curl -i -X POST 'https://api.example.com/api/v1/patients' \
 | `data.responsible.id` | texto, UUID | não | Usuário responsável. |
 | `data.responsible.name` | texto | não | Nome do usuário responsável. |
 | `data.responsible.status` | texto, enum | não | `pending`, `active` ou `inactive` (o vínculo não muda se o usuário for inativado depois). |
+| `data.viewerLink` | objeto | sim | Vínculo de cuidado vigente de quem consulta (BE-19): o parentesco da Figura 37. `null` para `admin` e `professional`, que leem a organização inteira. |
+| `data.viewerLink.role` | texto, enum | não | `caregiver` ou `family`, derivado do perfil de quem consulta. |
+| `data.viewerLink.linkType` | texto, até 40 | sim | Tipo de vínculo em texto livre (`tipo_vinculo` do MER), como "Filha". |
 | `data.createdAt` | texto ISO 8601 (UTC) | não | Cadastro. |
 | `data.updatedAt` | texto ISO 8601 (UTC) | não | Última alteração dos dados do paciente. |
 | `data.deletedAt` | texto ISO 8601 (UTC) | sim | Momento da inativação; `null` enquanto ativo. |

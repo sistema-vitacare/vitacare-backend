@@ -2,6 +2,7 @@ import { Injectable, Logger, StreamableFile } from '@nestjs/common';
 
 import type { RequestContext } from '@/common/context/requestContext.type';
 import { DomainException } from '@/common/errors/domain.exception';
+import { readsAnnulledFollowUps } from '@/modules/FollowUp/policies/followUpVisibility.policy';
 import { patientScope } from '@/modules/Patient/policies/patient.policy';
 import { FileStorageService } from '@/storage/fileStorage.service';
 
@@ -32,12 +33,14 @@ export class DownloadAttachmentUseCase {
       patientScope(ctx),
       followUpId,
       attachmentId,
+      readsAnnulledFollowUps(ctx),
     );
 
     if (!attachment) {
       throw new DomainException({
         ...AttachmentErrors.NOT_FOUND,
-        detail: 'Anexo inexistente, removido ou de paciente fora do alcance.',
+        detail:
+          'Anexo inexistente, removido, de paciente fora do alcance ou de registro anulado (familiar).',
       });
     }
 

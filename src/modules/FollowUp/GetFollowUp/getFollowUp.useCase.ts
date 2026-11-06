@@ -7,6 +7,7 @@ import { patientScope } from '@/modules/Patient/policies/patient.policy';
 import type { FollowUpDto } from '../dtos/followUp.dto';
 import { FollowUpErrors } from '../followUp.errors';
 import { toFollowUpResponse } from '../parsers/followUp.parser';
+import { readsAnnulledFollowUps } from '../policies/followUpVisibility.policy';
 import { FollowUpRepository } from '../repositories/followUp.repository';
 
 @Injectable()
@@ -17,12 +18,14 @@ export class GetFollowUpUseCase {
     const followUp = await this.followUps.findById(
       patientScope(ctx),
       followUpId,
+      readsAnnulledFollowUps(ctx),
     );
 
     if (!followUp) {
       throw new DomainException({
         ...FollowUpErrors.NOT_FOUND,
-        detail: 'Registro inexistente ou de paciente fora do alcance.',
+        detail:
+          'Registro inexistente, de paciente fora do alcance ou anulado (familiar).',
       });
     }
 

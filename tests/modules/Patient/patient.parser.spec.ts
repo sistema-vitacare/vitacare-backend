@@ -4,7 +4,12 @@ import {
   toPatientResponse,
 } from '@/modules/Patient/parsers/patient.parser';
 
-import { patientRow, professionalCtx } from './patient.fixtures';
+import { ProfileCode } from '@/common/context/requestContext.type';
+
+import { patientRow, professionalCtx, sessionOf } from './patient.fixtures';
+
+/** Mascara fixa: nao revela tamanho nem se o campo foi preenchido. */
+const HIDDEN = '********';
 
 describe('patient.parser', () => {
   it('cadastro: opcional ausente vira null e lista vazia', () => {
@@ -86,5 +91,65 @@ describe('patient.parser', () => {
         { maskCpf: true },
       ),
     ).toMatchObject({ cpf: null, responsible: null });
+  });
+
+  it('familiar: recorte da Figura 37, com documento, contato, endereco, plano e observacoes sempre mascarados', () => {
+    const row = patientRow({
+      phone: '(11) 98765-4321',
+      email: 'paciente@example.test',
+      healthPlan: 'Plano Exemplo',
+      notes: 'Observacao sintetica',
+      viewerLinkRole: 'family',
+      viewerLinkType: 'Filha',
+    });
+
+    expect(toPatientResponse(row, sessionOf(ProfileCode.FAMILY))).toEqual({
+      id: row.id,
+      name: 'Paciente Sintetico',
+      birthDate: '1948-03-12',
+      sex: 'female',
+      cpf: HIDDEN,
+      phone: HIDDEN,
+      email: HIDDEN,
+      address: {
+        zipCode: HIDDEN,
+        street: HIDDEN,
+        number: HIDDEN,
+        complement: HIDDEN,
+        district: HIDDEN,
+        city: HIDDEN,
+        state: HIDDEN,
+      },
+      mainCondition: 'Hipertensao arterial',
+      secondaryConditions: ['Diabetes tipo 2'],
+      healthPlan: HIDDEN,
+      notes: HIDDEN,
+      status: 'active',
+      responsible: {
+        id: row.responsibleId,
+        name: 'Profissional Sintetico',
+        status: 'active',
+      },
+      viewerLink: { role: 'family', linkType: 'Filha' },
+      createdAt: '2026-11-01T10:00:00.000Z',
+      updatedAt: '2026-11-02T10:00:00.000Z',
+      deletedAt: null,
+    });
+  });
+
+  it('viewerLink: vinculo de quem le; null para quem le a organizacao inteira', () => {
+    const caregiver = toPatientResponse(
+      patientRow({ viewerLinkRole: 'caregiver', viewerLinkType: null }),
+      sessionOf(ProfileCode.CAREGIVER),
+    );
+
+    expect(caregiver.viewerLink).toEqual({ role: 'caregiver', linkType: null });
+    expect(caregiver).toMatchObject({
+      cpf: '52998224725',
+      address: { street: 'Avenida Exemplo' },
+    });
+    expect(
+      toPatientResponse(patientRow(), professionalCtx).viewerLink,
+    ).toBeNull();
   });
 });

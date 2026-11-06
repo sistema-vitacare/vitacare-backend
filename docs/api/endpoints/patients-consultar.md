@@ -13,7 +13,7 @@ source: src/modules/Patient/patient.controller.ts
 
 Detalhe do paciente (UC07; Figura 36, parte de identificação, responsável e status). Paciente **inativo continua legível** aqui, com `status = inactive` e `deletedAt` preenchido. Medições, tendência, medicamentos e alertas da Figura 36 não fazem parte desta rota (dependem dos módulos de registros, medicamentos e alertas).
 
-Autenticação: `Authorization: Bearer <token>` de sessão normal com `patients:read`. A organização vem **sempre** da sessão. `admin` e `professional` alcançam todos os pacientes da organização; `caregiver` e `family` só os pacientes a que estão vinculados por um papel de vínculo que conceda leitura ao perfil. O papel que dá leitura é `caregiver` para o cuidador e `family` para o familiar, criados em [POST /patient-links](patient-links-criar.md) (BE-10); o vínculo de profissional responsável **não** conta (um profissional rebaixado a cuidador ou familiar deixa de ver os pacientes de que era responsável). A [revogação](patient-links-revogar.md) vale na requisição seguinte. Cuidador e familiar vinculados leem o mesmo cadastro que o profissional (decisão de Mateus em 2026-11-04, até o BE-19), inclusive de paciente inativo, e não escrevem. Paciente de outra organização ou fora do alcance responde `404 PATIENT_NOT_FOUND`, igual a um inexistente. O master (`platform_admin`) não tem `patients:*` e recebe `403`.
+Autenticação: `Authorization: Bearer <token>` de sessão normal com `patients:read`. A organização vem **sempre** da sessão. `admin` e `professional` alcançam todos os pacientes da organização; `caregiver` e `family` só os pacientes a que estão vinculados por um papel de vínculo que conceda leitura ao perfil. O papel que dá leitura é `caregiver` para o cuidador e `family` para o familiar, criados em [POST /patient-links](patient-links-criar.md) (BE-10); o vínculo de profissional responsável **não** conta (um profissional rebaixado a cuidador ou familiar deixa de ver os pacientes de que era responsável). A [revogação](patient-links-revogar.md) vale na requisição seguinte. O cuidador vinculado lê o mesmo cadastro que o profissional; o familiar, o recorte da Figura 37 (BE-19, decisão de Mateus em 2026-11-06: `cpf`, `phone`, `email`, as partes de `address`, `healthPlan` e `notes` saem como `********`, mesmo vazios). Os dois leem paciente inativo e não escrevem. Paciente de outra organização ou fora do alcance responde `404 PATIENT_NOT_FOUND`, igual a um inexistente. O master (`platform_admin`) não tem `patients:*` e recebe `403`.
 
 ## Request
 
@@ -74,6 +74,7 @@ curl -i 'https://api.example.com/api/v1/patients/3c9e2a4b-1f6d-4e8a-9b7c-5d4e3f2
       "name": "Profissional Exemplo",
       "status": "active"
     },
+    "viewerLink": null,
     "createdAt": "2026-11-04T12:30:00.000Z",
     "updatedAt": "2026-11-04T12:30:00.000Z",
     "deletedAt": null
@@ -111,11 +112,64 @@ curl -i 'https://api.example.com/api/v1/patients/3c9e2a4b-1f6d-4e8a-9b7c-5d4e3f2
 | `data.responsible.id` | texto, UUID | não | Usuário responsável. |
 | `data.responsible.name` | texto | não | Nome do usuário responsável. |
 | `data.responsible.status` | texto, enum | não | `pending`, `active` ou `inactive` (o vínculo não muda se o usuário for inativado depois). |
+| `data.viewerLink` | objeto | sim | Vínculo de cuidado vigente de quem consulta (BE-19): o parentesco da Figura 37. `null` para `admin` e `professional`, que leem a organização inteira. |
+| `data.viewerLink.role` | texto, enum | não | `caregiver` ou `family`, derivado do perfil de quem consulta. |
+| `data.viewerLink.linkType` | texto, até 40 | sim | Tipo de vínculo em texto livre (`tipo_vinculo` do MER), como "Filha". |
 | `data.createdAt` | texto ISO 8601 (UTC) | não | Cadastro. |
 | `data.updatedAt` | texto ISO 8601 (UTC) | não | Última alteração dos dados do paciente. |
 | `data.deletedAt` | texto ISO 8601 (UTC) | sim | Momento da inativação; `null` enquanto ativo. |
 
 Nunca saem `organization_id`, identificadores de vínculo nem situação clínica.
+
+### Resposta para o familiar (BE-19)
+
+Para a sessão `family`, o mesmo formato traz só o recorte da Figura 37 (decisão de Mateus em 2026-11-06): `cpf`, `phone`, `email`, todas as partes de `address`, `healthPlan` e `notes` saem mascarados com `********` (máscara fixa, aplicada também a campo vazio, para não revelar tamanho nem existência do dado). `viewerLink` traz o parentesco do vínculo do familiar.
+
+```json
+{
+  "data": {
+    "id": "3c9e2a4b-1f6d-4e8a-9b7c-5d4e3f2a1b0c",
+    "name": "Paciente Exemplo",
+    "birthDate": "1948-03-12",
+    "sex": "female",
+    "cpf": "********",
+    "phone": "********",
+    "email": "********",
+    "address": {
+      "zipCode": "********",
+      "street": "********",
+      "number": "********",
+      "complement": "********",
+      "district": "********",
+      "city": "********",
+      "state": "********"
+    },
+    "mainCondition": "Hipertensao arterial",
+    "secondaryConditions": [
+      "Diabetes tipo 2"
+    ],
+    "healthPlan": "********",
+    "notes": "********",
+    "status": "active",
+    "responsible": {
+      "id": "8f14e45f-ceea-4b7a-9f0b-1c2d3e4f5a6b",
+      "name": "Profissional Exemplo",
+      "status": "active"
+    },
+    "viewerLink": {
+      "role": "family",
+      "linkType": "Filha"
+    },
+    "createdAt": "2026-11-04T12:30:00.000Z",
+    "updatedAt": "2026-11-04T12:30:00.000Z",
+    "deletedAt": null
+  },
+  "meta": {
+    "requestId": "a3f5b7c9-1d2e-4f60-8a9b-0c1d2e3f4a5b",
+    "timestamp": "2026-11-04T12:30:00.000Z"
+  }
+}
+```
 
 ## Erros
 
@@ -146,4 +200,4 @@ Nunca saem `organization_id`, identificadores de vínculo nem situação clínic
 
 ## Origem e validação
 
-Controller `src/modules/Patient/patient.controller.ts`; caso de uso `src/modules/Patient/GetPatient/getPatient.useCase.ts`; DTO de resposta `src/modules/Patient/dtos/patient.dto.ts`; parser `src/modules/Patient/parsers/patient.parser.ts`; alcance `src/modules/Patient/policies/patient.policy.ts`; transação e consultas `src/modules/Patient/repositories/patient.repository.ts`; erros `src/modules/Patient/patient.errors.ts`; migration `src/database/migrations/1790700000000-CreatePatients.ts`. Testes: `tests/modules/Patient/changePatientStatus.useCase.spec.ts`, `tests/modules/Patient/patient.e2e-spec.ts` (HTTP com guard dublê e contrato OpenAPI das seis rotas) e `tests/modules/Patient/patientManagement.e2e-spec.ts` (PostgreSQL descartável com `AuthGuard` e `PermissionsGuard` reais, quatro organizações). Conferido contra o OpenAPI gerado (`/api/docs-json`, tag `patients`) e contra a aplicação compilada com HTTP real em 2026-11-04. Spec `docs/superpowers/specs/2026-11-04-be-09-pacientes-design.md`. Vault: [[2026-10-29-be-09-patients]] e [[2026-11-04-pacientes-cadastro-e-ciclo-de-vida]]. Requisitos: RF006, RF016; UC07.
+Controller `src/modules/Patient/patient.controller.ts`; caso de uso `src/modules/Patient/GetPatient/getPatient.useCase.ts`; DTO de resposta `src/modules/Patient/dtos/patient.dto.ts`; parser `src/modules/Patient/parsers/patient.parser.ts`; alcance `src/modules/Patient/policies/patient.policy.ts`; transação e consultas `src/modules/Patient/repositories/patient.repository.ts`; erros `src/modules/Patient/patient.errors.ts`; migration `src/database/migrations/1790700000000-CreatePatients.ts`. Testes: `tests/modules/Patient/changePatientStatus.useCase.spec.ts`, `tests/modules/Patient/patient.e2e-spec.ts` (HTTP com guard dublê e contrato OpenAPI das seis rotas) e `tests/modules/Patient/patientManagement.e2e-spec.ts` (PostgreSQL descartável com `AuthGuard` e `PermissionsGuard` reais, quatro organizações); recorte do familiar e `viewerLink` em `tests/modules/Patient/patient.parser.spec.ts` e `tests/modules/PatientAccess/familyAccess.e2e-spec.ts` (BE-19). Conferido contra o OpenAPI gerado (`/api/docs-json`, tag `patients`) e contra a aplicação compilada com HTTP real em 2026-11-04. Spec `docs/superpowers/specs/2026-11-04-be-09-pacientes-design.md`. Vault: [[2026-10-29-be-09-patients]] e [[2026-11-04-pacientes-cadastro-e-ciclo-de-vida]]. Requisitos: RF006, RF016; UC07.

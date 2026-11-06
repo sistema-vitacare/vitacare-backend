@@ -16,7 +16,7 @@ Resumo do histórico de um paciente (UC12; RF010/RF016; BE-18; Figura 36): conta
 Autenticação: `Authorization: Bearer <token>` de sessão normal com `patient_history:read` (`admin`, `professional`, `caregiver` e `family`). A organização vem **sempre** da sessão. Alcance pelo paciente, o mesmo das demais leituras clínicas:
 
 - `admin` e `professional`: qualquer paciente da organização;
-- `caregiver` e `family`: só paciente com vínculo **vigente** no papel do próprio perfil; a revogação vale na requisição seguinte. Até o BE-19, o familiar recebe a visão **completa**.
+- `caregiver` e `family`: só paciente com vínculo **vigente** no papel do próprio perfil; a revogação vale na requisição seguinte. O familiar recebe a visão completa, que já conta e mostra só registros válidos (BE-19).
 
 Paciente inexistente, de outra organização, sem vínculo ou com vínculo revogado → `404 PATIENT_NOT_FOUND`, **antes** de qualquer contagem: nenhum número, total ou conteúdo sai. O master (`platform_admin`) recebe `403`. Paciente **inativo** continua com a visão legível.
 

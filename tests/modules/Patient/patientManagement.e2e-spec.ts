@@ -794,6 +794,7 @@ describeWithDatabase('gestao de pacientes em PostgreSQL (e2e)', () => {
       };
       const [rows, total] = await repository.list(scope, {
         status: 'active',
+        searchCpf: true,
         skip: 0,
         take: 100,
       });

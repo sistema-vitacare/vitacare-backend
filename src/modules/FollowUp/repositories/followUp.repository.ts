@@ -331,7 +331,8 @@ export class FollowUpRepository {
                  WHERE i.response_id = resp.id
                    AND i.organization_id = resp.organization_id
                    AND ($10::uuid IS NULL OR ff.field_key = $10)
-                   AND ($11::varchar IS NULL OR lower(ff.section) = lower($11))))`;
+                   AND ($11::varchar IS NULL OR lower(ff.section) = lower($11))))
+          AND ($12::boolean OR r.status = 'valid')`;
       const parameters = [
         scope.organizationId,
         scope.viewerUserId,
@@ -344,13 +345,14 @@ export class FollowUpRepository {
         filter.authorUserId ?? null,
         filter.fieldKey ?? null,
         filter.section ?? null,
+        filter.includeAnnulled,
       ];
 
       const [rows, [{ total }]] = await Promise.all([
         manager.query<RecordRow[]>(
           `${RECORD_SELECT} ${where}
             ORDER BY r.visited_at DESC, r.created_at DESC, r.id
-            LIMIT $12 OFFSET $13`,
+            LIMIT $13 OFFSET $14`,
           [...parameters, filter.take, filter.skip],
         ),
         manager.query<Array<{ total: number }>>(
@@ -368,9 +370,15 @@ export class FollowUpRepository {
   async findById(
     scope: PatientScope,
     followUpId: string,
+    includeAnnulled: boolean,
   ): Promise<FollowUpDetail | null> {
     try {
-      return await this.findIn(this.dataSource.manager, scope, followUpId);
+      return await this.findIn(
+        this.dataSource.manager,
+        scope,
+        followUpId,
+        includeAnnulled,
+      );
     } catch (error) {
       throw translatePgError(error, 'follow_ups');
     }
@@ -392,14 +400,18 @@ export class FollowUpRepository {
     manager: EntityManager,
     scope: PatientScope,
     followUpId: string,
+    includeAnnulled = true,
   ): Promise<FollowUpDetail | null> {
     const rows = await manager.query<RecordRow[]>(
-      `${RECORD_SELECT} AND r.id = $4`,
+      `${RECORD_SELECT}
+          AND r.id = $4
+          AND ($5::boolean OR r.status = 'valid')`,
       [
         scope.organizationId,
         scope.viewerUserId,
         scope.viewerLinkRoles,
         followUpId,
+        includeAnnulled,
       ],
     );
     const [detail] = await this.withAnswers(manager, scope, rows);

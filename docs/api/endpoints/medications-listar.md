@@ -13,7 +13,7 @@ source: src/modules/Medication/medication.controller.ts
 
 Tela de medicamentos do paciente selecionado (Figura 41; UC08 passo 1; RF007). Devolve os medicamentos ativos e inativos de **um** paciente, cada um com a agenda, o próximo horário e o aviso de sobreposição. Adesão e "Suspenso" da Figura 41 não existem no backend (BE-26).
 
-Autenticação: `Authorization: Bearer <token>` de sessão normal com `medications:read` (rótulo "Consultar medicamentos") — `admin` e `professional` leem os pacientes da organização inteira; `caregiver` e `family` (permissão concedida no BE-14, decisão de Mateus em 2026-11-05) só os pacientes a que estão vinculados no papel do próprio perfil (vínculos de [POST /patient-links](patient-links-criar.md)); a [revogação](patient-links-revogar.md) vale na requisição seguinte. O familiar recebe o medicamento completo até o BE-19 (visão simplificada pendente). O master recebe `403`. Paciente ou medicamento fora do alcance ou de outra organização responde `404`, igual a um inexistente.
+Autenticação: `Authorization: Bearer <token>` de sessão normal com `medications:read` (rótulo "Consultar medicamentos") — `admin` e `professional` leem os pacientes da organização inteira; `caregiver` e `family` (permissão concedida no BE-14, decisão de Mateus em 2026-11-05) só os pacientes a que estão vinculados no papel do próprio perfil (vínculos de [POST /patient-links](patient-links-criar.md)); a [revogação](patient-links-revogar.md) vale na requisição seguinte. O familiar recebe o medicamento completo (decisão de Mateus no BE-19). O master recebe `403`. Paciente ou medicamento fora do alcance ou de outra organização responde `404`, igual a um inexistente.
 
 ## Request
 

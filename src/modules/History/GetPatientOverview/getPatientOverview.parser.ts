@@ -43,8 +43,8 @@ const toMeasurements = (rows: MeasurementRow[]): PatientMeasurementDto[] => {
 };
 
 /**
- * Visao consolidada -> resposta. Familiar e cuidador vinculados leem tudo ate
- * o BE-19 (visao simplificada); o `ctx` fica na assinatura para essa regra.
+ * Visao consolidada -> resposta, igual para todos os perfis: so registros
+ * validos entram, e o familiar le medicamentos e alertas completos (BE-19).
  */
 export const toPatientOverviewResponse = (
   overview: PatientOverview,

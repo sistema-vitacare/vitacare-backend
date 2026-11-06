@@ -13,7 +13,7 @@ source: src/modules/Attachment/attachment.controller.ts
 
 Entrega o conteúdo do anexo **pela própria API** (proxy autenticado). O arquivo fica num volume privado do container e não tem URL pública. Cada chamada é autorizada de novo a partir do banco, e o caminho interno nunca vale como autorização (P22; decisão de Mateus de 2026-11-05). Vínculo revogado vale já na requisição seguinte. BE-13, RF009/RF016, UC11, RNF004.
 
-Autenticação: `Authorization: Bearer <token>` com `patient_history:read`, no mesmo alcance da [listagem](follow-up-attachments-listar.md). Qualquer anexo inexistente, removido, de outro registro, de outra organização ou de paciente fora do alcance → `404 ATTACHMENT_NOT_FOUND`, sem distinguir os casos. Anexo de registro anulado ou de paciente inativo continua baixável.
+Autenticação: `Authorization: Bearer <token>` com `patient_history:read`, no mesmo alcance da [listagem](follow-up-attachments-listar.md). Qualquer anexo inexistente, removido, de outro registro, de outra organização ou de paciente fora do alcance → `404 ATTACHMENT_NOT_FOUND`, sem distinguir os casos. Anexo de registro anulado ou de paciente inativo continua baixável, exceto o de registro anulado para o familiar, que recebe `404 ATTACHMENT_NOT_FOUND` (BE-19).
 
 Como a rota exige o header `Authorization`, um `<img src>` ou link direto não funciona. O frontend baixa com `fetch` autenticado e exibe ou salva o `Blob`.
 
@@ -65,7 +65,7 @@ Os erros saem no formato JSON normal (`{ error, meta }`).
 | --- | --- | --- |
 | `401` | `AUTH_UNAUTHENTICATED` | Sessão ausente ou inválida. |
 | `403` | `AUTH_FORBIDDEN` | Sem `patient_history:read` (master). |
-| `404` | `ATTACHMENT_NOT_FOUND` | Anexo inexistente, removido, de outro registro, de outra organização ou de paciente fora do alcance. |
+| `404` | `ATTACHMENT_NOT_FOUND` | Anexo inexistente, removido, de outro registro, de outra organização, de paciente fora do alcance ou, para o familiar, de registro anulado. |
 | `404` | `ATTACHMENT_CONTENT_MISSING` | A linha do anexo é válida, mas o arquivo não está no volume (perda de volume ou restauração incompleta). A API registra `error` no log com o id do anexo. |
 | `422` | `VALIDATION_FAILED` | Algum id do path não é UUID. |
 
