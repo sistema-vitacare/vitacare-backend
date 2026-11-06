@@ -327,7 +327,7 @@ describe('Alert HTTP (e2e)', () => {
     expect(alerts.list).not.toHaveBeenCalled();
   });
 
-  it('publica as oito rotas no OpenAPI com bearer, envelope e erros', async () => {
+  it('publica as nove rotas no OpenAPI com bearer, envelope e erros', async () => {
     const document = (await request(server()).get('/api/docs-json'))
       .body as OpenApiDocument;
 
@@ -383,6 +383,13 @@ describe('Alert HTTP (e2e)', () => {
         ['401', '403', '404', '422'],
         'AlertDto',
       ],
+      [
+        '/api/v1/alerts/{alertId}/resolve',
+        'post',
+        '200',
+        ['401', '403', '404', '409', '422'],
+        'AlertDto',
+      ],
     ];
 
     for (const [path, method, success, errors, dto] of expected) {
@@ -433,7 +440,10 @@ describe('Alert HTTP (e2e)', () => {
     expect(schemas.CreateAlertRuleDto.properties?.patientId.type).toBe(
       'string',
     );
-    expect(schemas.AlertDto.properties?.status.enum).toEqual(['open']);
+    expect(schemas.AlertDto.properties?.status.enum).toEqual([
+      'open',
+      'resolved',
+    ]);
     expect(schemas.AlertDto.properties?.source.enum).toEqual([
       'reading',
       'absence',

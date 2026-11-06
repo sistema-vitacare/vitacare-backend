@@ -33,6 +33,7 @@ import { ListAlertRulesUseCase } from './ListAlertRules/listAlertRules.useCase';
 import { ListAlertsQueryDto } from './ListAlerts/listAlerts.dto';
 import { ListAlertsUseCase } from './ListAlerts/listAlerts.useCase';
 import { ReactivateAlertRuleUseCase } from './ReactivateAlertRule/reactivateAlertRule.useCase';
+import { ResolveAlertUseCase } from './ResolveAlert/resolveAlert.useCase';
 import { UpdateAlertRuleDto } from './UpdateAlertRule/updateAlertRule.dto';
 import { UpdateAlertRuleUseCase } from './UpdateAlertRule/updateAlertRule.useCase';
 
@@ -54,6 +55,7 @@ export class AlertController {
     private readonly reactivateAlertRule: ReactivateAlertRuleUseCase,
     private readonly listAlerts: ListAlertsUseCase,
     private readonly getAlert: GetAlertUseCase,
+    private readonly resolveAlert: ResolveAlertUseCase,
   ) {}
 
   @Post('alert-rules')
@@ -219,5 +221,27 @@ export class AlertController {
     @CurrentContext() ctx: RequestContext,
   ): Promise<AlertDto> {
     return this.getAlert.execute(alertId, ctx);
+  }
+
+  @Post('alerts/:alertId/resolve')
+  @HttpCode(HttpStatus.OK)
+  @RequirePermissions(Permissions.ALERTS_RESOLVE)
+  @ApiOperation({
+    summary:
+      'Resolve o alerta para todos, com autor e data; admin, profissional e cuidador no proprio alcance.',
+  })
+  @ApiEnvelope(AlertDto)
+  @ApiErrors(
+    UNAUTHENTICATED,
+    FORBIDDEN,
+    { status: 404, codes: ['ALERT_NOT_FOUND'] },
+    { status: 409, codes: ['ALERT_ALREADY_RESOLVED'] },
+    VALIDATION,
+  )
+  async resolve(
+    @Param('alertId', UuidParam('alertId')) alertId: string,
+    @CurrentContext() ctx: RequestContext,
+  ): Promise<AlertDto> {
+    return this.resolveAlert.execute(alertId, ctx);
   }
 }

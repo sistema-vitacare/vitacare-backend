@@ -8,6 +8,7 @@ import {
   ALERT_RULE_OPERATORS,
   ALERT_SEVERITIES,
   ALERT_SOURCES,
+  ALERT_STATUSES,
 } from '../types/alert.types';
 
 export class AlertRuleRefDto {
@@ -107,6 +108,30 @@ export class AlertMedicationReminderDto {
   scheduledAt!: string;
 }
 
+export class AlertResolutionDto {
+  @ApiProperty({ format: 'date-time' })
+  resolvedAt!: string;
+
+  @ApiProperty({ type: UserRefDto, description: 'Quem resolveu.' })
+  resolvedBy!: UserRefDto;
+}
+
+export class AlertOwnNotificationDto {
+  @ApiProperty({
+    format: 'uuid',
+    description: 'Use em POST /notifications/{id}/read.',
+  })
+  id!: string;
+
+  @ApiProperty({
+    type: String,
+    format: 'date-time',
+    nullable: true,
+    description: 'Leitura do proprio usuario; null = nao lida.',
+  })
+  readAt!: string | null;
+}
+
 export class AlertDto {
   @ApiProperty({ format: 'uuid' })
   id!: string;
@@ -126,9 +151,10 @@ export class AlertDto {
   severity!: string;
 
   @ApiProperty({
-    enum: ['open'],
+    enum: [...ALERT_STATUSES],
     example: 'open',
-    description: 'Leitura e resolucao ainda nao existem (BE-17).',
+    description:
+      'open = em aberto; resolved = resolvido (vale para todos; ver resolution).',
   })
   status!: string;
 
@@ -204,4 +230,19 @@ export class AlertDto {
 
   @ApiProperty({ format: 'date-time' })
   generatedAt!: string;
+
+  @ApiProperty({
+    type: AlertResolutionDto,
+    nullable: true,
+    description: 'Preenchido quando status = resolved.',
+  })
+  resolution!: AlertResolutionDto | null;
+
+  @ApiProperty({
+    type: AlertOwnNotificationDto,
+    nullable: true,
+    description:
+      'Notificacao do proprio usuario para este alerta; null se ele nao foi destinatario.',
+  })
+  notification!: AlertOwnNotificationDto | null;
 }

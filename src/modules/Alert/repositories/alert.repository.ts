@@ -16,9 +16,13 @@ import type {
   EvaluateRecordOutcome,
   ListAlertsFilter,
   ListAlertsOutcome,
+  ResolveAlertOutcome,
 } from '../types/alert.types';
 
-/** Alertas de pacientes do alcance `$1`..`$3` (alias `a`). */
+/**
+ * Alertas de pacientes do alcance `$1`..`$3` (alias `a`), com a notificacao
+ * do proprio usuario `$4` (`own`) e quem resolveu.
+ */
 const ALERT_FROM = `
     FROM alerts a
     JOIN patients p
@@ -36,6 +40,13 @@ const ALERT_FROM = `
     LEFT JOIN medications m
       ON m.id = a.medication_id
      AND m.organization_id = a.organization_id
+    LEFT JOIN users resolver
+      ON resolver.id = a.resolved_by_user_id
+     AND resolver.organization_id = a.organization_id
+    LEFT JOIN alert_notifications own
+      ON own.alert_id = a.id
+     AND own.organization_id = a.organization_id
+     AND own.user_id = $4
   ${PATIENT_SCOPE_WHERE}`;
 
 const ALERT_SELECT = `
@@ -68,7 +79,12 @@ const ALERT_SELECT = `
          m.name AS "medicationName",
          a.medication_reminder_id AS "medicationReminderId",
          a.scheduled_at AS "scheduledAt",
-         a.generated_at AS "generatedAt"
+         a.generated_at AS "generatedAt",
+         a.resolved_at AS "resolvedAt",
+         resolver.id AS "resolvedById",
+         resolver.name AS "resolvedByName",
+         own.id AS "notificationId",
+         own.read_at AS "readAt"
   ${ALERT_FROM}`;
 
 type RawAlertRow = Pick<
@@ -104,7 +120,19 @@ type RawAlertRow = Pick<
   medicationName: string | null;
   medicationReminderId: string | null;
   scheduledAt: Date | null;
+  resolvedAt: Date | null;
+  resolvedById: string | null;
+  resolvedByName: string | null;
+  notificationId: string | null;
+  readAt: Date | null;
 };
+
+const scopeParameters = (scope: AlertScope): unknown[] => [
+  scope.organizationId,
+  scope.viewerUserId,
+  scope.viewerLinkRoles,
+  scope.viewerId,
+];
 
 /** Cada origem preenche so o proprio bloco; os demais saem nulos. */
 const toRow = (raw: RawAlertRow): AlertRow => {
@@ -154,6 +182,17 @@ const toRow = (raw: RawAlertRow): AlertRow => {
           }
         : null,
     generatedAt: raw.generatedAt,
+    resolution:
+      raw.resolvedAt === null
+        ? null
+        : {
+            resolvedAt: raw.resolvedAt,
+            resolvedBy: { id: raw.resolvedById!, name: raw.resolvedByName! },
+          },
+    notification:
+      raw.notificationId === null
+        ? null
+        : { id: raw.notificationId, readAt: raw.readAt },
   };
 };
 
@@ -245,21 +284,21 @@ export class AlertRepository {
       }
 
       const where = `
-          AND a.patient_id = $4
-          AND ($5::varchar IS NULL OR a.severity = $5)`;
+          AND a.patient_id = $5
+          AND ($6::varchar IS NULL OR a.severity = $6)
+          AND ($7::varchar IS NULL OR a.status = $7)`;
       const parameters = [
-        scope.organizationId,
-        scope.viewerUserId,
-        scope.viewerLinkRoles,
+        ...scopeParameters(scope),
         filter.patientId,
         filter.severity ?? null,
+        filter.status ?? null,
       ];
 
       const [rows, [{ total }]] = await Promise.all([
         manager.query<RawAlertRow[]>(
           `${ALERT_SELECT} ${where}
             ORDER BY a.generated_at DESC, a.id
-            LIMIT $6 OFFSET $7`,
+            LIMIT $8 OFFSET $9`,
           [...parameters, filter.take, filter.skip],
         ),
         manager.query<Array<{ total: number }>>(
@@ -276,20 +315,83 @@ export class AlertRepository {
 
   async findById(scope: AlertScope, alertId: string): Promise<AlertRow | null> {
     try {
-      const [row] = await this.dataSource.manager.query<RawAlertRow[]>(
-        `${ALERT_SELECT} AND a.id = $4`,
-        [
-          scope.organizationId,
-          scope.viewerUserId,
-          scope.viewerLinkRoles,
-          alertId,
-        ],
-      );
-
-      return row ? toRow(row) : null;
+      return await this.findInScope(this.dataSource.manager, scope, alertId);
     } catch (error) {
       throw translatePgError(error, 'alerts');
     }
+  }
+
+  /**
+   * Resolve o alerta para todos (Figura 42), guardando autor e data, no
+   * alcance de pacientes de quem resolve. Nao ha desfazer.
+   */
+  async resolve(
+    scope: AlertScope,
+    alertId: string,
+    requestId: string,
+  ): Promise<ResolveAlertOutcome> {
+    try {
+      return await this.dataSource.transaction(async (manager) => {
+        const [current] = await manager.query<Array<{ status: string }>>(
+          `SELECT a.status
+             FROM alerts a
+             JOIN patients p
+               ON p.id = a.patient_id
+              AND p.organization_id = a.organization_id
+           ${PATIENT_SCOPE_WHERE}
+              AND a.id = $4
+              FOR UPDATE OF a`,
+          [
+            scope.organizationId,
+            scope.viewerUserId,
+            scope.viewerLinkRoles,
+            alertId,
+          ],
+        );
+
+        if (!current) return { kind: 'not_found' };
+        if (current.status === 'resolved') return { kind: 'already_resolved' };
+
+        await manager.query(
+          `UPDATE alerts
+              SET status = 'resolved',
+                  resolved_at = now(),
+                  resolved_by_user_id = $3,
+                  updated_at = now()
+            WHERE organization_id = $1 AND id = $2`,
+          [scope.organizationId, alertId, scope.viewerId],
+        );
+        await insertAuditEvent(manager, {
+          organizationId: scope.organizationId,
+          actorUserId: scope.viewerId,
+          action: 'alert.resolved',
+          entityType: 'alert',
+          entityId: alertId,
+          afterValues: { status: 'resolved' },
+          requestId,
+        });
+
+        return {
+          kind: 'resolved',
+          alert: (await this.findInScope(manager, scope, alertId))!,
+        };
+      });
+    } catch (error) {
+      throw translatePgError(error, 'alerts');
+    }
+  }
+
+  private async findInScope(
+    manager: EntityManager,
+    scope: AlertScope,
+    alertId: string,
+  ): Promise<AlertRow | null> {
+    const [row] = await manager.query<RawAlertRow[]>(
+      `${ALERT_SELECT} AND a.id = $5`,
+      [...scopeParameters(scope), alertId],
+    );
+
+    return row ? toRow(row) : null;
   }
 
   /**

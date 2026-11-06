@@ -4,10 +4,10 @@ import type { RequestContext } from '@/common/context/requestContext.type';
 import { DomainException } from '@/common/errors/domain.exception';
 import { type EnvelopePayload, paginate } from '@/common/http/envelope';
 import { PatientErrors } from '@/modules/Patient/patient.errors';
-import { patientScope } from '@/modules/Patient/policies/patient.policy';
 
 import type { AlertDto } from '../dtos/alert.dto';
 import { toAlertResponse } from '../parsers/alert.parser';
+import { alertScope } from '../policies/alertScope.policy';
 import { AlertRepository } from '../repositories/alert.repository';
 import type { ListAlertsQueryDto } from './listAlerts.dto';
 
@@ -20,9 +20,10 @@ export class ListAlertsUseCase {
     query: ListAlertsQueryDto,
     ctx: RequestContext,
   ): Promise<EnvelopePayload<AlertDto[]>> {
-    const outcome = await this.alerts.list(patientScope(ctx), {
+    const outcome = await this.alerts.list(alertScope(ctx), {
       patientId: query.patientId,
       severity: query.severity,
+      status: query.status,
       skip: query.skip,
       take: query.limit,
     });

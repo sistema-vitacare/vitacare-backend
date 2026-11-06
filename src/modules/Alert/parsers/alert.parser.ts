@@ -40,4 +40,12 @@ export const toAlertResponse = (
     scheduledAt: row.medicationReminder.scheduledAt.toISOString(),
   },
   generatedAt: row.generatedAt.toISOString(),
+  resolution: row.resolution && {
+    resolvedAt: row.resolution.resolvedAt.toISOString(),
+    resolvedBy: row.resolution.resolvedBy,
+  },
+  notification: row.notification && {
+    id: row.notification.id,
+    readAt: row.notification.readAt?.toISOString() ?? null,
+  },
 });
