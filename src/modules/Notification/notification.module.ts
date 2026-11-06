@@ -18,6 +18,31 @@ import {
   NotificationProcessor,
 } from './notification.processor';
 import { NotificationDeliveryRepository } from './repositories/notificationDelivery.repository';
+import { NotificationController } from './notification.controller';
+import { CountUnreadNotificationsUseCase } from './CountUnreadNotifications/countUnreadNotifications.useCase';
+import { GetNotificationPreferencesUseCase } from './GetNotificationPreferences/getNotificationPreferences.useCase';
+import { GetPushConfigUseCase } from './GetPushConfig/getPushConfig.useCase';
+import { ListNotificationsUseCase } from './ListNotifications/listNotifications.useCase';
+import { ReadAllNotificationsUseCase } from './ReadAllNotifications/readAllNotifications.useCase';
+import { ReadNotificationUseCase } from './ReadNotification/readNotification.useCase';
+import { RegisterPushSubscriptionUseCase } from './RegisterPushSubscription/registerPushSubscription.useCase';
+import { NotificationRepository } from './repositories/notification.repository';
+import { RevokePushSubscriptionUseCase } from './RevokePushSubscription/revokePushSubscription.useCase';
+import { UpdateNotificationPreferencesUseCase } from './UpdateNotificationPreferences/updateNotificationPreferences.useCase';
+
+export const NOTIFICATION_USE_CASES = [
+  ListNotificationsUseCase,
+  CountUnreadNotificationsUseCase,
+  ReadNotificationUseCase,
+  ReadAllNotificationsUseCase,
+  GetNotificationPreferencesUseCase,
+  UpdateNotificationPreferencesUseCase,
+  GetPushConfigUseCase,
+  RegisterPushSubscriptionUseCase,
+  RevokePushSubscriptionUseCase,
+];
+
+export const NOTIFICATION_REPOSITORIES = [NotificationRepository];
 
 /** Canal sem configuracao vira o desligado, como o mailer da recuperacao. */
 export const notificationChannelProviders: Provider[] = [
@@ -55,8 +80,11 @@ export const notificationChannelProviders: Provider[] = [
     ]),
     BullModule.registerQueue({ name: NOTIFICATIONS_QUEUE }),
   ],
+  controllers: [NotificationController],
   providers: [
     ...notificationChannelProviders,
+    ...NOTIFICATION_USE_CASES,
+    ...NOTIFICATION_REPOSITORIES,
     NotificationDeliveryRepository,
     DeliverNotificationsUseCase,
     NotificationProcessor,

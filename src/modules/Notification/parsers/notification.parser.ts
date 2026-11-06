@@ -1,0 +1,51 @@
+import type { RequestContext } from '@/common/context/requestContext.type';
+import { patientScope } from '@/modules/Patient/policies/patient.policy';
+
+import type { NotificationDto } from '../dtos/notification.dto';
+import type { NotificationPreferencesDto } from '../dtos/notificationPreferences.dto';
+import type {
+  InboxScope,
+  NotificationActor,
+  NotificationPreferencesRow,
+  NotificationRow,
+} from '../types/notification.types';
+
+/** Caixa da sessao: o proprio usuario no seu alcance de pacientes. */
+export const inboxScope = (ctx: RequestContext): InboxScope => ({
+  ...patientScope(ctx),
+  userId: ctx.userId,
+});
+
+export const notificationActor = (ctx: RequestContext): NotificationActor => ({
+  organizationId: ctx.organizationId,
+  userId: ctx.userId,
+  requestId: ctx.requestId,
+});
+
+/**
+ * Notificacao -> resposta. O `ctx` e onde a visao simplificada do familiar
+ * entrara (BE-19).
+ */
+export const toNotificationResponse = (
+  row: NotificationRow,
+  _ctx: RequestContext,
+): NotificationDto => ({
+  id: row.id,
+  alert: {
+    ...row.alert,
+    generatedAt: row.alert.generatedAt.toISOString(),
+  },
+  reason: row.reason,
+  readAt: row.readAt?.toISOString() ?? null,
+  createdAt: row.createdAt.toISOString(),
+});
+
+export const toPreferencesResponse = (
+  row: NotificationPreferencesRow,
+): NotificationPreferencesDto => ({
+  organizationAlerts: row.organizationAlerts,
+  reading: { ...row.reading },
+  absence: { ...row.absence },
+  medicationReminder: { ...row.medicationReminder },
+  updatedAt: row.updatedAt?.toISOString() ?? null,
+});

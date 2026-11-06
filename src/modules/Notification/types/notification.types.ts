@@ -1,4 +1,9 @@
-import type { AlertSource } from '@/modules/Alert/types/alert.types';
+import type {
+  AlertSeverity,
+  AlertSource,
+  AlertStatus,
+} from '@/modules/Alert/types/alert.types';
+import type { PatientScope } from '@/modules/Patient/types/patient.types';
 
 /** Canais decididos por Mateus em 2026-11-06. */
 export const NOTIFICATION_CHANNELS = ['in_app', 'push', 'email'] as const;
@@ -51,3 +56,71 @@ export const PREFERENCE_COLUMNS: Readonly<
     email: 'medication_reminder_email',
   },
 };
+
+/** Chave da origem no contrato da API (camelCase) x origem do alerta. */
+export const PREFERENCE_SOURCES = {
+  reading: 'reading',
+  absence: 'absence',
+  medicationReminder: 'medication_reminder',
+} as const satisfies Record<string, AlertSource>;
+
+export type PreferenceSourceKey = keyof typeof PREFERENCE_SOURCES;
+
+export interface ChannelPreferences {
+  inApp: boolean;
+  push: boolean;
+  email: boolean;
+}
+
+export interface NotificationPreferences extends Record<
+  PreferenceSourceKey,
+  ChannelPreferences
+> {
+  organizationAlerts: boolean;
+}
+
+export interface NotificationPreferencesRow extends NotificationPreferences {
+  updatedAt: Date | null;
+}
+
+/** Caixa do usuario: o proprio `userId` dentro do alcance de pacientes. */
+export interface InboxScope extends PatientScope {
+  userId: string;
+}
+
+export interface NotificationRow {
+  id: string;
+  alert: {
+    id: string;
+    patient: { id: string; name: string };
+    source: AlertSource;
+    severity: AlertSeverity;
+    status: AlertStatus;
+    title: string;
+    message: string;
+    generatedAt: Date;
+  };
+  reason: NotificationReason;
+  readAt: Date | null;
+  createdAt: Date;
+}
+
+export interface ListNotificationsFilter {
+  unread?: boolean;
+  patientId?: string;
+  skip: number;
+  take: number;
+}
+
+/** Organizacao, usuario e requestId vem sempre da sessao. */
+export interface NotificationActor {
+  organizationId: string;
+  userId: string;
+  requestId: string;
+}
+
+export interface PushSubscriptionInput {
+  endpoint: string;
+  p256dh: string;
+  auth: string;
+}
