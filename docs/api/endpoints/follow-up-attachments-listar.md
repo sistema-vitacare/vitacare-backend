@@ -11,9 +11,9 @@ source: src/modules/Attachment/attachment.controller.ts
 
 ## Propósito e acesso
 
-Mostra os anexos de um registro para quem pode ler o registro (BE-13, RF009/RF016, UC11; decisão de Mateus de 2026-11-05). Os metadados vêm daqui; o conteúdo sai pelo [download](follow-up-attachments-baixar.md). Anexos de registro **anulado** e de paciente **inativo** continuam listados; anexos removidos, não.
+Mostra os anexos de um registro para quem pode ler o registro (BE-13, RF009/RF016, UC11; decisão de Mateus de 2026-11-05). Os metadados vêm daqui; o conteúdo sai pelo [download](follow-up-attachments-baixar.md). Anexos de registro **anulado** (exceto para o familiar, BE-19) e de paciente **inativo** continuam listados; anexos removidos, não.
 
-Autenticação: `Authorization: Bearer <token>` com `patient_history:read`, no mesmo alcance de [GET /follow-ups/{followUpId}](follow-ups-consultar.md): `admin` e `professional` veem a organização inteira; `caregiver` e `family`, só registros de pacientes com vínculo **vigente** no papel do próprio perfil (o familiar vê os anexos até o BE-19). Master: `403 AUTH_FORBIDDEN`. Registro fora do alcance ou de outra organização → `404 FOLLOW_UP_NOT_FOUND`.
+Autenticação: `Authorization: Bearer <token>` com `patient_history:read`, no mesmo alcance de [GET /follow-ups/{followUpId}](follow-ups-consultar.md): `admin` e `professional` veem a organização inteira; `caregiver` e `family`, só registros de pacientes com vínculo **vigente** no papel do próprio perfil (o familiar só alcança anexos de registro válido; para registro anulado, `404 FOLLOW_UP_NOT_FOUND` — BE-19). Master: `403 AUTH_FORBIDDEN`. Registro fora do alcance ou de outra organização → `404 FOLLOW_UP_NOT_FOUND`.
 
 ## Request
 
@@ -63,7 +63,7 @@ Cada item tem as propriedades descritas em [POST .../attachments](follow-up-atta
 | --- | --- | --- |
 | `401` | `AUTH_UNAUTHENTICATED` | Sessão ausente ou inválida. |
 | `403` | `AUTH_FORBIDDEN` | Sem `patient_history:read` (master). |
-| `404` | `FOLLOW_UP_NOT_FOUND` | Registro inexistente, de outra organização ou de paciente fora do alcance (inclusive vínculo revogado). |
+| `404` | `FOLLOW_UP_NOT_FOUND` | Registro inexistente, de outra organização, de paciente fora do alcance (inclusive vínculo revogado) ou, para o familiar, anulado. |
 | `422` | `VALIDATION_FAILED` | `followUpId` não UUID. |
 
 ```json

@@ -11,12 +11,12 @@ source: src/modules/FollowUp/followUp.controller.ts
 
 ## Propósito e acesso
 
-Histórico do paciente do UC12 (RF010; BE-18) sobre os registros do UC11 (RF009; BE-12). Devolve os registros de **um paciente**, válidos e anulados, com autoria, as respostas e os metadados dos campos da versão respondida, filtráveis por período, parâmetro, categoria (seção), responsável, formulário e situação (decisão de Mateus, 2026-11-06). A visão simplificada do familiar é do BE-19 e **não** existe aqui. A visão consolidada (contadores e últimas medições) está em [GET /patients/{patientId}/overview](patients-visao-consolidada.md).
+Histórico do paciente do UC12 (RF010; BE-18) sobre os registros do UC11 (RF009; BE-12). Devolve os registros de **um paciente**, válidos e anulados, com autoria, as respostas e os metadados dos campos da versão respondida, filtráveis por período, parâmetro, categoria (seção), responsável, formulário e situação (decisão de Mateus, 2026-11-06). Para o familiar, a lista traz só registros válidos (BE-19). A visão consolidada (contadores e últimas medições) está em [GET /patients/{patientId}/overview](patients-visao-consolidada.md).
 
 Autenticação: `Authorization: Bearer <token>` de sessão normal com `patient_history:read` — `admin`, `professional`, `caregiver` e `family` (decisão de Mateus, 2026-11-04). Alcance pelo paciente:
 
 - `admin` e `professional`: qualquer paciente da organização;
-- `caregiver` e `family`: só paciente com vínculo **vigente** no papel do próprio perfil (BE-10). Até o BE-19, o familiar recebe o registro **completo**.
+- `caregiver` e `family`: só paciente com vínculo **vigente** no papel do próprio perfil (BE-10). O familiar recebe o registro válido completo, mas **nunca** o anulado (BE-19, decisão de Mateus em 2026-11-06): com `status=annulled`, a lista vem vazia (`total` 0).
 
 Paciente inexistente, de outra organização ou fora do alcance → `404 PATIENT_NOT_FOUND`. O master (`platform_admin`) recebe `403`.
 
@@ -98,7 +98,7 @@ As propriedades de cada item estão descritas em [follow-ups-consultar.md](follo
 - **Parâmetro e categoria:** `fieldKey` e `section` selecionam registros que têm **alguma** resposta no campo ou na seção; o registro sai **completo**, com todas as respostas (chamada do agente, pendente de confirmação: o registro é a unidade auditável). Campo desabilitado ou de versão antiga conta pela resposta gravada.
 - **Período ou filtro sem registro:** `200` com `data: []` e `total: 0`; a mensagem informativa do UC12 fica com o frontend.
 - **Ordem:** `visitedAt` decrescente (visita mais recente primeiro), depois `submittedAt` decrescente e `id`. Instantes em ISO 8601 UTC.
-- Registros anulados continuam na lista (sem filtro de `status`) com `status = "annulled"` e `annulment` preenchido.
+- Registros anulados continuam na lista (sem filtro de `status`) com `status = "annulled"` e `annulment` preenchido, exceto para o familiar, que não os recebe (BE-19).
 - Paciente inativo continua com o histórico inteiro legível.
 
 ## Erros

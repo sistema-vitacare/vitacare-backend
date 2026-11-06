@@ -13,7 +13,7 @@ source: src/modules/Medication/medication.controller.ts
 
 Detalhe de um medicamento (UC08; RF007) com a agenda vigente — ou, se inativo, a agenda encerrada na inativação —, o próximo horário e o aviso de sobreposição.
 
-Autenticação: `Authorization: Bearer <token>` de sessão normal com `medications:read` (rótulo "Consultar medicamentos") — `admin` e `professional` leem os pacientes da organização inteira; `caregiver` e `family` (permissão concedida no BE-14, decisão de Mateus em 2026-11-05) só os pacientes a que estão vinculados no papel do próprio perfil (vínculos de [POST /patient-links](patient-links-criar.md)); a [revogação](patient-links-revogar.md) vale na requisição seguinte. O familiar recebe o medicamento completo até o BE-19 (visão simplificada pendente). O master recebe `403`. Paciente ou medicamento fora do alcance ou de outra organização responde `404`, igual a um inexistente.
+Autenticação: `Authorization: Bearer <token>` de sessão normal com `medications:read` (rótulo "Consultar medicamentos") — `admin` e `professional` leem os pacientes da organização inteira; `caregiver` e `family` (permissão concedida no BE-14, decisão de Mateus em 2026-11-05) só os pacientes a que estão vinculados no papel do próprio perfil (vínculos de [POST /patient-links](patient-links-criar.md)); a [revogação](patient-links-revogar.md) vale na requisição seguinte. O familiar recebe o medicamento completo (decisão de Mateus no BE-19). O master recebe `403`. Paciente ou medicamento fora do alcance ou de outra organização responde `404`, igual a um inexistente.
 
 ## Request
 

@@ -13,7 +13,7 @@ source: src/modules/Patient/patient.controller.ts
 
 Listagem da Figura 34 (UC07; RF006/RF016): busca, filtro de condição e de status, paginação e total. A **listagem principal mostra só ativos**: o paciente inativado sai dela (UC07, fluxo alternativo) e aparece com `status=inactive`. "Última consulta" e a situação clínica (Crítico/Observação) da figura não existem no backend.
 
-Autenticação: `Authorization: Bearer <token>` de sessão normal com `patients:read` (os quatro perfis de organização cliente). A organização vem **sempre** da sessão. `admin` e `professional` alcançam todos os pacientes da organização; `caregiver` e `family` só os pacientes a que estão vinculados por um papel de vínculo que conceda leitura ao perfil. O papel que dá leitura é `caregiver` para o cuidador e `family` para o familiar, criados em [POST /patient-links](patient-links-criar.md) (BE-10); o vínculo de profissional responsável **não** conta (um profissional rebaixado a cuidador ou familiar deixa de ver os pacientes de que era responsável). A [revogação](patient-links-revogar.md) vale na requisição seguinte. Cuidador e familiar vinculados leem o mesmo cadastro que o profissional (decisão de Mateus em 2026-11-04, até o BE-19), inclusive de paciente inativo, e não escrevem. Paciente de outra organização ou fora do alcance responde `404 PATIENT_NOT_FOUND`, igual a um inexistente. O master (`platform_admin`) não tem `patients:*` e recebe `403`.
+Autenticação: `Authorization: Bearer <token>` de sessão normal com `patients:read` (os quatro perfis de organização cliente). A organização vem **sempre** da sessão. `admin` e `professional` alcançam todos os pacientes da organização; `caregiver` e `family` só os pacientes a que estão vinculados por um papel de vínculo que conceda leitura ao perfil. O papel que dá leitura é `caregiver` para o cuidador e `family` para o familiar, criados em [POST /patient-links](patient-links-criar.md) (BE-10); o vínculo de profissional responsável **não** conta (um profissional rebaixado a cuidador ou familiar deixa de ver os pacientes de que era responsável). A [revogação](patient-links-revogar.md) vale na requisição seguinte. O cuidador vinculado lê o mesmo cadastro que o profissional; o familiar, o recorte da Figura 37 (BE-19, decisão de Mateus em 2026-11-06: `cpf`, `phone`, `email`, as partes de `address`, `healthPlan` e `notes` saem como `********`, mesmo vazios). Os dois leem paciente inativo e não escrevem. Paciente de outra organização ou fora do alcance responde `404 PATIENT_NOT_FOUND`, igual a um inexistente. O master (`platform_admin`) não tem `patients:*` e recebe `403`.
 
 ## Request
 
@@ -34,7 +34,7 @@ Query:
 | `page` | inteiro | não | `1` | ≥ 1 | Página. |
 | `limit` | inteiro | não | `20` | 1 a 100 | Itens por página. |
 | `status` | texto, enum | não | `active` | `active`, `inactive` | Situação cadastral listada. |
-| `search` | texto | não | — | 1 a 100 após aparar | Trecho do nome, sem diferenciar maiúsculas. Se a busca tiver só dígitos, pontos, hífens e espaços, também procura o trecho de dígitos no CPF (`529.982` acha `52998224725`). `%`, `_` e `\` valem como texto. |
+| `search` | texto | não | — | 1 a 100 após aparar | Trecho do nome, sem diferenciar maiúsculas. Se a busca tiver só dígitos, pontos, hífens e espaços, também procura o trecho de dígitos no CPF (`529.982` acha `52998224725`). Para o familiar, a busca é **só pelo nome** (BE-19), porque ele não vê o CPF. `%`, `_` e `\` valem como texto. |
 | `condition` | texto | não | — | 1 a 100 após aparar | Trecho da condição principal ou de uma das secundárias, sem diferenciar maiúsculas. |
 
 ```bash
@@ -79,6 +79,7 @@ curl -i 'https://api.example.com/api/v1/patients?search=paciente&condition=hiper
         "name": "Profissional Exemplo",
         "status": "active"
       },
+      "viewerLink": null,
       "createdAt": "2026-11-04T12:30:00.000Z",
       "updatedAt": "2026-11-04T12:30:00.000Z",
       "deletedAt": null
@@ -125,11 +126,16 @@ Cada item de `data` tem as propriedades abaixo (aqui com o prefixo `data.` do de
 | `data.responsible.id` | texto, UUID | não | Usuário responsável. |
 | `data.responsible.name` | texto | não | Nome do usuário responsável. |
 | `data.responsible.status` | texto, enum | não | `pending`, `active` ou `inactive` (o vínculo não muda se o usuário for inativado depois). |
+| `data.viewerLink` | objeto | sim | Vínculo de cuidado vigente de quem consulta (BE-19): o parentesco da Figura 37. `null` para `admin` e `professional`, que leem a organização inteira. |
+| `data.viewerLink.role` | texto, enum | não | `caregiver` ou `family`, derivado do perfil de quem consulta. |
+| `data.viewerLink.linkType` | texto, até 40 | sim | Tipo de vínculo em texto livre (`tipo_vinculo` do MER), como "Filha". |
 | `data.createdAt` | texto ISO 8601 (UTC) | não | Cadastro. |
 | `data.updatedAt` | texto ISO 8601 (UTC) | não | Última alteração dos dados do paciente. |
 | `data.deletedAt` | texto ISO 8601 (UTC) | sim | Momento da inativação; `null` enquanto ativo. |
 
 Nunca saem `organization_id`, identificadores de vínculo nem situação clínica.
+
+Para a sessão `family`, cada item traz só o recorte da Figura 37 (BE-19): `cpf`, `phone`, `email`, as partes de `address`, `healthPlan` e `notes` saem mascarados com `********` (máscara fixa, aplicada também a campo vazio, para não revelar tamanho nem existência do dado), e `viewerLink` traz o parentesco. Exemplo completo em [GET /patients/{patientId}](patients-consultar.md#resposta-para-o-familiar-be-19).
 
 ## Paginação, ordem e filtros
 

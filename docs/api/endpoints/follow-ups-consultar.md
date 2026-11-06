@@ -13,7 +13,7 @@ source: src/modules/FollowUp/followUp.controller.ts
 
 Detalhe de um registro do UC11 (RF009; BE-12): visita, autor, formulário e versão respondidos, observações, situação (válido ou anulado) e respostas com os metadados dos campos **da versão respondida** — publicar uma versão nova do formulário não muda a interpretação de um registro antigo.
 
-Autenticação: `Authorization: Bearer <token>` de sessão normal com `patient_history:read`. `admin` e `professional` alcançam qualquer registro da organização; `caregiver` e `family`, só registros de pacientes com vínculo vigente no papel do próprio perfil (o familiar recebe o registro completo até o BE-19). Registro inexistente, de outra organização ou de paciente fora do alcance → `404 FOLLOW_UP_NOT_FOUND`.
+Autenticação: `Authorization: Bearer <token>` de sessão normal com `patient_history:read`. `admin` e `professional` alcançam qualquer registro da organização; `caregiver` e `family`, só registros de pacientes com vínculo vigente no papel do próprio perfil (o familiar recebe o registro válido completo, mas o anulado responde `404 FOLLOW_UP_NOT_FOUND` para ele — BE-19). Registro inexistente, de outra organização ou de paciente fora do alcance → `404 FOLLOW_UP_NOT_FOUND`.
 
 ## Request
 
@@ -110,7 +110,7 @@ curl -i 'https://api.example.com/api/v1/follow-ups/f0e1d2c3-b4a5-4968-8776-65544
 | --- | --- | --- |
 | `401` | `AUTH_UNAUTHENTICATED` | Sessão ausente ou inválida. |
 | `403` | `AUTH_FORBIDDEN` | Sessão sem `patient_history:read`. |
-| `404` | `FOLLOW_UP_NOT_FOUND` | Registro inexistente, de outra organização ou de paciente fora do alcance. |
+| `404` | `FOLLOW_UP_NOT_FOUND` | Registro inexistente, de outra organização, de paciente fora do alcance ou, para o familiar, anulado. |
 | `422` | `VALIDATION_FAILED` | `followUpId` não é UUID. |
 
 ```json
