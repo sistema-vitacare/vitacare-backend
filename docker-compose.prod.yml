@@ -85,7 +85,8 @@ services:
       THROTTLE_TTL_MS: ${THROTTLE_TTL_MS:-60000}
       THROTTLE_LIMIT: ${THROTTLE_LIMIT:-120}
 
-      # --- E-mail: decisão de 2026-09-22, não existe SMTP no projeto.
+      # --- E-mail: decisão de 2026-09-22, não existe SMTP no projeto. Ligado,
+      # serve à recuperação de senha e aos e-mails de alerta (BE-17).
       SMTP_ENABLED: ${SMTP_ENABLED:-false}
       SMTP_HOST: ${SMTP_HOST:-}
       SMTP_PORT: ${SMTP_PORT:-587}
@@ -94,6 +95,14 @@ services:
       SMTP_PASSWORD: ${SMTP_PASSWORD:-}
       SMTP_FROM: ${SMTP_FROM:-}
       PASSWORD_RESET_URL: ${PASSWORD_RESET_URL:-}
+
+      # --- Push do navegador (BE-17). Chaves VAPID de
+      # `npx web-push generate-vapid-keys`; a privada é segredo.
+      WEB_PUSH_ENABLED: ${WEB_PUSH_ENABLED:-false}
+      WEB_PUSH_PUBLIC_KEY: ${WEB_PUSH_PUBLIC_KEY:-}
+      WEB_PUSH_PRIVATE_KEY: ${WEB_PUSH_PRIVATE_KEY:-}
+      WEB_PUSH_SUBJECT: ${WEB_PUSH_SUBJECT:-}
+      NOTIFICATION_APP_URL: ${NOTIFICATION_APP_URL:-}
 
       # --- Anexos privados: volume nomeado abaixo (molde <sistema>-storage).
       # Fixo: é o ponto de montagem, não uma escolha da stack.

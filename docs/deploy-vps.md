@@ -157,6 +157,24 @@ APP_BIND=0.0.0.0
 CORS_ORIGINS=http://<IP-da-VPS>:1040
 ```
 
+Notificações (BE-17), opcionais. Sem elas, a caixa interna funciona, o push
+fica desligado e os e-mails ficam como não enviados (`CHANNEL_DISABLED`):
+
+```dotenv
+# Push do navegador: gerar uma vez com `npx web-push generate-vapid-keys`.
+# Trocar o par invalida as inscrições existentes (os navegadores se inscrevem de novo).
+WEB_PUSH_ENABLED=true
+WEB_PUSH_PUBLIC_KEY=<chave publica>
+WEB_PUSH_PRIVATE_KEY=<chave privada, segredo>
+WEB_PUSH_SUBJECT=mailto:<contato do operador>
+# Link do app no push e no e-mail.
+NOTIFICATION_APP_URL=http://<IP-da-VPS>:1040
+```
+
+O container precisa de saída HTTPS para os serviços de push (`fcm.googleapis.com`,
+`*.push.services.mozilla.com`, `*.notify.windows.com`, `*.push.apple.com`) e,
+com SMTP ligado, para o servidor de e-mail.
+
 ### 5. Stack no Portainer
 
 Stacks → Add stack → **Repository**:
@@ -281,12 +299,14 @@ removida do firewall. A API lê o IP real por `X-Forwarded-For`
 ## Pendências
 
 - **Worker e agendamento**: o próprio container `api` roda os workers BullMQ
-  (filas `alerts`, varredura de avaliação do BE-15, e `automation`, ausência e
-  lembretes do BE-16), com job schedulers de 60 s gravados no Redis. Falta o
-  heartbeat no Uptime Kuma para acusar varredura parada.
+  (filas `alerts`, varredura de avaliação do BE-15, `automation`, ausência e
+  lembretes do BE-16, e `notifications`, entrega por push e e-mail do BE-17,
+  a cada 10 s), com job schedulers gravados no Redis. Falta o heartbeat no
+  Uptime Kuma para acusar varredura parada.
 - **S3**: anexos usam o volume local (decisão de 2026-11-05); armazenamento de
   relatórios PDF (BE-21) ainda não decidido. **SMTP**: decisão de não ter
-  (2026-09-22).
+  (2026-09-22); o envio de e-mail de alerta (BE-17) já existe e passa a valer
+  quando um servidor for configurado.
 - **Backup do volume de anexos**: linha de cron acima ainda não configurada na
   VPS; cópia externa (camada 3 do `vps-hostinger-backup`) também pendente.
 - **Órfãos no volume**: arquivo cuja compensação falhou fica inacessível; não há
