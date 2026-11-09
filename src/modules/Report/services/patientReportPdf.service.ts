@@ -1,6 +1,7 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import PDFDocument from 'pdfkit';
 
+import { DomainException } from '@/common/errors/domain.exception';
 import type { FollowUpDto } from '@/modules/FollowUp/dtos/followUp.dto';
 import type { EvolutionSeriesDto } from '@/modules/Indicator/GetPatientEvolution/getPatientEvolution.dto';
 import type { MedicationDto } from '@/modules/Medication/dtos/medication.dto';
@@ -15,6 +16,7 @@ import {
   ROUTE_LABELS,
   toPdfText,
 } from '../policies/reportText.policy';
+import { ReportErrors } from '../report.errors';
 
 const MARGIN = 50;
 const FOOTER_HEIGHT = 30;
@@ -62,7 +64,25 @@ type Document = PDFKit.PDFDocument;
  */
 @Injectable()
 export class PatientReportPdfService {
-  render(report: PatientReportDto): Promise<Buffer> {
+  private readonly logger = new Logger(PatientReportPdfService.name);
+
+  /** Falha da biblioteca vira `REPORT_EXPORT_FAILED`; a causa so vai ao log. */
+  async render(report: PatientReportDto): Promise<Buffer> {
+    try {
+      return await this.draw(report);
+    } catch (error) {
+      this.logger.error(
+        `Falha ao gerar o PDF do relatorio: ${(error as Error).message}`,
+        (error as Error).stack,
+      );
+      throw new DomainException({
+        ...ReportErrors.EXPORT_FAILED,
+        detail: null,
+      });
+    }
+  }
+
+  protected draw(report: PatientReportDto): Promise<Buffer> {
     return new Promise((resolve, reject) => {
       const doc = new PDFDocument({
         size: 'A4',

@@ -1,7 +1,7 @@
 import { PatientReportPdfService } from '@/modules/Report/services/patientReportPdf.service';
 
 import { followUpDetail } from '../FollowUp/followUp.fixtures';
-import { patientRow } from '../Patient/patient.fixtures';
+import { captureError, patientRow } from '../Patient/patient.fixtures';
 import { extractPdfText } from './pdfText';
 import { glicemiaPoint, patientReport } from './report.fixtures';
 
@@ -111,5 +111,26 @@ describe('PatientReportPdfService', () => {
 
     expect(pages.length).toBeGreaterThan(1);
     expect(pages.at(-1)).toContain(`Página ${pages.length} de ${pages.length}`);
+  });
+});
+
+describe('PatientReportPdfService com falha na geracao', () => {
+  class FailingPdfService extends PatientReportPdfService {
+    protected draw(): Promise<Buffer> {
+      return Promise.reject(new Error('falha sintetica do pdfkit'));
+    }
+  }
+
+  it('vira 500 REPORT_EXPORT_FAILED sem detalhe tecnico', async () => {
+    const error = await captureError(
+      new FailingPdfService().render(patientReport()),
+    );
+
+    expect(error.code).toBe('REPORT_EXPORT_FAILED');
+    expect(error.getStatus()).toBe(500);
+    expect(error.detail).toBeNull();
+    expect(error.message).toBe(
+      'Não foi possível gerar o PDF do relatório. Tente novamente.',
+    );
   });
 });
