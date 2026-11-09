@@ -15,5 +15,6 @@ export const INDICATOR_REPOSITORIES = [PatientEvolutionRepository];
 @Module({
   controllers: [IndicatorController],
   providers: [...INDICATOR_USE_CASES, ...INDICATOR_REPOSITORIES],
+  exports: [PatientEvolutionRepository],
 })
 export class IndicatorModule {}

@@ -25,5 +25,6 @@ export const PATIENT_USE_CASES = [
   imports: [TypeOrmModule.forFeature([Patient, UserPatient])],
   controllers: [PatientController],
   providers: [...PATIENT_USE_CASES, PatientRepository],
+  exports: [PatientRepository],
 })
 export class PatientModule {}

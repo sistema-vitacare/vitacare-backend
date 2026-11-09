@@ -31,5 +31,6 @@ export const FOLLOW_UP_USE_CASES = [
   ],
   controllers: [FollowUpController],
   providers: [...FOLLOW_UP_USE_CASES, FollowUpRepository],
+  exports: [FollowUpRepository],
 })
 export class FollowUpModule {}
