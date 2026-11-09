@@ -105,9 +105,9 @@ Todas as rotas: `dashboard:read`, Bearer, envelope `{ data, meta }`.
     "previousPeriod": { "from": "2026-09-01", "to": "2026-09-30" },
     "patients": { "active": 128, "newInPeriod": 12 },
     "users": { "active": 23 },
-    "followUps": { "inPeriod": 340, "previousPeriod": 335, "change": 5,
+    "followUps": { "inPeriod": 340, "previousPeriodTotal": 335, "change": 5,
                    "byDay": [{ "date": "2026-10-01", "total": 11 }] },
-    "alerts": { "issuedInPeriod": 41, "previousPeriod": 38, "change": 3, "pending": 7 },
+    "alerts": { "issuedInPeriod": 41, "previousPeriodTotal": 38, "change": 3, "pending": 7 },
     "priorityAlerts": [{
       "id": "…", "patient": { "id": "…", "name": "…" }, "source": "reading",
       "severity": "critical", "title": "…", "generatedAt": "…",
@@ -134,22 +134,27 @@ Detalhes (UC05 passo 4):
 - `GET /api/v1/dashboard/users` (sem query) → `active`, `pending`,
   `inactive`, `byProfile` (`profile { code, name }`, `active`, `pending`,
   `inactive`) nos quatro perfis de tenant, sempre presentes.
-- `GET /api/v1/dashboard/follow-ups?from&to` → `inPeriod`, `previousPeriod`,
-  `change`, `byDay`, `byForm` (`form { id, name }`, `total`), `byAuthor`
+- `GET /api/v1/dashboard/follow-ups?from&to` → `inPeriod`,
+  `previousPeriodTotal`, `change`, `byDay`, `byForm` (`form { id, name }`, `total`), `byAuthor`
   (`user { id, name }`, `total`), do maior para o menor.
 - `GET /api/v1/dashboard/alerts?from&to` → `issuedInPeriod`,
-  `previousPeriod`, `change`, `byDay`, `bySeverity` e `bySource` (os três e
+  `previousPeriodTotal`, `change`, `byDay`, `bySeverity` e `bySource` (os três e
   as três chaves sempre presentes, zero quando não houver), `issuedStillOpen`
   (dos emitidos no período, quantos seguem abertos) e `pending` (`total`,
   `bySeverity`).
 
-Com período: `period`/`previousPeriod` no corpo, como no resumo; o aviso de
-período sem dados vale também para os detalhes de registros e alertas.
+Com período: `period`/`previousPeriod` (intervalo) no corpo, como no resumo;
+as contagens do período anterior chamam-se `previousPeriodTotal` em todas as
+rotas, para `previousPeriod` ter um só significado. O detalhe de registros
+repete o aviso do resumo; o de alertas avisa "Nenhum alerta emitido no período
+selecionado." quando `issuedInPeriod = 0`; pacientes e usuários não avisam
+(são foto).
 
 Erros: `401 AUTH_UNAUTHENTICATED`; `403 AUTH_FORBIDDEN`;
 `403 DASHBOARD_PLAN_FEATURE_UNAVAILABLE`; `422 VALIDATION_FAILED` (data
 inválida, invertida, `from` futuro sem `to`, mais de 366 dias, query
-desconhecida).
+desconhecida; não se aplica a `/dashboard/users`, que não tem query);
+`500 INTERNAL_ERROR` (falha ao carregar, declarado no OpenAPI).
 
 ## 5. Desenho interno
 
