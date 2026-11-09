@@ -9,8 +9,11 @@ export type DashboardPeriod = EvolutionPeriod;
 /** Itens das listas da Figura 33 (decisao de Mateus, 2026-11-09). */
 export const DASHBOARD_LIST_SIZE = 5;
 
-export const DASHBOARD_EMPTY_MESSAGE =
+export const DASHBOARD_NO_FOLLOW_UPS_MESSAGE =
   'Nenhum registro de acompanhamento no período selecionado.';
+
+export const DASHBOARD_NO_ALERTS_MESSAGE =
+  'Nenhum alerta emitido no período selecionado.';
 
 export interface DayCount {
   date: string;
