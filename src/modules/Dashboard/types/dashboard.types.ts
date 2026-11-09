@@ -68,11 +68,10 @@ export interface PendingAlerts {
   bySeverity: Record<AlertSeverity, number>;
 }
 
-export interface PatientsBreakdown {
+export interface PatientCounts {
   active: number;
   inactive: number;
   newInPeriod: number;
-  byResponsible: CountByRef[];
 }
 
 export interface UsersByProfileRow {
