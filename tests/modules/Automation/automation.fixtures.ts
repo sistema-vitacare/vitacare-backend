@@ -18,6 +18,8 @@ import { CreateMedications1791200000000 } from '@/database/migrations/1791200000
 import { CreateAlerts1791300000000 } from '@/database/migrations/1791300000000-CreateAlerts';
 import { CreateScheduledAlerts1791400000000 } from '@/database/migrations/1791400000000-CreateScheduledAlerts';
 import { CreateAlertNotifications1791500000000 } from '@/database/migrations/1791500000000-CreateAlertNotifications';
+import { AddDashboardIndexes1791600000000 } from '@/database/migrations/1791600000000-AddDashboardIndexes';
+import { AuditEventQuery1791700000000 } from '@/database/migrations/1791700000000-AuditEventQuery';
 import { SnakeNamingStrategy } from '@/database/snakeNaming.strategy';
 
 const SRC_ROOT = join(__dirname, '..', '..', '..', 'src');
@@ -40,6 +42,8 @@ export const ALL_MIGRATIONS = [
   CreateAlerts1791300000000,
   CreateScheduledAlerts1791400000000,
   CreateAlertNotifications1791500000000,
+  AddDashboardIndexes1791600000000,
+  AuditEventQuery1791700000000,
 ];
 
 export const TRUNCATE_AUTOMATION =

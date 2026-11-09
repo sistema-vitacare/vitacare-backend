@@ -28,6 +28,7 @@ import { AddPatientCareLinks1790800000000 } from '@/database/migrations/17908000
 import { CreateFollowUpForms1790900000000 } from '@/database/migrations/1790900000000-CreateFollowUpForms';
 import { CreateFollowUpRecords1791000000000 } from '@/database/migrations/1791000000000-CreateFollowUpRecords';
 import { CreateFollowUpAttachments1791100000000 } from '@/database/migrations/1791100000000-CreateFollowUpAttachments';
+import { AuditEventQuery1791700000000 } from '@/database/migrations/1791700000000-AuditEventQuery';
 import { runPlatformSeed } from '@/database/seeds/platformSeed';
 import { SnakeNamingStrategy } from '@/database/snakeNaming.strategy';
 import type { TenantProfileCode } from '@/modules/Access/access.permissions';
@@ -71,6 +72,7 @@ const MIGRATIONS = [
   CreateFollowUpForms1790900000000,
   CreateFollowUpRecords1791000000000,
   CreateFollowUpAttachments1791100000000,
+  AuditEventQuery1791700000000,
 ];
 
 const TRUNCATE_ALL =

@@ -10,6 +10,7 @@ import { AddUserPendingCheck1790400000000 } from '@/database/migrations/17904000
 import { AddPlanTermsAndChangeRequests1790500000000 } from '@/database/migrations/1790500000000-AddPlanTermsAndChangeRequests';
 import { ApplyPlanCatalogRules1790600000000 } from '@/database/migrations/1790600000000-ApplyPlanCatalogRules';
 import { CreatePatients1790700000000 } from '@/database/migrations/1790700000000-CreatePatients';
+import { AuditEventQuery1791700000000 } from '@/database/migrations/1791700000000-AuditEventQuery';
 import {
   PLATFORM_ADMIN_PERMISSIONS,
   TENANT_PROFILES,
@@ -92,6 +93,7 @@ describeWithDatabase(
           AddPlanTermsAndChangeRequests1790500000000,
           ApplyPlanCatalogRules1790600000000,
           CreatePatients1790700000000,
+          AuditEventQuery1791700000000,
         ],
         namingStrategy: new SnakeNamingStrategy(),
         synchronize: false,
@@ -110,7 +112,7 @@ describeWithDatabase(
       }
 
       migrated = (await dataSource.runMigrations()).length;
-      expect(migrated).toBe(9);
+      expect(migrated).toBe(10);
 
       const passwords = new PasswordHasher();
 

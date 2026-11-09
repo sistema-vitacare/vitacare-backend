@@ -6,6 +6,7 @@ import { CreateAuthSchema1790000000000 } from '@/database/migrations/17900000000
 import { AddOrganizationKind1790100000000 } from '@/database/migrations/1790100000000-AddOrganizationKind';
 import { AddTemporaryPasswordExpiry1790200000000 } from '@/database/migrations/1790200000000-AddTemporaryPasswordExpiry';
 import { SyncTenantAccessProfiles1790300000000 } from '@/database/migrations/1790300000000-SyncTenantAccessProfiles';
+import { AuditEventQuery1791700000000 } from '@/database/migrations/1791700000000-AuditEventQuery';
 import {
   ProfileCode,
   type RequestContext,
@@ -27,12 +28,16 @@ import { PasswordHasher } from '@/modules/Auth/security/passwordHasher';
 
 const SRC_ROOT = join(__dirname, '..', '..', '..', 'src');
 
-/** As quatro migrations anteriores a sincronizacao: montam o estado antigo. */
+/**
+ * As quatro migrations anteriores a sincronizacao montam o estado antigo. A do
+ * BE-23 entra junto porque o seed da plataforma grava auditoria com perfil e IP.
+ */
 const OLD_MIGRATIONS = [
   CreateInitialIdentitySchema1789674300000,
   CreateAuthSchema1790000000000,
   AddOrganizationKind1790100000000,
   AddTemporaryPasswordExpiry1790200000000,
+  AuditEventQuery1791700000000,
 ];
 
 const SYNC_MIGRATION = 'SyncTenantAccessProfiles1790300000000';
@@ -278,7 +283,7 @@ describeWithDatabase('perfis de acesso em PostgreSQL descartavel', () => {
     }
 
     migrated = (await dataSource.runMigrations()).length;
-    expect(migrated).toBe(4);
+    expect(migrated).toBe(5);
 
     planId = (await scalar(
       `INSERT INTO usage_plans (name, user_limit, patient_limit)

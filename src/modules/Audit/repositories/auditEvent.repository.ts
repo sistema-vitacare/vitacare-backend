@@ -1,3 +1,4 @@
+import { currentRequestIp } from '@/common/context/requestMetadata';
 import type { EntityManager } from 'typeorm';
 
 export interface AuditEventInput {
@@ -16,10 +17,17 @@ export const insertAuditEvent = async (
   manager: EntityManager,
   event: AuditEventInput,
 ): Promise<void> => {
+  // Perfil e IP do instante da acao (BE-23): o perfil e lido na mesma transacao.
   await manager.query(
     `INSERT INTO audit_events
-       (organization_id, actor_type, actor_user_id, action, entity_type, entity_id, after_values, request_id)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+       (organization_id, actor_type, actor_user_id, actor_profile_code, action,
+        entity_type, entity_id, after_values, request_id, ip_address)
+     VALUES ($1, $2, $3::uuid,
+             (SELECT profile.code
+                FROM users actor
+                JOIN access_profiles profile ON profile.id = actor.profile_id
+               WHERE actor.id = $3::uuid AND actor.organization_id = $1),
+             $4, $5, $6, $7, $8, $9)`,
     [
       event.organizationId,
       event.actorUserId === null ? 'system' : 'user',
@@ -29,6 +37,7 @@ export const insertAuditEvent = async (
       event.entityId,
       event.afterValues ? JSON.stringify(event.afterValues) : null,
       event.requestId,
+      currentRequestIp(),
     ],
   );
 };

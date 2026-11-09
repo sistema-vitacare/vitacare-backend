@@ -17,6 +17,7 @@ import { CreateMedications1791200000000 } from '@/database/migrations/1791200000
 import { CreateAlerts1791300000000 } from '@/database/migrations/1791300000000-CreateAlerts';
 import { CreateScheduledAlerts1791400000000 } from '@/database/migrations/1791400000000-CreateScheduledAlerts';
 import { CreateAlertNotifications1791500000000 } from '@/database/migrations/1791500000000-CreateAlertNotifications';
+import { AuditEventQuery1791700000000 } from '@/database/migrations/1791700000000-AuditEventQuery';
 import { SnakeNamingStrategy } from '@/database/snakeNaming.strategy';
 import { ChangePasswordUseCase } from '@/modules/Auth/ChangePassword/changePassword.useCase';
 import { CompleteFirstAccessUseCase } from '@/modules/Auth/CompleteFirstAccess/completeFirstAccess.useCase';
@@ -256,6 +257,7 @@ describeWithDatabase('autenticacao em PostgreSQL descartavel', () => {
         CreateAlerts1791300000000,
         CreateScheduledAlerts1791400000000,
         CreateAlertNotifications1791500000000,
+        AuditEventQuery1791700000000,
       ],
       namingStrategy: new SnakeNamingStrategy(),
       synchronize: false,
@@ -274,7 +276,7 @@ describeWithDatabase('autenticacao em PostgreSQL descartavel', () => {
     }
 
     migrated = (await dataSource.runMigrations()).length;
-    expect(migrated).toBe(16);
+    expect(migrated).toBe(17);
 
     passwords = new PasswordHasher();
     tokens = new TokenService();
