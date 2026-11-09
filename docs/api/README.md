@@ -50,6 +50,8 @@ O corpo das rotas de negócio é JSON quando aplicável. Autenticação usa Bear
 | `GET /api/v1/patients/:patientId` | Consulta um paciente, ativo ou inativo | [patients-consultar.md](endpoints/patients-consultar.md) |
 | `GET /api/v1/patients/:patientId/overview` | Visão consolidada: contadores, últimas medições, medicamentos ativos e alertas recentes | [patients-visao-consolidada.md](endpoints/patients-visao-consolidada.md) |
 | `GET /api/v1/patients/:patientId/evolution` | Séries de evolução por parâmetro com média, variação e tendência no período | [patients-evolucao.md](endpoints/patients-evolucao.md) |
+| `GET /api/v1/patients/:patientId/report` | Relatório consolidado do período (identificação, registros, séries com indicadores, medicamentos ativos) | [patients-relatorio.md](endpoints/patients-relatorio.md) |
+| `GET /api/v1/patients/:patientId/report/pdf` | O mesmo relatório em PDF (binário, fora do envelope), gerado na hora e auditado | [patients-relatorio-pdf.md](endpoints/patients-relatorio-pdf.md) |
 | `PATCH /api/v1/patients/:patientId` | Edita dados ou troca o responsável de paciente ativo | [patients-atualizar.md](endpoints/patients-atualizar.md) |
 | `POST /api/v1/patients/:patientId/deactivate` | Inativa o paciente, preservando vínculo e histórico | [patients-inativar.md](endpoints/patients-inativar.md) |
 | `POST /api/v1/patients/:patientId/reactivate` | Reativa o paciente, respeitando o limite do plano | [patients-reativar.md](endpoints/patients-reativar.md) |
@@ -217,7 +219,11 @@ A [evolução do paciente](endpoints/patients-evolucao.md) (`GET /patients/:pati
 
 Indicador sem amostra mínima sai `null` e entra em `unavailable` com o motivo, como pede o UC10. Um ponto é uma medição de registro válido; o período é `from`/`to` em dias da visita no fuso `America/Sao_Paulo`, com padrão nos últimos 30 dias e no máximo 366 dias. Campos `number` com unidade diferente entre versões, ou `scale` com faixa diferente, viram séries separadas e nunca se misturam numa média; período sem medição é `200` com `series: []`. Indicadores com 3 casas decimais.
 
-A rota exige `patient_evolution:read` (admin, profissional e familiar; o cuidador não tem) e o alcance de paciente das demais leituras; fora dele, `404 PATIENT_NOT_FOUND`. O familiar recebe a mesma resposta do profissional. O relatório em PDF (BE-21) e o painel (BE-22) seguem fora.
+A rota exige `patient_evolution:read` (admin, profissional e familiar; o cuidador não tem) e o alcance de paciente das demais leituras; fora dele, `404 PATIENT_NOT_FOUND`. O familiar recebe a mesma resposta do profissional. O painel (BE-22) segue fora.
+
+### Relatório do paciente e PDF
+
+O [relatório do paciente](endpoints/patients-relatorio.md) (`GET /patients/:patientId/report`) e sua [exportação em PDF](endpoints/patients-relatorio-pdf.md) (`GET /patients/:patientId/report/pdf`) entregam o mesmo conteúdo (BE-21, 2026-11-09; RF012, RF016; UC10; decisões de Mateus): identificação do paciente sem CPF, contato, endereço, plano de saúde e observações do cadastro; período com a regra do BE-20 (padrão de 30 dias, no máximo 366); resumo e lista completa dos registros **válidos** (no máximo 1.000, senão `422 REPORT_TOO_MANY_RECORDS`); as mesmas `series` do `/evolution`, com o motivo de cada indicador indisponível; e os medicamentos ativos no momento da geração. Alertas não entram. O PDF é **gerado na hora e não fica guardado**: não há catálogo de relatórios, link posterior nem XLSX (P21/P27), e cada pedido é reautorizado. Período vazio gera o relatório com o aviso "Nenhum registro válido no período.". Falha na geração responde `500 REPORT_EXPORT_FAILED` e a nova tentativa é repetir o pedido. Só a exportação em PDF é auditada (`patient_report.exported` com paciente e período, sem dado clínico). As duas rotas exigem `reports:generate` (admin e profissional); cuidador e familiar recebem `403`.
 
 ### Anexos de registro
 
@@ -382,6 +388,7 @@ Escrita pode acrescentar `meta.message`:
 | `GET /api/docs-json` | Documento OpenAPI, formato fixado pela especificação. |
 | `GET /api/v1/follow-ups/:followUpId/attachments/:attachmentId/content` | Conteúdo binário do anexo; os erros continuam no formato JSON. |
 | `DELETE /api/v1/follow-ups/:followUpId/attachments/:attachmentId` | `204 No Content`, sem corpo. |
+| `GET /api/v1/patients/:patientId/report/pdf` | PDF binário do relatório; os erros continuam no formato JSON. |
 
 ### Formato de erro
 
