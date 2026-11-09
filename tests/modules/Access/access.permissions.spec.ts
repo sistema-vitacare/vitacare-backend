@@ -148,7 +148,7 @@ describe('matriz de permissoes dos perfis', () => {
     expect(TENANT_PERMISSION_CODES.some(isPlatformPermission)).toBe(false);
   });
 
-  it('master inalterado', () => {
+  it('master: plataforma e auditoria de todas as organizacoes (BE-23)', () => {
     expect(sorted(PLATFORM_ADMIN_PERMISSIONS)).toEqual(
       sorted([
         'organization:read',
@@ -158,6 +158,8 @@ describe('matriz de permissoes dos perfis', () => {
         'platform_organizations:read',
         'platform_organizations:update',
         'platform_organizations:change_status',
+        'audit_events:read',
+        'audit_events:export',
       ]),
     );
   });

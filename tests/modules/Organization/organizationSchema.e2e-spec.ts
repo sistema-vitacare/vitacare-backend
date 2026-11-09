@@ -312,6 +312,8 @@ describeWithDatabase('organizacoes em PostgreSQL descartavel', () => {
 
       expect(principal?.organizationKind).toBe('platform');
       expect([...(principal?.permissions ?? [])].sort()).toEqual([
+        'audit_events:export',
+        'audit_events:read',
         'organization:read',
         'organization:update',
         'platform_organizations:change_status',

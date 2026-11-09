@@ -930,17 +930,25 @@ describeWithDatabase('perfis de acesso em PostgreSQL descartavel', () => {
     it('down remove apenas os 30 codigos novos e suas concessoes', async () => {
       const { organizationId } = await insertLegacyTenant('casa-reverte');
       const platformBefore = await grantsOf(platformId);
+      const auditPermissionIds = (
+        await fullDataSource.query<Array<{ id: string }>>(
+          "SELECT id FROM permissions WHERE code LIKE 'audit_events:%'",
+        )
+      ).map((row) => row.id);
 
       await runSync();
       await fullDataSource.undoLastMigration();
 
       expect(await isSyncApplied()).toBe(false);
-      expect(await catalog()).toEqual(
-        expectedCatalog(PLATFORM_ADMIN_PERMISSIONS),
+      // `audit_events:*` (master desde o BE-23) estao entre os codigos que o down remove.
+      const platformBeforeSync = PLATFORM_ADMIN_PERMISSIONS.filter(
+        (code) => !code.startsWith('audit_events:'),
       );
+
+      expect(await catalog()).toEqual(expectedCatalog(platformBeforeSync));
       expect(
         await scalar('SELECT count(*)::text AS value FROM permissions'),
-      ).toBe(String(PLATFORM_ADMIN_PERMISSIONS.length));
+      ).toBe(String(platformBeforeSync.length));
 
       // Perfis ficam; o admin conserva as tres concessoes que o codigo antigo usava.
       expect(
@@ -955,7 +963,12 @@ describeWithDatabase('perfis de acesso em PostgreSQL descartavel', () => {
       for (const code of ['professional', 'caregiver', 'family']) {
         expect(await livePermissionsOf(organizationId, code)).toEqual([]);
       }
-      expect(await grantsOf(platformId)).toEqual(platformBefore);
+      expect(await grantsOf(platformId)).toEqual(
+        platformBefore.filter(
+          (grant) =>
+            !auditPermissionIds.includes(grant.permission_id as string),
+        ),
+      );
     }, 30000);
   });
 });

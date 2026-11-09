@@ -36,6 +36,11 @@ import { User } from '@/modules/User/entities/user.entity';
   "(actor_type = 'user' AND actor_user_id IS NOT NULL) OR (actor_type = 'system' AND actor_user_id IS NULL)",
 )
 @Check(
+  'audit_events_profile_check',
+  "actor_type = 'user' OR actor_profile_code IS NULL",
+)
+@Index('audit_events_occurred_idx', ['occurredAt', 'id'])
+@Check(
   'audit_events_before_object_check',
   "before_values IS NULL OR jsonb_typeof(before_values) = 'object'",
 )
@@ -56,6 +61,10 @@ export class AuditEvent {
   @Column({ type: 'uuid', nullable: true })
   actorUserId!: string | null;
 
+  /** Perfil do autor no instante da acao (BE-23); nulo em evento de sistema e nos anteriores. */
+  @Column({ type: 'varchar', length: 32, nullable: true })
+  actorProfileCode!: string | null;
+
   @Column({ type: 'varchar', length: 80 })
   action!: string;
 
@@ -75,6 +84,10 @@ export class AuditEvent {
 
   @Column({ type: 'varchar', length: 80, nullable: true })
   requestId!: string | null;
+
+  /** IP do cliente pela regra `TRUST_PROXY`; nulo em job e nos eventos anteriores. */
+  @Column({ type: 'inet', nullable: true })
+  ipAddress!: string | null;
 
   @Column({ type: 'timestamptz', default: () => 'now()' })
   occurredAt!: Date;
