@@ -49,6 +49,7 @@ O corpo das rotas de negócio é JSON quando aplicável. Autenticação usa Bear
 | `GET /api/v1/patients` | Lista os pacientes ao alcance da sessão (ativos por padrão) | [patients-listar.md](endpoints/patients-listar.md) |
 | `GET /api/v1/patients/:patientId` | Consulta um paciente, ativo ou inativo | [patients-consultar.md](endpoints/patients-consultar.md) |
 | `GET /api/v1/patients/:patientId/overview` | Visão consolidada: contadores, últimas medições, medicamentos ativos e alertas recentes | [patients-visao-consolidada.md](endpoints/patients-visao-consolidada.md) |
+| `GET /api/v1/patients/:patientId/evolution` | Séries de evolução por parâmetro com média, variação e tendência no período | [patients-evolucao.md](endpoints/patients-evolucao.md) |
 | `PATCH /api/v1/patients/:patientId` | Edita dados ou troca o responsável de paciente ativo | [patients-atualizar.md](endpoints/patients-atualizar.md) |
 | `POST /api/v1/patients/:patientId/deactivate` | Inativa o paciente, preservando vínculo e histórico | [patients-inativar.md](endpoints/patients-inativar.md) |
 | `POST /api/v1/patients/:patientId/reactivate` | Reativa o paciente, respeitando o limite do plano | [patients-reativar.md](endpoints/patients-reativar.md) |
@@ -184,7 +185,7 @@ As duas rotas exigem `patient_history:read` e o mesmo alcance de paciente: admin
 
 ### Visão do familiar
 
-O familiar acompanha o paciente vinculado **só lendo**, pelas mesmas rotas dos outros perfis (BE-19, 2026-11-06; RF016; UC14; decisões de Mateus). Não há rota própria. O painel é a [visão consolidada](endpoints/patients-visao-consolidada.md), os registros recentes são o [histórico](endpoints/follow-ups-listar.md), e os alertas vêm de [GET /alerts](endpoints/alerts-listar.md) e da [caixa de notificações](endpoints/notifications-listar.md).
+O familiar acompanha o paciente vinculado **só lendo**, pelas mesmas rotas dos outros perfis (BE-19, 2026-11-06; RF016; UC14; decisões de Mateus). Não há rota própria. O painel é a [visão consolidada](endpoints/patients-visao-consolidada.md), os registros recentes são o [histórico](endpoints/follow-ups-listar.md), os gráficos de evolução vêm de [GET /patients/:id/evolution](endpoints/patients-evolucao.md) (BE-20, mesma resposta do profissional), e os alertas vêm de [GET /alerts](endpoints/alerts-listar.md) e da [caixa de notificações](endpoints/notifications-listar.md).
 
 O que muda quando o perfil da sessão é `family`:
 
@@ -204,7 +205,19 @@ Garantias que já existiam e continuam testadas:
 - **Identificador alheio:** `patientId`, `followUpId` ou `attachmentId` de outro paciente ou de outra organização responde `404`, sem conteúdo.
 - **Sem vínculo:** `GET /patients` devolve lista vazia; a mensagem orientativa ("solicite permissão ao profissional responsável") fica com o frontend.
 
-**Fora do escopo:** próxima visita e adesão (Figura 37) dependem do BE-26; gráficos com fórmulas de evolução, do BE-20.
+**Fora do escopo:** próxima visita e adesão (Figura 37) dependem do BE-26.
+
+### Evolução e indicadores
+
+A [evolução do paciente](endpoints/patients-evolucao.md) (`GET /patients/:patientId/evolution`; BE-20, 2026-11-09; RF011; UC10/UC14; decisões de Mateus) devolve, por parâmetro numérico, os pontos do período e três indicadores, sem classificação clínica:
+
+- **média:** aritmética simples, com pelo menos 1 medição;
+- **variação:** último valor − primeiro, com pelo menos 2;
+- **tendência:** inclinação da reta de mínimos quadrados em unidade por dia, com direção pelo sinal (`rising`, `falling`, `flat`), com pelo menos 3 medições em 2 instantes distintos.
+
+Indicador sem amostra mínima sai `null` e entra em `unavailable` com o motivo, como pede o UC10. Um ponto é uma medição de registro válido; o período é `from`/`to` em dias da visita no fuso `America/Sao_Paulo`, com padrão nos últimos 30 dias e no máximo 366 dias. Campos `number` com unidade diferente entre versões, ou `scale` com faixa diferente, viram séries separadas e nunca se misturam numa média; período sem medição é `200` com `series: []`. Indicadores com 3 casas decimais.
+
+A rota exige `patient_evolution:read` (admin, profissional e familiar; o cuidador não tem) e o alcance de paciente das demais leituras; fora dele, `404 PATIENT_NOT_FOUND`. O familiar recebe a mesma resposta do profissional. O relatório em PDF (BE-21) e o painel (BE-22) seguem fora.
 
 ### Anexos de registro
 
