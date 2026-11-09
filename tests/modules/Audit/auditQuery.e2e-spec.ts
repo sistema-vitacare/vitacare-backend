@@ -357,6 +357,159 @@ describeWithDatabase('consulta da auditoria (BE-23, UC06, e2e)', () => {
     });
   });
 
+  describe('exportacao CSV', () => {
+    const exportCsv = (token: string, query: string) =>
+      t.http('get', `/audit-events/export?${query}`, token);
+
+    const exportsOf = (organizationId: string) =>
+      t.dataSource.query<
+        Array<{ actor_user_id: string; after_values: Record<string, unknown> }>
+      >(
+        `SELECT actor_user_id, after_values FROM audit_events
+          WHERE organization_id = $1 AND action = 'audit_events.exported'
+          ORDER BY occurred_at, id`,
+        [organizationId],
+      );
+
+    it('admin exporta so a propria organizacao, sem valores gravados', async () => {
+      const response = await exportCsv(A.tokens.admin, OCTOBER);
+
+      expect(response.status).toBe(200);
+      expect(response.headers['content-type']).toBe('text/csv; charset=utf-8');
+      expect(response.headers['content-disposition']).toBe(
+        'attachment; filename="auditoria-2026-10-01-a-2026-10-31.csv"',
+      );
+      expect(response.headers['cache-control']).toBe('private, no-store');
+
+      const lines = response.text
+        .replace(/^\uFEFF/, '')
+        .trimEnd()
+        .split('\r\n');
+
+      expect(lines).toHaveLength(5);
+      expect(lines[1]).toContain('user.updated');
+      expect(lines[4]).toContain(';192.0.2.10;');
+      expect(response.text).toContain('Paciente Alfa');
+      expect(response.text).not.toContain('Paciente Beta');
+      expect(response.text).not.toContain('nunca');
+    });
+
+    it('repetir o pedido gera o mesmo arquivo e registra cada exportacao', async () => {
+      const before = (await exportsOf(B.id)).length;
+      const query = `${OCTOBER}&action=patient.created&search=${encodeURIComponent('profissional')}`;
+      const first = await exportCsv(B.tokens.admin, query);
+      const second = await exportCsv(B.tokens.admin, query);
+
+      expect(first.status).toBe(200);
+      expect(second.text).toBe(first.text);
+      expect(first.text).toContain('Paciente Beta');
+
+      const records = (await exportsOf(B.id)).slice(before);
+
+      expect(records).toHaveLength(2);
+      expect(records[0]).toEqual({
+        actor_user_id: B.users.admin,
+        after_values: {
+          from: '2026-10-01',
+          to: '2026-10-31',
+          total: 1,
+          filters: {
+            action: 'patient.created',
+            severity: null,
+            actorUserId: null,
+            actorType: null,
+            organizationId: B.id,
+            hasSearch: true,
+          },
+        },
+      });
+      expect(JSON.stringify(records)).not.toContain('profissional');
+    });
+
+    it('a exportacao aparece na consulta como acao de atencao', async () => {
+      const [exported] = dataOf<AuditEventDto[]>(
+        await list(B.tokens.admin, 'action=audit_events.exported'),
+      );
+
+      expect(exported).toMatchObject({
+        actionLabel: 'Exportou a auditoria',
+        severity: 'warning',
+        actor: { profile: { code: 'admin' } },
+      });
+      expect(['127.0.0.1', '::ffff:127.0.0.1', '::1']).toContain(
+        exported.ipAddress,
+      );
+    });
+
+    it('acima de 10.000 eventos responde 422 e nao registra', async () => {
+      await t.dataSource.query(
+        `INSERT INTO audit_events (organization_id, actor_type, action, entity_type, occurred_at)
+         SELECT $1, 'system', 'alert.generated', 'alert', '2025-03-10T12:00:00Z'
+           FROM generate_series(1, 10001)`,
+        [B.id],
+      );
+      const before = (await exportsOf(B.id)).length;
+      const response = await exportCsv(
+        B.tokens.admin,
+        'from=2025-03-01&to=2025-03-31',
+      );
+
+      expect(response.status).toBe(422);
+      expect(errorCode(response)).toBe('AUDIT_EXPORT_TOO_MANY_EVENTS');
+      expect(await exportsOf(B.id)).toHaveLength(before);
+    });
+
+    it('master exporta todas as organizacoes e o registro fica na plataforma', async () => {
+      const response = await exportCsv(
+        t.masterToken,
+        `${OCTOBER}&action=patient.created`,
+      );
+
+      expect(response.status).toBe(200);
+      expect(response.text.trimEnd().split('\r\n')).toHaveLength(3);
+      expect(response.text).not.toContain('Paciente Alfa');
+
+      const platform = await t.scalar(
+        "SELECT id AS value FROM organizations WHERE kind = 'platform'",
+      );
+
+      expect((await exportsOf(platform!)).at(-1)?.after_values).toMatchObject({
+        total: 2,
+        filters: { organizationId: null },
+      });
+    });
+
+    it.each(['professional', 'caregiver', 'family'] as const)(
+      '%s recebe 403 e nada e registrado',
+      async (role) => {
+        const before = (await exportsOf(A.id)).length;
+        const response = await exportCsv(A.tokens[role], OCTOBER);
+
+        expect(response.status).toBe(403);
+        expect(await exportsOf(A.id)).toHaveLength(before);
+      },
+    );
+
+    it('nenhum evento ou arquivo carrega senha ou token de sessao', async () => {
+      const secrets = [
+        'senha conhecida de teste',
+        A.tokens.admin,
+        B.tokens.admin,
+        t.masterToken,
+      ];
+      const dump = await t.scalar(
+        `SELECT string_agg(coalesce(after_values::text, '') || coalesce(before_values::text, ''), '|') AS value
+           FROM audit_events`,
+      );
+      const csv = (await exportCsv(t.masterToken, '')).text;
+
+      for (const secret of secrets) {
+        expect(dump).not.toContain(secret);
+        expect(csv).not.toContain(secret);
+      }
+    });
+  });
+
   describe('permissao', () => {
     it.each(['professional', 'caregiver', 'family'] as const)(
       '%s recebe 403 na lista, no detalhe e no catalogo',

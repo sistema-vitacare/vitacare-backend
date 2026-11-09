@@ -1,5 +1,18 @@
-import { Controller, Get, Param, Query } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import {
+  Controller,
+  Get,
+  Header,
+  Param,
+  Query,
+  StreamableFile,
+} from '@nestjs/common';
+import {
+  ApiBearerAuth,
+  ApiOkResponse,
+  ApiOperation,
+  ApiProduces,
+  ApiTags,
+} from '@nestjs/swagger';
 
 import { CurrentContext } from '@/common/context/currentContext.decorator';
 import type { RequestContext } from '@/common/context/requestContext.type';
@@ -15,11 +28,14 @@ import {
   AuditActionDto,
   AuditEventDetailDto,
   AuditEventDto,
+  AuditEventFilterQueryDto,
   ListAuditEventsQueryDto,
 } from './dtos/auditEvent.dto';
+import { ExportAuditEventsUseCase } from './ExportAuditEvents/exportAuditEvents.useCase';
 import { GetAuditEventUseCase } from './GetAuditEvent/getAuditEvent.useCase';
 import { ListAuditActionsUseCase } from './ListAuditActions/listAuditActions.useCase';
 import { ListAuditEventsUseCase } from './ListAuditEvents/listAuditEvents.useCase';
+import { AUDIT_EXPORT_MAX_EVENTS } from './types/auditEvent.types';
 
 const AUTH_ERRORS = [
   { status: 401, codes: ['AUTH_UNAUTHENTICATED'] },
@@ -38,6 +54,7 @@ export class AuditController {
     private readonly listEvents: ListAuditEventsUseCase,
     private readonly getEvent: GetAuditEventUseCase,
     private readonly listActions: ListAuditActionsUseCase,
+    private readonly exportEvents: ExportAuditEventsUseCase,
   ) {}
 
   @Get()
@@ -65,6 +82,33 @@ export class AuditController {
   @ApiErrors(...AUTH_ERRORS)
   actions(): AuditActionDto[] {
     return this.listActions.execute();
+  }
+
+  @Get('export')
+  @RequirePermissions(Permissions.AUDIT_EVENTS_EXPORT)
+  @Header('Cache-Control', 'private, no-store')
+  @ApiOperation({
+    summary:
+      'Exporta em CSV (binario, fora do envelope) os eventos dos mesmos filtros da lista, gerado na hora, sem guardar arquivo, e registrado na auditoria (UC06 passo 5).',
+  })
+  @ApiProduces('text/csv', 'application/json')
+  @ApiOkResponse({
+    description: `CSV UTF-8 com BOM, separador ";", Content-Disposition attachment; ate ${AUDIT_EXPORT_MAX_EVENTS} eventos. Erros saem em JSON; em falha na geracao, repetir o pedido.`,
+    content: { 'text/csv': { schema: { type: 'string', format: 'binary' } } },
+  })
+  @ApiErrors(
+    ...AUTH_ERRORS,
+    {
+      status: 422,
+      codes: ['VALIDATION_FAILED', 'AUDIT_EXPORT_TOO_MANY_EVENTS'],
+    },
+    { status: 500, codes: ['AUDIT_EXPORT_FAILED'] },
+  )
+  export(
+    @Query() query: AuditEventFilterQueryDto,
+    @CurrentContext() ctx: RequestContext,
+  ): Promise<StreamableFile> {
+    return this.exportEvents.execute(query, ctx);
   }
 
   @Get(':eventId')

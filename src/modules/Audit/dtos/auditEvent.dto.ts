@@ -16,7 +16,6 @@ import {
 } from '../policies/auditCatalog.policy';
 import {
   AUDIT_ACTOR_TYPES,
-  AUDIT_EXPORT_MAX_EVENTS,
   type AuditActorType,
 } from '../types/auditEvent.types';
 
@@ -201,5 +200,3 @@ export class AuditActionDto {
   })
   severity!: AuditSeverity | null;
 }
-
-export const AUDIT_EXPORT_LIMIT_DESCRIPTION = `Ate ${AUDIT_EXPORT_MAX_EVENTS} eventos por arquivo.`;

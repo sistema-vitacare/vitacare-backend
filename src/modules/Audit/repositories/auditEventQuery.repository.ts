@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 
+import type { RequestContext } from '@/common/context/requestContext.type';
 import { translatePgError } from '@/common/errors/pgError.translator';
 
 import { auditSeveritySql } from '../policies/auditCatalog.policy';
@@ -8,6 +9,7 @@ import type {
   AuditEventFilter,
   AuditEventRow,
 } from '../types/auditEvent.types';
+import { insertAuditEvent } from './auditEvent.repository';
 
 const SEVERITY = auditSeveritySql('e.action', 'e.after_values');
 
@@ -97,6 +99,26 @@ export class AuditEventQueryRepository {
     );
 
     return row ?? null;
+  }
+
+  /** Na organizacao da sessao: a do admin ou a plataforma, para o master. */
+  async recordExport(
+    ctx: RequestContext,
+    afterValues: Record<string, unknown>,
+  ): Promise<void> {
+    try {
+      await insertAuditEvent(this.dataSource.manager, {
+        organizationId: ctx.organizationId,
+        actorUserId: ctx.userId,
+        action: 'audit_events.exported',
+        entityType: 'audit_events',
+        entityId: null,
+        afterValues,
+        requestId: ctx.requestId,
+      });
+    } catch (error) {
+      throw translatePgError(error, 'audit_events');
+    }
   }
 
   private where(filter: AuditEventFilter): { sql: string; params: unknown[] } {
