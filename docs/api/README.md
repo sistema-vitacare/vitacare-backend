@@ -1,7 +1,7 @@
 ---
 title: Manual de integração da API VitaCare
 status: atual
-updated: 2026-11-06
+updated: 2026-11-09
 ---
 
 # Manual de integração da API VitaCare
@@ -111,6 +111,11 @@ O corpo das rotas de negócio é JSON quando aplicável. Autenticação usa Bear
 | `POST /api/v1/plan-change-requests/:requestId/cancel` | Cancela a solicitação pendente | [plan-change-requests-cancelar.md](endpoints/plan-change-requests-cancelar.md) |
 | `POST /api/v1/plan-change-requests/:requestId/approve` | Aprova e aplica o plano pedido (plataforma) | [plan-change-requests-aprovar.md](endpoints/plan-change-requests-aprovar.md) |
 | `POST /api/v1/plan-change-requests/:requestId/reject` | Recusa a solicitação (plataforma) | [plan-change-requests-recusar.md](endpoints/plan-change-requests-recusar.md) |
+| `GET /api/v1/dashboard` | Painel operacional: pacientes e usuários ativos, registros e alertas emitidos no período com o período anterior, pendentes, prioritários e últimos registros (admin, Enterprise) | [dashboard-resumo.md](endpoints/dashboard-resumo.md) |
+| `GET /api/v1/dashboard/patients` | Detalhe de pacientes: ativos, inativos, novos no período e por profissional responsável | [dashboard-pacientes.md](endpoints/dashboard-pacientes.md) |
+| `GET /api/v1/dashboard/users` | Detalhe de usuários: ativos, convidados e inativos por perfil | [dashboard-usuarios.md](endpoints/dashboard-usuarios.md) |
+| `GET /api/v1/dashboard/follow-ups` | Detalhe de registros: válidos no período por dia, formulário e autor | [dashboard-registros.md](endpoints/dashboard-registros.md) |
+| `GET /api/v1/dashboard/alerts` | Detalhe de alertas: emitidos no período por dia, severidade e origem, e pendentes agora | [dashboard-alertas.md](endpoints/dashboard-alertas.md) |
 
 Os caminhos de Swagger usam `SWAGGER_PATH=docs` e só existem com `SWAGGER_ENABLED=true`. O documento OpenAPI é gerado em runtime; consulte a rota JSON do ambiente para conferir a versão publicada. `/health/live` é excluída do OpenAPI de propósito, mas permanece documentada aqui.
 
@@ -219,11 +224,15 @@ A [evolução do paciente](endpoints/patients-evolucao.md) (`GET /patients/:pati
 
 Indicador sem amostra mínima sai `null` e entra em `unavailable` com o motivo, como pede o UC10. Um ponto é uma medição de registro válido; o período é `from`/`to` em dias da visita no fuso `America/Sao_Paulo`, com padrão nos últimos 30 dias e no máximo 366 dias. Campos `number` com unidade diferente entre versões, ou `scale` com faixa diferente, viram séries separadas e nunca se misturam numa média; período sem medição é `200` com `series: []`. Indicadores com 3 casas decimais.
 
-A rota exige `patient_evolution:read` (admin, profissional e familiar; o cuidador não tem) e o alcance de paciente das demais leituras; fora dele, `404 PATIENT_NOT_FOUND`. O familiar recebe a mesma resposta do profissional. O painel (BE-22) segue fora.
+A rota exige `patient_evolution:read` (admin, profissional e familiar; o cuidador não tem) e o alcance de paciente das demais leituras; fora dele, `404 PATIENT_NOT_FOUND`. O familiar recebe a mesma resposta do profissional. O painel operacional da organização (BE-22) está em [Painel operacional da organização](#painel-operacional-da-organização).
 
 ### Relatório do paciente e PDF
 
 O [relatório do paciente](endpoints/patients-relatorio.md) (`GET /patients/:patientId/report`) e sua [exportação em PDF](endpoints/patients-relatorio-pdf.md) (`GET /patients/:patientId/report/pdf`) entregam o mesmo conteúdo (BE-21, 2026-11-09; RF012, RF016; UC10; decisões de Mateus): identificação do paciente sem CPF, contato, endereço, plano de saúde e observações do cadastro; período com a regra do BE-20 (padrão de 30 dias, no máximo 366); resumo e lista completa dos registros **válidos** (no máximo 1.000, senão `422 REPORT_TOO_MANY_RECORDS`); as mesmas `series` do `/evolution`, com o motivo de cada indicador indisponível; e os medicamentos ativos no momento da geração. Alertas não entram. O PDF é **gerado na hora e não fica guardado**: não há catálogo de relatórios, link posterior nem XLSX (P21/P27), e cada pedido é reautorizado. Período vazio gera o relatório com o aviso "Nenhum registro válido no período.". Falha na geração responde `500 REPORT_EXPORT_FAILED` e a nova tentativa é repetir o pedido. Só a exportação em PDF é auditada (`patient_report.exported` com paciente e período, sem dado clínico). As duas rotas exigem `reports:generate` (admin e profissional); cuidador e familiar recebem `403`.
+
+### Painel operacional da organização
+
+O [painel operacional](endpoints/dashboard-resumo.md) (`GET /dashboard`) e os quatro detalhes por indicador ([pacientes](endpoints/dashboard-pacientes.md), [usuários](endpoints/dashboard-usuarios.md), [registros](endpoints/dashboard-registros.md), [alertas](endpoints/dashboard-alertas.md)) atendem o UC05 (BE-22, 2026-11-09; RF015; Figura 33; decisões de Mateus). Só o **admin** (`dashboard:read`) e só organização cujo plano tem `operational_dashboard` — o **Enterprise** do Quadro 2; no Basic, `403 DASHBOARD_PLAN_FEATURE_UNAVAILABLE`. Pacientes e usuários ativos são a foto de agora (usuário ativo = `status = active`, sem os convidados `pending`). Registros contam pela data da **visita**, só válidos; alertas **emitidos** contam pela geração, de todas as origens e em qualquer status, e **pendentes** são os `open` agora. O período segue a regra do BE-20 (dias no fuso `America/Sao_Paulo`, padrão de 30 dias, no máximo 366) e cada número de período vem com o **período anterior de mesmo tamanho** e a diferença absoluta. O resumo traz ainda o gráfico de registros por dia, até 5 alertas prioritários (abertos, por severidade e recência) e os 5 últimos registros. Período sem registro responde `200` com zeros e `meta.message`; falha ao carregar é `500 INTERNAL_ERROR` sem `detail`, e a nova tentativa é repetir a chamada. Sem auditoria e sem cache. A migration `1791600000000-AddDashboardIndexes` só cria índices.
 
 ### Anexos de registro
 

@@ -37,6 +37,7 @@ import { PlanModule } from './modules/Plan/plan.module';
 import { PatientModule } from './modules/Patient/patient.module';
 import { PatientAccessModule } from './modules/PatientAccess/patientAccess.module';
 import { ReportModule } from './modules/Report/report.module';
+import { DashboardModule } from './modules/Dashboard/dashboard.module';
 import { UserModule } from './modules/User/user.module';
 import { QueueModule } from './queue/queue.module';
 import { RedisModule } from './redis/redis.module';
@@ -127,6 +128,7 @@ function prettyTransport() {
     HistoryModule,
     IndicatorModule,
     ReportModule,
+    DashboardModule,
     AlertModule,
     NotificationModule,
     AutomationModule,
