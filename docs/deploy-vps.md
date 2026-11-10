@@ -8,13 +8,11 @@ mesmo tempo.
 
 ```text
 merge na main
-  └─ GitHub Actions: testes (Postgres + Redis reais)
-       └─ homologacao (só lê o GHCR): imagem buildada uma vez, deploy do zero,
-          smoke completo, backup → restore → verify, revert/migrate, rollback
-            └─ publicacao: a MESMA imagem (artefato) no GHCR (:latest e :sha-<commit>) → webhook
-                 └─ Portainer relê o compose, baixa a imagem, recria app-vitacare
-                      └─ entrypoint: migrations pendentes → API NestJS na porta 1050
-                           └─ smoke de leitura confere data.version = commit
+  └─ GitHub Actions: testes (compose, lint, build, unitários; sem banco nem Redis)
+       └─ imagem: build e push no GHCR (:latest e :sha-<commit>)
+            └─ deploy: webhook → Portainer relê o compose, baixa a imagem, recria app-vitacare
+                 └─ entrypoint: migrations pendentes → API NestJS na porta 1050
+                      └─ o job espera data.version = commit e /health/ready 200
 stdout JSON (pino, level_name) → Alloy → Loki · cAdvisor → Prometheus · heartbeat → Kuma
 ```
 
@@ -35,12 +33,40 @@ stdout JSON (pino, level_name) → Alloy → Loki · cAdvisor → Prometheus · 
 | `docker-entrypoint.sh` | `RUN_MIGRATIONS=true` → migrations; depois `exec node dist/main.js` |
 | `docker-compose.prod.yml` | o que a stack do Portainer lê |
 | `.env.production.example` | modelo das variáveis da stack |
-| `.github/workflows/deploy.yml` | testes → homologação (só lê o GHCR) → publicação da imagem testada (só na `main`) → webhook → smoke de leitura |
+| `.github/workflows/deploy.yml` | `testes` (lint, build, unitários) → `imagem` (GHCR, só no push da `main`) → `deploy` (webhook e espera da versão nova) |
 | `scripts/ops/smoke.mjs` | smoke por HTTP: `read` (produção), `full` (homologação), `verify` (após restore/rollback) |
 | `scripts/ops/backup.sh` · `restore.sh` | backup diário de banco **e** anexos; restauração conferida |
-| `scripts/ops/ci-homologation.sh` | roteiro do job `homologacao`, também rodável localmente |
+| `scripts/ops/ci-homologation.sh` | homologação efêmera da imagem (deploy do zero, smoke, backup → restore → verify, revert/migrate, rollback), rodada à mão ([abaixo](#antes-do-merge-na-main)) |
 | `scripts/ops/load.mjs` | medição de desempenho (RNF008) contra homologação |
 | `compose.yaml` | desenvolvimento (build local, porta 3000, sem migration automática) |
+
+## Antes do merge na main
+
+O CI é simples, rápido e leve (decisão de Mateus em 2026-11-10): só checa o
+compose de produção e roda lint, build e unitários. Os e2e e a homologação
+completa da imagem **não rodam no CI** e são rodados à mão, antes de um merge
+na `main` que mexa em schema (migration), backup/restore ou infraestrutura
+(Dockerfile, entrypoint, compose, workflow, `scripts/ops/`):
+
+```bash
+# e2e contra PostgreSQL e Redis descartáveis (banco vazio vitacare_schema_test em localhost)
+VITACARE_TEST_DATABASE_URL=postgresql://<usuario>:<senha>@127.0.0.1:5432/vitacare_schema_test \
+VITACARE_TEST_REDIS_URL=redis://127.0.0.1:6379/15 \
+VITACARE_TEST_REQUIRE_INFRA=true npm run test:e2e -- --runInBand
+
+# homologação efêmera da imagem: sobe com os limites de produção, deploy do zero,
+# seed, smoke completo, backup → restore → verify, revert + migrate e rollback
+# para ROLLBACK_IMAGE (a :latest, pacote privado: `docker login ghcr.io` antes;
+# sem ela o rollback é pulado) sobre o schema novo; tudo é desfeito no fim
+docker build --target runtime --build-arg GIT_SHA="$(git rev-parse HEAD)" -t vitacare-backend:ci .
+IMAGE=vitacare-backend:ci ROLLBACK_IMAGE=ghcr.io/sistema-vitacare/vitacare-backend:latest \
+  EXPECT_VERSION="$(git rev-parse HEAD)" PG_CONTAINER=<container-do-postgres> \
+  DB_HOST=127.0.0.1 DB_PORT=5432 DB_USERNAME=<usuario> DB_PASSWORD=<senha> \
+  REDIS_HOST=127.0.0.1 REDIS_PORT=6379 sh scripts/ops/ci-homologation.sh
+```
+
+Também à mão, de tempos em tempos: `npm audit --omit=dev --audit-level=high`.
+Anotar o resultado na nota da tarefa no vault.
 
 ## Equivalências com o molde Laravel
 
@@ -264,10 +290,11 @@ no primeiro acesso e cadastra cada organização com o primeiro administrador em
 
 Settings → Secrets and variables → Actions: secret `PORTAINER_WEBHOOK_URL` (URL
 do passo 5) e variable `APP_URL=http://<IP-da-VPS>:1050`. *Re-run all jobs* do
-workflow do passo 1: três jobs verdes (`testes`, `homologacao`, `deploy`), com
-"7/7 verificacoes ok (modo read)" no fim do deploy. O resumo do job
-`homologacao` mostra o tempo de restauração e se o rollback para a `:latest`
-anterior funcionou sobre o schema novo.
+workflow do passo 1: três jobs verdes (`testes`, `imagem`, `deploy`), com
+"Versão <commit> no ar em <APP_URL>" no fim do deploy (o job espera
+`GET /api/v1` mostrar o commit em `data.version` e `/health/ready` responder
+`200`, por até 6 minutos). A homologação da imagem não roda no CI: ver
+[Antes do merge na main](#antes-do-merge-na-main).
 
 ### 10. Monitoramento e backup
 
@@ -358,11 +385,12 @@ Anotar o `time` na nota da tarefa no vault: é a medição do RTO.
 
 ## Migrations e rollback
 
-- **Antes de um merge com migration**: `/opt/vitacare/backup.sh` à mão e
-  confirmar a pasta nova. O CI já provou `revert` + `migrate` e, no resumo do
-  job `homologacao`, se a imagem anterior roda sobre o schema novo.
+- **Antes de um merge com migration**: rodar à mão a homologação de
+  [Antes do merge na main](#antes-do-merge-na-main), que prova `revert` +
+  `migrate` e diz se a imagem anterior roda sobre o schema novo; depois
+  `/opt/vitacare/backup.sh` na VPS e confirmar a pasta nova.
 - **Rollback de imagem** (código antigo compatível com o schema novo — o resumo
-  do CI diz): `APP_IMAGE=ghcr.io/sistema-vitacare/vitacare-backend:sha-<commit>`
+  da homologação local diz): `APP_IMAGE=ghcr.io/sistema-vitacare/vitacare-backend:sha-<commit>`
   → Update the stack; apagar a variável para voltar.
 - **Rollback com schema** (o resumo avisou incompatibilidade): parar a stack,
   `docker run --rm --network infra <variáveis do banco> ghcr.io/sistema-vitacare/vitacare-backend:sha-<commit-novo> revert`
@@ -476,5 +504,5 @@ removida do firewall. A API lê o IP real por `X-Forwarded-For`
 - **LGPD (P31)** e retenção clínica: ver o checklist.
 - **S3**: anexos usam o volume local (decisão de 2026-11-05). **SMTP**: o envio
   de e-mail (BE-17) vale quando um servidor for configurado.
-- **Dependências**: `npm audit` sem `high`/`critical`; restam 3 `moderate`
+- **Dependências**: `npm audit` (à mão, fora do CI) sem `high`/`critical`; restam 3 `moderate`
   (glob/minimatch via TypeORM, correção só no TypeORM 1.x, fora do semver).

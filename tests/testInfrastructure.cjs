@@ -3,7 +3,7 @@
  *
  * As suites de banco e Redis pulam sem `VITACARE_TEST_DATABASE_URL` e
  * `VITACARE_TEST_REDIS_URL`, para o desenvolvimento local rodar sem
- * dependencias. Com `VITACARE_TEST_REQUIRE_INFRA=true` (o CI liga), pular
+ * dependencias. Com `VITACARE_TEST_REQUIRE_INFRA=true` (no e2e local), pular
  * deixa de ser opcao: faltar URL ou servico derruba a execucao antes do
  * primeiro teste, e qualquer teste pulado a reprova no fim.
  */

@@ -68,12 +68,19 @@ VITACARE_ENV_FILE=.env.production HOST_PORT=8080 docker compose up -d
 
 ## Deploy de producao
 
-Merge na `main` → GitHub Actions (audit, lint, build, unitarios e e2e contra
-PostgreSQL e Redis reais) → homologacao efemera da imagem (deploy do zero,
-smoke completo, backup/restore, revert e rollback) → a **mesma** imagem no GHCR
-→ webhook do Portainer → stack `vitacare` com **um container**, `app-vitacare`,
-na porta `1050` → smoke de leitura na versao nova. O entrypoint aplica as
-migrations pendentes (`RUN_MIGRATIONS=true`) e sobe a API.
+Merge na `main` → GitHub Actions em tres jobs: `testes` (checagens do compose
+de producao, lint, build e unitarios, sem banco nem Redis) → `imagem` (build e
+push no GHCR, `:latest` e `:sha-<commit>`) → `deploy` (webhook do Portainer e
+espera `GET /api/v1` mostrar o commit em `data.version` e `/health/ready`
+responder `200`). A stack `vitacare` tem **um container**, `app-vitacare`, na
+porta `1050`; o entrypoint aplica as migrations pendentes
+(`RUN_MIGRATIONS=true`) e sobe a API.
+
+O CI e simples e leve de proposito (decisao de Mateus em 2026-11-10): os e2e
+(`npm run test:e2e` com PostgreSQL e Redis descartaveis) e a homologacao
+completa da imagem (`scripts/ops/ci-homologation.sh`: deploy do zero, smoke,
+backup/restore, revert e rollback) rodam **a mao**, antes de um merge na `main`
+que mexa em schema, backup ou infraestrutura.
 
 PostgreSQL e Redis sao os da stack `infra` da VPS, alcancados pela rede
 docker. Passo a passo, pool, memoria, timeouts e rollback:
@@ -89,7 +96,7 @@ metas e checklist em [docs/deploy-vps.md](docs/deploy-vps.md):
 | --- | --- |
 | `smoke.mjs` | `--mode read` (seguro em producao), `full` (so homologacao, `--allow-writes`), `verify` (apos restore/rollback) |
 | `backup.sh` / `restore.sh` | backup diario de banco **e** anexos juntos; restauracao conferida por `SHA256SUMS` |
-| `ci-homologation.sh` | o roteiro do job `homologacao`, rodavel localmente com Docker |
+| `ci-homologation.sh` | homologacao efemera da imagem, rodada a mao com Docker antes de merge que mexa em schema, backup ou infraestrutura |
 | `load.mjs` | medicao do RNF008 contra homologacao (p95 500 ms / 1 s / 5 s) |
 
 Na imagem: `docker-entrypoint.sh revert` desfaz a ultima migration e
@@ -355,9 +362,10 @@ que Redis, workers e banco estao vivos, o que `/health/live` nao prova.
 
 - `npm test` — unitarios de `tests/`, exceto `*.e2e-spec.ts`.
 - `npm run test:e2e` — sobe o pipeline HTTP real (helmet, CORS, versionamento,
-  validacao, filtro de erros, Swagger) com PostgreSQL e Redis mockados. No CI as
-  suites de banco e Redis abaixo rodam contra servicos descartaveis do proprio
-  job (`.github/workflows/deploy.yml`).
+  validacao, filtro de erros, Swagger) com PostgreSQL e Redis mockados. Os e2e
+  nao rodam no CI: rode-os localmente, com as suites de banco e Redis abaixo
+  apontadas para servicos descartaveis e `VITACARE_TEST_REQUIRE_INFRA=true`
+  (falta de infraestrutura ou teste pulado reprova), antes de merge na `main`.
 - `tests/modules/Auth/authRateLimiter.integration.e2e-spec.ts` exercita o
   limite de abuso contra um Redis **real** e pula sem
   `VITACARE_TEST_REDIS_URL`. Aponte para um banco logico descartavel, por
