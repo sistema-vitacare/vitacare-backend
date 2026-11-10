@@ -347,7 +347,9 @@ describeWithInfrastructure('homologacao funcional dos 14 casos de uso', () => {
           invalid.body as { error: { fields: Array<{ field: string }> } }
         ).error.fields.map((field) => field.field),
       ).toEqual(expect.arrayContaining(['email', 'cpf', 'profileCode']));
-    });
+      // Oito convites com primeiro acesso: ~32 hashes argon2id, lentos de
+      // proposito; o limite padrao de 5 s depende da velocidade da maquina.
+    }, 30000);
 
     it('UC01 — senha errada 401, logout revoga o token na chamada seguinte', async () => {
       const wrong = await login(
