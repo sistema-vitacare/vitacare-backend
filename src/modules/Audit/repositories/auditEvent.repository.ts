@@ -1,5 +1,6 @@
-import { currentRequestIp } from '@/common/context/requestMetadata';
 import type { EntityManager } from 'typeorm';
+
+import { currentRequestIp } from '@/common/context/requestMetadata';
 
 export interface AuditEventInput {
   organizationId: string;
@@ -37,7 +38,8 @@ export const insertAuditEvent = async (
       event.entityId,
       event.afterValues ? JSON.stringify(event.afterValues) : null,
       event.requestId,
-      currentRequestIp(),
+      // Evento de sistema (job, alerta avaliado no pedido, alvo do master) nao herda o IP.
+      event.actorUserId === null ? null : currentRequestIp(),
     ],
   );
 };

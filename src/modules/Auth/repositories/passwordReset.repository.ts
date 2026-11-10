@@ -1,6 +1,7 @@
-import { insertAuditEvent } from '@/modules/Audit/repositories/auditEvent.repository';
 import { Injectable } from '@nestjs/common';
 import { DataSource } from 'typeorm';
+
+import { insertAuditEvent } from '@/modules/Audit/repositories/auditEvent.repository';
 
 /** `UPDATE`/`INSERT` do driver `pg` devolvem `[linhas, afetadas]`. */
 type WriteResult = [unknown, number];

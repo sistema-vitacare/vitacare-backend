@@ -1,6 +1,7 @@
-import { insertAuditEvent } from '@/modules/Audit/repositories/auditEvent.repository';
 import { Injectable } from '@nestjs/common';
 import { DataSource, EntityManager } from 'typeorm';
+
+import { insertAuditEvent } from '@/modules/Audit/repositories/auditEvent.repository';
 
 import type { AuthSessionType } from '../entities/authSession.entity';
 

@@ -1,3 +1,4 @@
+import { runWithRequestMetadata } from '@/common/context/requestMetadata';
 import { insertAuditEvent } from '@/modules/Audit/repositories/auditEvent.repository';
 
 import {
@@ -111,6 +112,26 @@ describeWithDatabase('perfil e IP gravados na auditoria (BE-23, e2e)', () => {
 
     expect(event.ip_address).toBeNull();
     expect(event.actor_profile_code).toBeNull();
+  });
+
+  it('evento de sistema gerado durante uma requisicao nao leva o IP dela', async () => {
+    const { B } = t.tenants;
+
+    await runWithRequestMetadata({ ip: '192.0.2.50' }, () =>
+      t.dataSource.transaction((manager) =>
+        insertAuditEvent(manager, {
+          organizationId: B.id,
+          actorUserId: null,
+          action: 'alert.generated',
+          entityType: 'alert',
+          entityId: null,
+          afterValues: { severity: 'warning' },
+          requestId: 'req-pedido',
+        }),
+      ),
+    );
+
+    expect((await lastEvent(B.id, 'alert.generated')).ip_address).toBeNull();
   });
 
   it('login fora de HTTP grava o perfil e IP nulo', async () => {
