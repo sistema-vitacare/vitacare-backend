@@ -124,4 +124,10 @@ export const environmentValidationSchema = Joi.object({
 
   // Arquivos privados (anexos): diretorio local, volume Docker na imagem
   STORAGE_PATH: Joi.string().trim().default('./storage'),
+
+  // Operacao: monitor Push do Uptime Kuma (heartbeat dos workers)
+  UPTIME_KUMA_PUSH_URL: Joi.string()
+    .uri({ scheme: ['http', 'https'] })
+    .allow('')
+    .optional(),
 });

@@ -104,6 +104,11 @@ services:
       WEB_PUSH_SUBJECT: ${WEB_PUSH_SUBJECT:-}
       NOTIFICATION_APP_URL: ${NOTIFICATION_APP_URL:-}
 
+      # --- Heartbeat dos workers BullMQ (a cada 5 min, só com o banco
+      # respondendo) para o monitor Push do Uptime Kuma, intervalo 600 s:
+      # http://uptime-kuma:3001/api/push/<token>. Vazia = sem heartbeat.
+      UPTIME_KUMA_PUSH_URL: ${UPTIME_KUMA_PUSH_URL:-}
+
       # --- Anexos privados: volume nomeado abaixo (molde <sistema>-storage).
       # Fixo: é o ponto de montagem, não uma escolha da stack.
       STORAGE_PATH: /app/storage

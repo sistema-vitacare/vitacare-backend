@@ -13,6 +13,7 @@ import { environmentValidationSchema } from './config/env.validation';
 import redisConfig from './config/redis.config';
 import mailConfig from './config/mail.config';
 import notificationConfig from './config/notification.config';
+import operationsConfig from './config/operations.config';
 import securityConfig from './config/security.config';
 import storageConfig from './config/storage.config';
 import { DatabaseModule } from './database/database.module';
@@ -57,6 +58,7 @@ import { StorageModule } from './storage/storage.module';
         mailConfig,
         notificationConfig,
         storageConfig,
+        operationsConfig,
       ],
       validationSchema: environmentValidationSchema,
       validationOptions: {
