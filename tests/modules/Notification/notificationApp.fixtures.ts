@@ -186,6 +186,10 @@ export const bootNotificationApp = async (
   });
 
   await app.init();
+  // Ja escutando: sem isso o supertest abre o servidor a cada requisicao e o
+  // fecha ao terminar, e o close() de uma requisicao concorrente derruba as
+  // conexoes ainda ociosas das outras (ECONNRESET, sobretudo em multipart).
+  await app.listen(0, '127.0.0.1');
 
   const passwords = moduleRef.get(PasswordHasher);
   const login = moduleRef.get(LoginUseCase);
