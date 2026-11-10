@@ -13,14 +13,16 @@ import { insertAuditEvent } from './auditEvent.repository';
 
 const SEVERITY = auditSeveritySql('e.action', 'e.after_values');
 
-/** Nome legivel do item; nomes clinicos so na organizacao de quem consulta. */
+/**
+ * Nome legivel do item. Nome de pessoa de outra organizacao e mascarado no
+ * caso de uso; formulario e medicamento so na organizacao de quem consulta.
+ */
 const entityLabel = (viewer: string) => `CASE e.entity_type
     WHEN 'user' THEN (SELECT u.name FROM users u
                        WHERE u.id = e.entity_id AND u.organization_id = e.organization_id)
     WHEN 'organization' THEN (SELECT eo.trade_name FROM organizations eo WHERE eo.id = e.entity_id)
-    WHEN 'patient' THEN CASE WHEN e.organization_id = ${viewer} THEN
-      (SELECT p.name FROM patients p
-        WHERE p.id = e.entity_id AND p.organization_id = e.organization_id) END
+    WHEN 'patient' THEN (SELECT p.name FROM patients p
+                          WHERE p.id = e.entity_id AND p.organization_id = e.organization_id)
     WHEN 'follow_up_form' THEN CASE WHEN e.organization_id = ${viewer} THEN
       (SELECT f.name FROM follow_up_forms f
         WHERE f.id = e.entity_id AND f.organization_id = e.organization_id) END
@@ -142,9 +144,19 @@ export class AuditEventQueryRepository {
     if (filter.actorType) add((p) => `e.actor_type = ${p}`, filter.actorType);
     if (filter.severity) add((p) => `(${SEVERITY}) = ${p}`, filter.severity);
     if (filter.search) {
-      params.push(`%${escapeLike(filter.search.term)}%`, filter.search.actions);
+      params.push(
+        `%${escapeLike(filter.search.term)}%`,
+        filter.search.actions,
+        filter.viewerOrganizationId,
+      );
+      const term = `$${params.length - 2}`;
+      const actions = `$${params.length - 1}`;
+      const viewer = `$${params.length}`;
+
+      // Nome mascarado (outra organizacao) nao pode ser descoberto pela busca.
       conditions.push(
-        `(actor.name ILIKE $${params.length - 1} OR e.action = ANY($${params.length}::varchar[]))`,
+        `((actor.name ILIKE ${term} AND e.organization_id = ${viewer}::uuid)
+          OR e.action = ANY(${actions}::varchar[]))`,
       );
     }
 

@@ -59,7 +59,7 @@ export class AuditEventFilterQueryDto extends PickType(
   @ApiPropertyOptional({
     maxLength: 100,
     description:
-      'Busca no nome do responsavel ou no codigo/rotulo da acao, sem diferenciar maiusculas (rotulo tambem sem acento).',
+      'Busca no nome do responsavel (so na organizacao da sessao) ou no codigo/rotulo da acao, sem diferenciar maiusculas (rotulo tambem sem acento).',
   })
   @IsOptional()
   @Transform(trim)
@@ -85,7 +85,11 @@ export class AuditRefDto {
   @ApiProperty({ format: 'uuid' })
   id!: string;
 
-  @ApiProperty({ example: 'Nome Exemplo' })
+  @ApiProperty({
+    example: 'Nome Exemplo',
+    description:
+      'Nome da organizacao ou do responsavel. Para o master, o responsavel de outra organizacao sai mascarado ("P**** L***").',
+  })
   name!: string;
 }
 
@@ -124,7 +128,7 @@ export class AuditEntityDto {
     nullable: true,
     example: 'Paciente Exemplo',
     description:
-      'Nome do usuario, organizacao, paciente, formulario ou medicamento; nulo nos demais tipos e, para o master, nos nomes clinicos de outra organizacao.',
+      'Nome do usuario, organizacao, paciente, formulario ou medicamento; nulo nos demais tipos. Para o master, em outra organizacao, nome de usuario e paciente sai mascarado ("P**** L***") e de formulario e medicamento sai nulo.',
   })
   label!: string | null;
 }

@@ -9,6 +9,7 @@ import type {
   AuditEventDetailDto,
   AuditEventDto,
 } from '@/modules/Audit/dtos/auditEvent.dto';
+import { maskPersonName } from '@/modules/Audit/policies/auditPersonalData.policy';
 
 import {
   bootNotificationApp,
@@ -325,7 +326,7 @@ describeWithDatabase('consulta da auditoria (BE-23, UC06, e2e)', () => {
   });
 
   describe('master da plataforma', () => {
-    it('ve todas as organizacoes, sem nome clinico de outra organizacao', async () => {
+    it('ve todas as organizacoes com os nomes de pessoas mascarados', async () => {
       const events = dataOf<AuditEventDto[]>(
         await list(t.masterToken, `${OCTOBER}&action=patient.created`),
       );
@@ -335,10 +336,24 @@ describeWithDatabase('consulta da auditoria (BE-23, UC06, e2e)', () => {
         ids.patientEventA,
       ]);
       expect(events.map((e) => e.entity)).toEqual([
-        { type: 'patient', id: ids.patientB, label: null },
-        { type: 'patient', id: ids.patientA, label: null },
+        { type: 'patient', id: ids.patientB, label: 'P******* B***' },
+        { type: 'patient', id: ids.patientA, label: 'P******* A***' },
       ]);
-      expect(events[0].actor.user?.name).toBe(`Usuario profissional ${B.code}`);
+      expect(events[0].actor.user).toEqual({
+        id: B.users.professional,
+        name: maskPersonName(`Usuario profissional ${B.code}`),
+      });
+      expect(events[0].organization.name).toBe(`Organizacao ${B.code}`);
+      expect(JSON.stringify(events)).not.toContain('Paciente');
+    });
+
+    it('a busca do master nao procura nome de pessoa de outra organizacao', async () => {
+      expect(
+        await listIds(t.masterToken, `${OCTOBER}&search=profissional`),
+      ).toEqual([]);
+      expect(
+        await listIds(t.masterToken, `${OCTOBER}&search=cadastrou%20paciente`),
+      ).toEqual([ids.patientEventB, ids.patientEventA]);
     });
 
     it('filtra por organizacao e detalha evento de qualquer uma', async () => {
@@ -354,6 +369,9 @@ describeWithDatabase('consulta da auditoria (BE-23, UC06, e2e)', () => {
 
       expect(detail.status).toBe(200);
       expect(dataOf<AuditEventDetailDto>(detail).organization.id).toBe(B.id);
+      expect(dataOf<AuditEventDetailDto>(detail).entity.label).toBe(
+        'P******* B***',
+      );
     });
   });
 
@@ -468,6 +486,7 @@ describeWithDatabase('consulta da auditoria (BE-23, UC06, e2e)', () => {
       expect(response.status).toBe(200);
       expect(response.text.trimEnd().split('\r\n')).toHaveLength(3);
       expect(response.text).not.toContain('Paciente Alfa');
+      expect(response.text).toContain(';P******* A***;');
 
       const platform = await t.scalar(
         "SELECT id AS value FROM organizations WHERE kind = 'platform'",

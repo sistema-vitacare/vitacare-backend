@@ -6,6 +6,7 @@ import { todayInBrazil } from '@/modules/Medication/policies/medicationSchedule.
 
 import { AuditErrors } from '../audit.errors';
 import type { AuditEventFilterQueryDto } from '../dtos/auditEvent.dto';
+import { maskForeignPersonalData } from '../policies/auditPersonalData.policy';
 import { resolveAuditFilter } from '../policies/auditFilter.policy';
 import { AuditEventQueryRepository } from '../repositories/auditEventQuery.repository';
 import { AuditCsvService } from '../services/auditCsv.service';
@@ -42,7 +43,9 @@ export class ExportAuditEventsUseCase {
     let file: Buffer;
 
     try {
-      file = this.csv.render(rows);
+      file = this.csv.render(
+        rows.map((row) => maskForeignPersonalData(row, ctx.organizationId)),
+      );
     } catch (error) {
       throw new DomainException({
         ...AuditErrors.EXPORT_FAILED,

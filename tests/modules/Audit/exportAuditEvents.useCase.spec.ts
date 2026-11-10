@@ -40,7 +40,9 @@ describe('exportacao da auditoria (BE-23, UC06 passo 5)', () => {
   });
 
   it('gera o CSV, audita sem o termo da busca e entrega como anexo', async () => {
-    repo.listAll.mockResolvedValue([{}, {}] as never);
+    const own = { organizationId: ctx.organizationId };
+
+    repo.listAll.mockResolvedValue([own, own] as never);
 
     const file = await useCase.execute(
       {

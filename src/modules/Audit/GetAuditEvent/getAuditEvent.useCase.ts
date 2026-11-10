@@ -7,6 +7,7 @@ import { isPlatformContext } from '@/modules/Organization/policies/organization.
 import { AuditErrors } from '../audit.errors';
 import type { AuditEventDetailDto } from '../dtos/auditEvent.dto';
 import { toAuditEventDetailResponse } from '../parsers/auditEvent.parser';
+import { maskForeignPersonalData } from '../policies/auditPersonalData.policy';
 import { AuditEventQueryRepository } from '../repositories/auditEventQuery.repository';
 
 /** UC06 passo 5: detalhe com os valores gravados. */
@@ -31,6 +32,8 @@ export class GetAuditEventUseCase {
       });
     }
 
-    return toAuditEventDetailResponse(row);
+    return toAuditEventDetailResponse(
+      maskForeignPersonalData(row, ctx.organizationId),
+    );
   }
 }

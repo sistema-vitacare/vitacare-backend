@@ -9,6 +9,7 @@ import type {
   ListAuditEventsQueryDto,
 } from '../dtos/auditEvent.dto';
 import { toAuditEventResponse } from '../parsers/auditEvent.parser';
+import { maskForeignPersonalData } from '../policies/auditPersonalData.policy';
 import { resolveAuditFilter } from '../policies/auditFilter.policy';
 import { AuditEventQueryRepository } from '../repositories/auditEventQuery.repository';
 import { AUDIT_EMPTY_MESSAGE } from '../types/auditEvent.types';
@@ -29,7 +30,13 @@ export class ListAuditEventsUseCase {
       (query.page - 1) * query.limit,
       query.limit,
     );
-    const page = paginate(rows.map(toAuditEventResponse), total, query);
+    const page = paginate(
+      rows.map((row) =>
+        toAuditEventResponse(maskForeignPersonalData(row, ctx.organizationId)),
+      ),
+      total,
+      query,
+    );
 
     if (total === 0) page.extras.message = AUDIT_EMPTY_MESSAGE;
 
