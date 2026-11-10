@@ -5,8 +5,7 @@ import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import type Redis from 'ioredis';
 import { LoggerModule } from 'nestjs-pino';
 import { AppController } from './app.controller';
-import { redactRequestLog } from './common/http/logRedaction';
-import { requestIdFromHeaders } from './common/http/requestId';
+import { buildHttpLoggerOptions } from './common/http/httpLogger.options';
 import appConfig from './config/app.config';
 import authConfig from './config/auth.config';
 import databaseConfig from './config/database.config';
@@ -43,18 +42,6 @@ import { QueueModule } from './queue/queue.module';
 import { RedisModule } from './redis/redis.module';
 import { StorageModule } from './storage/storage.module';
 
-// pino-pretty e devDependency: a imagem de runtime instala com --omit=dev e nao
-// o tem. Fora de producao usamos o log formatado quando o pacote existe e
-// caimos em JSON puro quando nao existe, em vez de derrubar o boot.
-function prettyTransport() {
-  try {
-    require.resolve('pino-pretty');
-    return { target: 'pino-pretty', options: { singleLine: true } };
-  } catch {
-    return undefined;
-  }
-}
-
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -80,25 +67,10 @@ function prettyTransport() {
     LoggerModule.forRootAsync({
       inject: [ConfigService],
       useFactory: (config: ConfigService) => ({
-        pinoHttp: {
+        pinoHttp: buildHttpLoggerOptions({
           level: config.getOrThrow<string>('app.logLevel'),
-          // Em producao o log vai em JSON puro para o coletor de logs.
-          transport:
-            config.getOrThrow<string>('app.environment') === 'production'
-              ? undefined
-              : prettyTransport(),
-          genReqId: requestIdFromHeaders,
-          serializers: { req: redactRequestLog },
-          redact: [
-            'req.headers.authorization',
-            'req.headers.cookie',
-            'req.headers["x-api-key"]',
-          ],
-          autoLogging: {
-            ignore: (req: { url?: string }) =>
-              req.url === '/health/live' || req.url === '/health/ready',
-          },
-        },
+          environment: config.getOrThrow<string>('app.environment'),
+        }),
       }),
     }),
     ThrottlerModule.forRootAsync({
