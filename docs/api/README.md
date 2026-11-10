@@ -1,7 +1,7 @@
 ---
 title: Manual de integração da API VitaCare
 status: atual
-updated: 2026-11-09
+updated: 2026-11-10
 ---
 
 # Manual de integração da API VitaCare
@@ -406,6 +406,7 @@ Escrita pode acrescentar `meta.message`:
 | `GET /api/v1/follow-ups/:followUpId/attachments/:attachmentId/content` | Conteúdo binário do anexo; os erros continuam no formato JSON. |
 | `DELETE /api/v1/follow-ups/:followUpId/attachments/:attachmentId` | `204 No Content`, sem corpo. |
 | `GET /api/v1/patients/:patientId/report/pdf` | PDF binário do relatório; os erros continuam no formato JSON. |
+| `GET /api/v1/audit-events/export` | CSV da auditoria (UTF-8 com BOM); os erros continuam no formato JSON. |
 
 ### Formato de erro
 
@@ -481,9 +482,29 @@ Erro inesperado suprime o `detail` e não expõe a causa:
 
 Códigos transversais de `error.code`: `BAD_REQUEST`, `VALIDATION_FAILED`, `UNAUTHENTICATED`, `FORBIDDEN`, `NOT_FOUND`, `CONFLICT`, `RATE_LIMITED`, `INTERNAL_ERROR`, `SERVICE_UNAVAILABLE`. Cada módulo declara os seus em `<modulo>.errors.ts` e a nota do endpoint lista os possíveis por status.
 
-### Paginação
+### Paginação, filtros e períodos
 
-`PaginationQueryDto` vale para toda rota de listagem: `page` inteiro mínimo 1, padrão 1; `limit` inteiro de 1 a 100, padrão 20. O resultado alimenta `meta.pagination`. **Nenhuma rota atual recebe esses parâmetros.** Cada rota futura documenta seus próprios filtros, ordenação e limites antes de ser publicada.
+Toda listagem paginada recebe `page` (inteiro, mínimo 1, padrão 1) e `limit` (inteiro de 1 a 100, padrão 20) e devolve `meta.pagination` (`page`, `limit`, `total`, `totalPages`). Página além da última responde `200` com `data: []` e o `total` real. São paginadas: `GET /organizations`, `/plan-change-requests`, `/users`, `/patients`, `/patient-links`, `/patient-links/eligible-users`, `/forms`, `/follow-ups`, `/alert-rules`, `/alerts`, `/medications`, `/notifications` e `/audit-events`. Os anexos de um registro (no máximo 5) e o catálogo de planos saem inteiros, sem `meta.pagination`.
+
+Filtros são parâmetros de query combinados com E; a nota de cada rota lista os aceitos, a ordenação fixa e os limites. Parâmetro desconhecido ou fora do formato responde `422 VALIDATION_FAILED` com o item em `fields`. Resultado vazio é sempre `200` com lista vazia, nunca `404`.
+
+Períodos (`from`/`to` em histórico, evolução, relatório, painel e auditoria) são dias `AAAA-MM-DD` inclusivos no fuso `America/Sao_Paulo`; a regra de padrão, máximo de 366 dias e `422 PERIOD_TOO_LONG` está na nota de cada rota. Instantes nas respostas saem em ISO 8601 UTC.
+
+## Guia de integração dos clientes (desktop e mobile)
+
+A mesma API e os mesmos contratos atendem o frontend React/PWA em computador, tablet e celular (RF019, RNF002). O backend não diferencia dispositivo nem navegador: não lê `User-Agent`, não tem rota ou formato por plataforma e não mantém estado de tela. Responsividade, layout e compatibilidade visual com Chrome, Edge, Safari e Firefox (RNF001–003) são validadas no frontend.
+
+**Origem e CORS.** O frontend de outra origem só é aceito se estiver em `CORS_ORIGINS`; em produção, lista vazia desliga o CORS. O preflight libera `Authorization` e `Content-Type`, e a resposta expõe `Content-Disposition`, para o navegador entregar ao frontend o nome dos arquivos baixados. A sessão vai no header `Authorization: Bearer <token>`, não em cookie, então `CORS_CREDENTIALS` fica `false`.
+
+**Sessão.** Faça login, guarde o token só pelo tempo da sessão e envie-o em toda rota protegida. `401` em qualquer chamada significa sessão encerrada (logout, expiração, inativação, organização inativada ou troca de senha): volte ao login. Com `data.state = password_change_required`, só [primeiro acesso](endpoints/auth-primeiro-acesso.md) e [logout](endpoints/auth-logout.md) respondem. `403` é falta de permissão do perfil; `404` cobre recurso inexistente, de outra organização ou de paciente sem vínculo, sem distinção.
+
+**Erros por campo.** `422` traz `error.fields` com `field` (campo aninhado como `pai.filho`), `code` e `message`; use-os para marcar o campo no formulário. Os demais erros trazem só `error.code` estável e `error.message` exibível. Trate pelo `code`, cite `meta.requestId` ao reportar e espere `429 RATE_LIMITED` se o limite de requisições estourar.
+
+**Envio de arquivo.** O anexo vai em `multipart/form-data`, campo `file`, um arquivo por requisição: JPEG, PNG, WEBP ou PDF detectados pelo conteúdo, até 10 MiB ([enviar anexo](endpoints/follow-up-attachments-enviar.md)).
+
+**Downloads.** As três rotas binárias são o [anexo](endpoints/follow-up-attachments-baixar.md), o [PDF do relatório](endpoints/patients-relatorio-pdf.md) e o [CSV da auditoria](endpoints/audit-events-exportar.md). Todas exigem Bearer, então o link direto não funciona: busque com `fetch` e o header, confira `response.ok` e o `Content-Type` (erro chega em JSON), leia o nome em `Content-Disposition: attachment; filename="..."` e entregue o `Blob` ao usuário. As respostas saem com `Cache-Control: private, no-store`, cada pedido é reautorizado, e PDF e CSV são gerados na hora: em falha (`500`), repita o pedido.
+
+**Mesmo comportamento em qualquer cliente.** Paginação, filtros, períodos e o recorte por perfil (inclusive a visão mascarada do familiar) são aplicados no servidor e valem igual para desktop e mobile.
 
 ## Manutenção do manual
 

@@ -3,7 +3,7 @@ title: Inativar regra de alerta
 status: atual
 updated: 2026-11-05
 method: POST
-path: /api/v1/alert-rules/:ruleId/deactivate
+path: /api/v1/alert-rules/{ruleId}/deactivate
 source: src/modules/Alert/alert.controller.ts
 ---
 

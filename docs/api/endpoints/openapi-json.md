@@ -1,7 +1,7 @@
 ---
 title: Contrato OpenAPI gerado
 status: atual
-updated: 2026-09-17
+updated: 2026-11-10
 method: GET
 path: /api/docs-json
 source: src/app.setup.ts
@@ -11,7 +11,7 @@ source: src/app.setup.ts
 
 ## Propósito e acesso
 
-Entrega o documento OpenAPI gerado no boot a partir dos controllers e DTOs, para integração e geração de clientes. É pública neste checkout e só existe com `SWAGGER_ENABLED=true`. O caminho depende de `API_PREFIX`/`SWAGGER_PATH`; a versão das operações depende de `API_VERSION`. O JSON reflete as rotas registradas naquela execução, não módulos apenas planejados.
+Entrega o documento OpenAPI gerado no boot a partir dos controllers e DTOs, para integração e geração de clientes. É pública neste checkout e só existe com `SWAGGER_ENABLED=true`. O caminho depende de `API_PREFIX`/`SWAGGER_PATH`; a versão das operações depende de `API_VERSION`. O JSON reflete as rotas registradas naquela execução, não módulos apenas planejados. É o único formato publicado: desde 2026-11-10 (BE-24) não existe versão YAML, e `GET /api/docs-yaml` responde `404`. O teste `tests/app/apiContract.e2e-spec.ts` confere este documento contra as rotas reais e o manual.
 
 ## Request
 
