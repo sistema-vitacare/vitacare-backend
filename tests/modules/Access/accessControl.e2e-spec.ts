@@ -22,6 +22,7 @@ import { SyncTenantAccessProfiles1790300000000 } from '@/database/migrations/179
 import { AddPlanTermsAndChangeRequests1790500000000 } from '@/database/migrations/1790500000000-AddPlanTermsAndChangeRequests';
 import { ApplyPlanCatalogRules1790600000000 } from '@/database/migrations/1790600000000-ApplyPlanCatalogRules';
 import { CreatePatients1790700000000 } from '@/database/migrations/1790700000000-CreatePatients';
+import { AuditEventQuery1791700000000 } from '@/database/migrations/1791700000000-AuditEventQuery';
 import { runPlatformSeed } from '@/database/seeds/platformSeed';
 import { SnakeNamingStrategy } from '@/database/snakeNaming.strategy';
 import { AccessController } from '@/modules/Access/access.controller';
@@ -79,6 +80,7 @@ const MIGRATIONS = [
   AddPlanTermsAndChangeRequests1790500000000,
   ApplyPlanCatalogRules1790600000000,
   CreatePatients1790700000000,
+  AuditEventQuery1791700000000,
 ];
 
 const TRUNCATE_ALL =

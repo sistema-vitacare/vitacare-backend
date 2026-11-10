@@ -1,6 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { DataSource, EntityManager } from 'typeorm';
 
+import { insertAuditEvent } from '@/modules/Audit/repositories/auditEvent.repository';
+
 import type { AuthSessionType } from '../entities/authSession.entity';
 
 /** `UPDATE`/`INSERT` do driver `pg` devolvem `[linhas, afetadas]`. */
@@ -371,18 +373,13 @@ export class AuthTransactionRepository {
       requestId: string | null;
     },
   ): Promise<void> {
-    await manager.query<WriteResult>(
-      `INSERT INTO audit_events
-         (organization_id, actor_type, actor_user_id, action, entity_type, entity_id, request_id)
-       VALUES ($1, $2, $3, $4, 'user', $5, $6)`,
-      [
-        event.organizationId,
-        event.actorUserId === null ? 'system' : 'user',
-        event.actorUserId,
-        event.action,
-        event.entityId,
-        event.requestId,
-      ],
-    );
+    await insertAuditEvent(manager, {
+      organizationId: event.organizationId,
+      actorUserId: event.actorUserId,
+      action: event.action,
+      entityType: 'user',
+      entityId: event.entityId,
+      requestId: event.requestId,
+    });
   }
 }

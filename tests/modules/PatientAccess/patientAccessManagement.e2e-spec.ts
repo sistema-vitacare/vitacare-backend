@@ -23,6 +23,7 @@ import { AddPlanTermsAndChangeRequests1790500000000 } from '@/database/migration
 import { ApplyPlanCatalogRules1790600000000 } from '@/database/migrations/1790600000000-ApplyPlanCatalogRules';
 import { CreatePatients1790700000000 } from '@/database/migrations/1790700000000-CreatePatients';
 import { AddPatientCareLinks1790800000000 } from '@/database/migrations/1790800000000-AddPatientCareLinks';
+import { AuditEventQuery1791700000000 } from '@/database/migrations/1791700000000-AuditEventQuery';
 import { runPlatformSeed } from '@/database/seeds/platformSeed';
 import { SnakeNamingStrategy } from '@/database/snakeNaming.strategy';
 import type { TenantProfileCode } from '@/modules/Access/access.permissions';
@@ -66,6 +67,7 @@ const MIGRATIONS = [
   ApplyPlanCatalogRules1790600000000,
   CreatePatients1790700000000,
   AddPatientCareLinks1790800000000,
+  AuditEventQuery1791700000000,
 ];
 
 const TRUNCATE_ALL =

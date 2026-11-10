@@ -22,6 +22,7 @@ import { AddUserPendingCheck1790400000000 } from '@/database/migrations/17904000
 import { AddPlanTermsAndChangeRequests1790500000000 } from '@/database/migrations/1790500000000-AddPlanTermsAndChangeRequests';
 import { ApplyPlanCatalogRules1790600000000 } from '@/database/migrations/1790600000000-ApplyPlanCatalogRules';
 import { CreatePatients1790700000000 } from '@/database/migrations/1790700000000-CreatePatients';
+import { AuditEventQuery1791700000000 } from '@/database/migrations/1791700000000-AuditEventQuery';
 import { runPlatformSeed } from '@/database/seeds/platformSeed';
 import { SnakeNamingStrategy } from '@/database/snakeNaming.strategy';
 import { AuthGuard } from '@/modules/Auth/guards/auth.guard';
@@ -60,6 +61,7 @@ const MIGRATIONS = [
   AddPlanTermsAndChangeRequests1790500000000,
   ApplyPlanCatalogRules1790600000000,
   CreatePatients1790700000000,
+  AuditEventQuery1791700000000,
 ];
 
 const TRUNCATE_ALL =
@@ -1172,6 +1174,7 @@ describeWithDatabase('planos de uso em PostgreSQL (e2e)', () => {
 
   describe('migration', () => {
     it('reverte as regras do Quadro 2 sem perder planos nem termos', async () => {
+      await dataSource.undoLastMigration(); // AuditEventQuery (BE-23), a ultima
       await dataSource.undoLastMigration(); // CreatePatients, que vem depois
       await dataSource.undoLastMigration();
 
@@ -1197,6 +1200,7 @@ describeWithDatabase('planos de uso em PostgreSQL (e2e)', () => {
     });
 
     it('reverte e reaplica com dados, mantendo o plano do catalogo em uso', async () => {
+      await dataSource.undoLastMigration(); // AuditEventQuery (BE-23)
       await dataSource.undoLastMigration(); // CreatePatients
       await dataSource.undoLastMigration();
       await dataSource.undoLastMigration();

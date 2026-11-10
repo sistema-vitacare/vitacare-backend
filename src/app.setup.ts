@@ -11,6 +11,7 @@ import type { NextFunction, Request, Response } from 'express';
 import helmet from 'helmet';
 import { AllExceptionsFilter } from './common/filters/allExceptions.filter';
 import { BEARER_SECURITY_SCHEME } from './common/http/bearerAuth';
+import { RequestMetadataInterceptor } from './common/http/requestMetadata.interceptor';
 import { ResponseEnvelopeInterceptor } from './common/http/responseEnvelope.interceptor';
 import { validationExceptionFactory } from './common/http/validationException.factory';
 
@@ -105,7 +106,10 @@ export const setupApp = (
       exceptionFactory: validationExceptionFactory,
     }),
   );
-  app.useGlobalInterceptors(new ResponseEnvelopeInterceptor(excludedPaths));
+  app.useGlobalInterceptors(
+    new RequestMetadataInterceptor(),
+    new ResponseEnvelopeInterceptor(excludedPaths),
+  );
   app.useGlobalFilters(new AllExceptionsFilter(excludedPaths));
   app.enableShutdownHooks();
 

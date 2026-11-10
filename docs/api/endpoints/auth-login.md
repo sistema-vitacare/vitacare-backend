@@ -1,7 +1,7 @@
 ---
 title: Login em uma organização
 status: atual
-updated: 2026-11-03
+updated: 2026-11-09
 method: POST
 path: /api/v1/auth/login
 source: src/modules/Auth/auth.controller.ts
@@ -79,7 +79,7 @@ curl -i -X POST 'https://api.example.com/api/v1/auth/login' \
 
 Efeitos da chamada bem-sucedida: cria a sessão, atualiza `users.last_access_at` e grava auditoria (`auth.login_succeeded` ou `auth.first_access_started`) na organização do usuário. Nada disso vaza na resposta.
 
-A tentativa **recusada** também é auditada, como `auth.login_failed`, desde que o código informado corresponda a uma organização existente. Quando o e-mail pertence a uma conta daquela organização, o evento sai com autor (`actor_type = 'user'`); quando não pertence, sai como evento de sistema, sem autor e sem entidade. Código de organização inexistente não gera evento, porque `audit_events.organization_id` é obrigatório e referencia a tabela. Nenhum dado digitado na tentativa — e-mail, senha ou IP — é copiado para a auditoria; o `request_id` liga o evento ao log da requisição. Nada disso muda a resposta, que continua idêntica em todos os casos.
+A tentativa **recusada** também é auditada, como `auth.login_failed`, desde que o código informado corresponda a uma organização existente. Quando o e-mail pertence a uma conta daquela organização, o evento sai com autor (`actor_type = 'user'`); quando não pertence, sai como evento de sistema, sem autor e sem entidade. Código de organização inexistente não gera evento, porque `audit_events.organization_id` é obrigatório e referencia a tabela. Nenhum dado digitado na tentativa — e-mail ou senha — é copiado para a auditoria; o `request_id` liga o evento ao log da requisição. Desde o BE-23 todo evento guarda o IP do cliente (pela regra `TRUST_PROXY`, não por um campo da requisição) e, quando há autor, o perfil dele no instante da ação; ver [auditoria](audit-events-listar.md). Nada disso muda a resposta, que continua idêntica em todos os casos.
 
 ## Erros
 

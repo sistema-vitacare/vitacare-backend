@@ -1,6 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 
+import { insertAuditEvent } from '@/modules/Audit/repositories/auditEvent.repository';
+
 /** `UPDATE`/`INSERT` do driver `pg` devolvem `[linhas, afetadas]`. */
 type WriteResult = [unknown, number];
 
@@ -123,12 +125,14 @@ export class PasswordResetRepository {
         [token.userId, token.organizationId],
       );
 
-      await manager.query<WriteResult>(
-        `INSERT INTO audit_events
-           (organization_id, actor_type, actor_user_id, action, entity_type, entity_id)
-         VALUES ($1, 'user', $2, 'auth.password_recovered', 'user', $2)`,
-        [token.organizationId, token.userId],
-      );
+      await insertAuditEvent(manager, {
+        organizationId: token.organizationId,
+        actorUserId: token.userId,
+        action: 'auth.password_recovered',
+        entityType: 'user',
+        entityId: token.userId,
+        requestId: null,
+      });
 
       return true;
     });
