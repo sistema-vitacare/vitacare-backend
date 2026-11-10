@@ -1,5 +1,5 @@
 import { applyDecorators } from '@nestjs/common';
-import { ApiExtraModels, ApiResponse } from '@nestjs/swagger';
+import { ApiExtraModels, ApiResponse, getSchemaPath } from '@nestjs/swagger';
 import { ErrorResponseDto } from './envelope.dto';
 
 export interface ApiErrorGroup {
@@ -11,7 +11,9 @@ export interface ApiErrorGroup {
 
 /**
  * Documenta os erros possiveis da rota, agrupados por status. Os codigos vem do
- * catalogo `<modulo>.errors.ts`; nao inventar codigo no local de uso.
+ * catalogo `<modulo>.errors.ts`; nao inventar codigo no local de uso. O tipo
+ * JSON e explicito porque, numa rota de arquivo, o `@ApiProduces` da rota
+ * seria copiado para o erro, que sai sempre em JSON.
  */
 export const ApiErrors = (...groups: ApiErrorGroup[]) =>
   applyDecorators(
@@ -19,9 +21,13 @@ export const ApiErrors = (...groups: ApiErrorGroup[]) =>
     ...groups.map((group) =>
       ApiResponse({
         status: group.status,
-        type: ErrorResponseDto,
         description:
           group.description ?? `Codigos possiveis: ${group.codes.join(', ')}`,
+        content: {
+          'application/json': {
+            schema: { $ref: getSchemaPath(ErrorResponseDto) },
+          },
+        },
       }),
     ),
   );

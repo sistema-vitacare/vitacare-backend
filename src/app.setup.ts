@@ -33,17 +33,21 @@ export interface AppSetupOptions {
 /**
  * Sem origens configuradas: libera tudo em desenvolvimento e desliga o CORS em
  * producao. Um frontend so passa a ser aceito quando entra em CORS_ORIGINS.
+ * O navegador so entrega ao frontend de outra origem o nome do arquivo baixado
+ * (anexo, PDF, CSV) se `Content-Disposition` estiver exposto.
  */
 export const resolveCors = (
   origins: string[],
   credentials: boolean,
   isProduction: boolean,
 ): CorsOptions | false => {
+  const exposedHeaders = ['Content-Disposition'];
+
   if (origins.length > 0) {
-    return { origin: origins, credentials };
+    return { origin: origins, credentials, exposedHeaders };
   }
 
-  return isProduction ? false : { origin: true, credentials };
+  return isProduction ? false : { origin: true, credentials, exposedHeaders };
 };
 
 /**
@@ -132,7 +136,10 @@ export const setupApp = (
         .build(),
     );
 
+    // So o JSON: o contrato publicado e `/docs-json`; o YAML seria uma rota a
+    // mais sem nota no manual.
     SwaggerModule.setup(docsPath, app, document, {
+      raw: ['json'],
       swaggerOptions: { persistAuthorization: true },
     });
   }

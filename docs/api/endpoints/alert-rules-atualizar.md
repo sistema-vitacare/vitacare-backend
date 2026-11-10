@@ -3,7 +3,7 @@ title: Editar regra de alerta
 status: atual
 updated: 2026-11-05
 method: PATCH
-path: /api/v1/alert-rules/:ruleId
+path: /api/v1/alert-rules/{ruleId}
 source: src/modules/Alert/alert.controller.ts
 ---
 

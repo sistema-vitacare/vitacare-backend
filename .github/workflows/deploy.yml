@@ -92,10 +92,13 @@ jobs:
       # Com as duas URLs, as suítes de schema, seed e rate limit rodam contra o
       # banco e o Redis de serviço, descartáveis por definição. O nome do banco
       # e o host local são exigidos pela trava dos próprios testes.
+      # VITACARE_TEST_REQUIRE_INFRA reprova a etapa se faltar URL ou serviço,
+      # ou se qualquer teste for pulado (BE-24).
       - run: npm run test:e2e -- --runInBand
         env:
           VITACARE_TEST_DATABASE_URL: postgresql://vitacare:secret@127.0.0.1:5432/vitacare_schema_test
           VITACARE_TEST_REDIS_URL: redis://127.0.0.1:6379/15
+          VITACARE_TEST_REQUIRE_INFRA: "true"
 
   imagem:
     needs: testes
