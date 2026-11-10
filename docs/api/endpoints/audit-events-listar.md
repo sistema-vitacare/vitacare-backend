@@ -13,7 +13,7 @@ source: src/modules/Audit/audit.controller.ts
 
 Consulta da trilha de auditoria (RF017; UC06 passos 1–4; RNF007; Figura 45; BE-23). Cada entrada mostra data e hora, responsável (usuário ou Sistema/Automação) com o **perfil no instante da ação**, ação com rótulo e gravidade, item relacionado e IP. Filtro sem resultado é o fluxo alternativo do UC06: `200` com lista vazia e `meta.message`.
 
-Decisões de Mateus em 2026-11-09: perfil e IP gravados no momento da ação (eventos anteriores ao BE-23 saem com os dois nulos); gravidade por catálogo fixo por ação; leituras não são auditadas; o **master consulta todas as organizações e o admin só a própria**; item = tipo + id + nome legível. Decisão de Mateus em 2026-11-09 (segunda rodada): o master vê os **dados pessoais de outra organização mascarados** — nome do responsável, do paciente e do usuário afetado mascarado com a inicial de cada palavra (`"Paulo Lima"` → `"P**** L***"`); o nome da organização e o IP saem completos. Chamada do agente pendente de confirmação: nome de formulário e medicamento de outra organização sai `null`, e a busca por nome só procura na organização da sessão, para o nome mascarado não ser descoberto por tentativa.
+Decisões de Mateus em 2026-11-09: perfil e IP gravados no momento da ação (eventos anteriores ao BE-23 saem com os dois nulos); gravidade por catálogo fixo por ação; leituras não são auditadas; o **master consulta todas as organizações e o admin só a própria**; item = tipo + id + nome legível. Decisão de Mateus em 2026-11-09 (segunda rodada): o master vê os **dados pessoais de outra organização mascarados** — nome do responsável, do paciente e do usuário afetado mascarado com a inicial de cada palavra (`"Paulo Lima"` → `"P**** L***"`); o nome da organização e o IP saem completos. Nome de formulário e medicamento sai completo para o master (decisão de Mateus, 2026-11-09: "o master pode ver tudo"). Chamada do agente pendente de confirmação: a busca por nome só procura na organização da sessão, para o nome mascarado não ser descoberto por tentativa.
 
 Acesso: `Bearer` com `audit_events:read` — `admin` (só eventos da organização da sessão) e `platform_admin` (todas). Profissional, cuidador e familiar recebem `403`. A consulta não é auditada.
 
@@ -102,7 +102,7 @@ Sem resultado: `"data": []`, `meta.pagination.total = 0` e `meta.message = "Nenh
 | `severity` | `info` \| `normal` \| `warning` \| `critical` | não | Do catálogo; em `alert.generated`, a severidade do alerta gerado. |
 | `entity.type` | texto | não | Tipo do item (`user`, `patient`, `follow_up_form`, `follow_up_record`, `alert`, `medication`, `organization`, ...). |
 | `entity.id` | uuid | sim | Item; `null` quando o evento não tem item (ex.: exportação da auditoria). |
-| `entity.label` | texto | sim | Nome do usuário, organização, paciente, formulário ou medicamento; `null` nos demais tipos e em item apagado. Para o master, em outra organização: usuário e paciente mascarados (`P**** L***`), formulário e medicamento `null`. |
+| `entity.label` | texto | sim | Nome do usuário, organização, paciente, formulário ou medicamento; `null` nos demais tipos e em item apagado. Para o master, em outra organização: usuário e paciente mascarados (`P**** L***`); formulário, medicamento e organização completos. |
 | `ipAddress` | texto IPv4/IPv6 | sim | IP do cliente pela regra `TRUST_PROXY`; `null` em evento de sistema/job e nos anteriores ao BE-23. |
 | `requestId` | texto | sim | Liga o evento ao log da requisição; `null` em job. |
 

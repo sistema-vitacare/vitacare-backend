@@ -14,21 +14,19 @@ import { insertAuditEvent } from './auditEvent.repository';
 const SEVERITY = auditSeveritySql('e.action', 'e.after_values');
 
 /**
- * Nome legivel do item. Nome de pessoa de outra organizacao e mascarado no
- * caso de uso; formulario e medicamento so na organizacao de quem consulta.
+ * Nome legivel do item, sempre da organizacao do evento. Nome de pessoa de
+ * outra organizacao e mascarado no caso de uso.
  */
-const entityLabel = (viewer: string) => `CASE e.entity_type
+const ENTITY_LABEL = `CASE e.entity_type
     WHEN 'user' THEN (SELECT u.name FROM users u
                        WHERE u.id = e.entity_id AND u.organization_id = e.organization_id)
     WHEN 'organization' THEN (SELECT eo.trade_name FROM organizations eo WHERE eo.id = e.entity_id)
     WHEN 'patient' THEN (SELECT p.name FROM patients p
                           WHERE p.id = e.entity_id AND p.organization_id = e.organization_id)
-    WHEN 'follow_up_form' THEN CASE WHEN e.organization_id = ${viewer} THEN
-      (SELECT f.name FROM follow_up_forms f
-        WHERE f.id = e.entity_id AND f.organization_id = e.organization_id) END
-    WHEN 'medication' THEN CASE WHEN e.organization_id = ${viewer} THEN
-      (SELECT m.name FROM medications m
-        WHERE m.id = e.entity_id AND m.organization_id = e.organization_id) END
+    WHEN 'follow_up_form' THEN (SELECT f.name FROM follow_up_forms f
+                                 WHERE f.id = e.entity_id AND f.organization_id = e.organization_id)
+    WHEN 'medication' THEN (SELECT m.name FROM medications m
+                             WHERE m.id = e.entity_id AND m.organization_id = e.organization_id)
   END`;
 
 const FROM = `FROM audit_events e
@@ -63,7 +61,6 @@ export class AuditEventQueryRepository {
        ORDER BY e.occurred_at DESC, e.id DESC
        LIMIT $${where.params.length + 1} OFFSET $${where.params.length + 2}`,
       [...where.params, take, skip],
-      filter.viewerOrganizationId,
     );
 
     return [rows, total];
@@ -85,19 +82,16 @@ export class AuditEventQueryRepository {
     return this.select(
       `${where.sql} ORDER BY e.occurred_at DESC, e.id DESC`,
       where.params,
-      filter.viewerOrganizationId,
     );
   }
 
   async findById(
     id: string,
     organizationId: string | null,
-    viewerOrganizationId: string,
   ): Promise<AuditEventRow | null> {
     const [row] = await this.select(
       'WHERE e.id = $1 AND ($2::uuid IS NULL OR e.organization_id = $2::uuid)',
       [id, organizationId],
-      viewerOrganizationId,
     );
 
     return row ?? null;
@@ -163,11 +157,7 @@ export class AuditEventQueryRepository {
     return { sql: `WHERE ${conditions.join('\n   AND ')}`, params };
   }
 
-  private select(
-    tail: string,
-    params: unknown[],
-    viewerOrganizationId: string,
-  ): Promise<AuditEventRow[]> {
+  private select(tail: string, params: unknown[]): Promise<AuditEventRow[]> {
     return this.query<AuditEventRow>(
       `SELECT e.id,
               e.occurred_at AS "occurredAt",
@@ -181,14 +171,14 @@ export class AuditEventQueryRepository {
               ${SEVERITY} AS severity,
               e.entity_type AS "entityType",
               e.entity_id AS "entityId",
-              ${entityLabel(`$${params.length + 1}::uuid`)} AS "entityLabel",
+              ${ENTITY_LABEL} AS "entityLabel",
               host(e.ip_address) AS "ipAddress",
               e.request_id AS "requestId",
               e.before_values AS "beforeValues",
               e.after_values AS "afterValues"
          ${FROM}
          ${tail}`,
-      [...params, viewerOrganizationId],
+      params,
     );
   }
 

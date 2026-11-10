@@ -22,7 +22,6 @@ export class GetAuditEventUseCase {
     const row = await this.events.findById(
       eventId,
       isPlatformContext(ctx) ? null : ctx.organizationId,
-      ctx.organizationId,
     );
 
     if (!row) {

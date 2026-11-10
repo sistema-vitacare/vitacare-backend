@@ -33,7 +33,7 @@ export interface AuditEventRow {
 export interface AuditEventFilter {
   /** `null`: todas as organizacoes (so o master). */
   organizationId: string | null;
-  /** Organizacao da sessao: nomes clinicos de outra organizacao saem nulos. */
+  /** Organizacao da sessao: a busca por nome so procura nela (nomes de fora saem mascarados). */
   viewerOrganizationId: string;
   period: { from: string; to: string };
   action?: string;

@@ -326,6 +326,41 @@ describeWithDatabase('consulta da auditoria (BE-23, UC06, e2e)', () => {
   });
 
   describe('master da plataforma', () => {
+    it('ve o nome de formulario e medicamento de outra organizacao', async () => {
+      const form = await t.scalar(
+        `INSERT INTO follow_up_forms (organization_id, name, status)
+         VALUES ($1, 'Sinais vitais', 'active') RETURNING id AS value`,
+        [B.id],
+      );
+      const medication = await t.scalar(
+        `INSERT INTO medications
+           (organization_id, patient_id, created_by_user_id, name, dose_amount, dose_unit)
+         VALUES ($1, $2, $3, 'Losartana', 50, 'mg') RETURNING id AS value`,
+        [B.id, ids.patientB, B.users.professional],
+      );
+
+      for (const [entityType, entityId, action] of [
+        ['follow_up_form', form, 'form.created'],
+        ['medication', medication, 'medication.created'],
+      ] as const) {
+        await event({
+          organizationId: B.id,
+          actorUserId: B.users.professional,
+          profile: 'professional',
+          action,
+          entityType,
+          entityId,
+          occurredAt: '2026-09-15T12:00:00Z',
+        });
+      }
+
+      const labels = dataOf<AuditEventDto[]>(
+        await list(t.masterToken, 'from=2026-09-15&to=2026-09-15'),
+      ).map((e) => e.entity.label);
+
+      expect(labels.sort()).toEqual(['Losartana', 'Sinais vitais']);
+    });
+
     it('ve todas as organizacoes com os nomes de pessoas mascarados', async () => {
       const events = dataOf<AuditEventDto[]>(
         await list(t.masterToken, `${OCTOBER}&action=patient.created`),

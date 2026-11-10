@@ -13,7 +13,7 @@ source: src/modules/Audit/audit.controller.ts
 
 Detalhe de um evento da [lista](audit-events-listar.md) (RF017; UC06 passo 5; BE-23): os mesmos campos da lista mais os valores anterior e novo **como foram gravados**. A gravação só guarda ids, códigos, nomes de campos alterados e contagens — nunca senha, token ou valor clínico. Por defesa em profundidade, o valor de qualquer chave com `password`, `token`, `secret` ou `hash` no nome sai como `********`, em qualquer nível.
 
-Acesso: `Bearer` com `audit_events:read`. O admin só alcança eventos da própria organização; evento de outra responde `404`. O master alcança qualquer organização, com os nomes de pessoas de outra organização mascarados (`P**** L***`) e formulário/medicamento `null`, como na lista. A consulta não é auditada.
+Acesso: `Bearer` com `audit_events:read`. O admin só alcança eventos da própria organização; evento de outra responde `404`. O master alcança qualquer organização, com os nomes de pessoas de outra organização mascarados (`P**** L***`) e o resto completo, como na lista. A consulta não é auditada.
 
 ## Request
 

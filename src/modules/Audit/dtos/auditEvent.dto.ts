@@ -128,7 +128,7 @@ export class AuditEntityDto {
     nullable: true,
     example: 'Paciente Exemplo',
     description:
-      'Nome do usuario, organizacao, paciente, formulario ou medicamento; nulo nos demais tipos. Para o master, em outra organizacao, nome de usuario e paciente sai mascarado ("P**** L***") e de formulario e medicamento sai nulo.',
+      'Nome do usuario, organizacao, paciente, formulario ou medicamento; nulo nos demais tipos. Para o master, em outra organizacao, nome de usuario e paciente sai mascarado ("P**** L***"); formulario, medicamento e organizacao saem completos.',
   })
   label!: string | null;
 }

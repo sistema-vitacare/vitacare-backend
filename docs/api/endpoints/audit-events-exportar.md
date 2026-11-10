@@ -13,7 +13,7 @@ source: src/modules/Audit/audit.controller.ts
 
 Exportação do UC06 passo 5 ("Exportar CSV" da Figura 45; RF017; BE-23). Decisões de Mateus em 2026-11-09: **CSV gerado na hora**, com os mesmos filtros da [lista](audit-events-listar.md), nada guardado no servidor; nova tentativa após falha = repetir o pedido (fluxo alternativo do UC06); limite de eventos por arquivo; a própria exportação vira evento auditado.
 
-Acesso: `Bearer` com `audit_events:export` — `admin` (só a própria organização) e `platform_admin` (todas, ou a de `organizationId`). Cada pedido é reautorizado. Para o master, os nomes de pessoas de outra organização saem mascarados (`P**** L***`) e formulário/medicamento vazios, como na lista.
+Acesso: `Bearer` com `audit_events:export` — `admin` (só a própria organização) e `platform_admin` (todas, ou a de `organizationId`). Cada pedido é reautorizado. Para o master, os nomes de pessoas de outra organização saem mascarados (`P**** L***`) e o resto completo, como na lista.
 
 ## Request
 
