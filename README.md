@@ -10,6 +10,7 @@ producao, o deploy e automatico pela `main` ([deploy na VPS](docs/deploy-vps.md)
 - [Configuracao](#configuracao)
 - [Executar com Docker](#executar-com-docker)
 - [Deploy de producao](#deploy-de-producao)
+- [Operacao: smoke, backup, restore e carga](#operacao-smoke-backup-restore-e-carga)
 - [Desenvolvimento local](#desenvolvimento-local)
 - [Rotas](#rotas)
 - [Manual de integracao da API](#manual-de-integracao-da-api)
@@ -67,15 +68,33 @@ VITACARE_ENV_FILE=.env.production HOST_PORT=8080 docker compose up -d
 
 ## Deploy de producao
 
-Merge na `main` → GitHub Actions (lint, build, unitarios e e2e contra PostgreSQL
-e Redis reais) → imagem `vitacare-backend` no GHCR → webhook do Portainer →
-stack `vitacare` com **um container**, `app-vitacare`, na porta `1050`. O
-entrypoint aplica as migrations pendentes (`RUN_MIGRATIONS=true`) e sobe a API.
+Merge na `main` → GitHub Actions (audit, lint, build, unitarios e e2e contra
+PostgreSQL e Redis reais) → homologacao efemera da imagem (deploy do zero,
+smoke completo, backup/restore, revert e rollback) → a **mesma** imagem no GHCR
+→ webhook do Portainer → stack `vitacare` com **um container**, `app-vitacare`,
+na porta `1050` → smoke de leitura na versao nova. O entrypoint aplica as
+migrations pendentes (`RUN_MIGRATIONS=true`) e sobe a API.
 
 PostgreSQL e Redis sao os da stack `infra` da VPS, alcancados pela rede
 docker. Passo a passo, pool, memoria, timeouts e rollback:
 [docs/deploy-vps.md](docs/deploy-vps.md). Variaveis da stack:
 `.env.production.example`.
+
+## Operacao: smoke, backup, restore e carga
+
+Scripts sem dependencia nova em `scripts/ops/` (BE-25); procedimento completo,
+metas e checklist em [docs/deploy-vps.md](docs/deploy-vps.md):
+
+| Script | Uso |
+| --- | --- |
+| `smoke.mjs` | `--mode read` (seguro em producao), `full` (so homologacao, `--allow-writes`), `verify` (apos restore/rollback) |
+| `backup.sh` / `restore.sh` | backup diario de banco **e** anexos juntos; restauracao conferida por `SHA256SUMS` |
+| `ci-homologation.sh` | o roteiro do job `homologacao`, rodavel localmente com Docker |
+| `load.mjs` | medicao do RNF008 contra homologacao (p95 500 ms / 1 s / 5 s) |
+
+Na imagem: `docker-entrypoint.sh revert` desfaz a ultima migration e
+`node dist/cli/storage-orphans.js [--delete]` lista ou apaga arquivos orfaos do
+volume.
 
 ## Desenvolvimento local
 
@@ -302,8 +321,15 @@ coletor; em desenvolvimento passam por `pino-pretty`. Cada requisicao recebe um
 id, ecoado em `meta.requestId`; um `X-Request-Id` valido vindo de um proxy e
 adotado, para correlacionar com o log dele.
 
-`authorization`, `cookie` e `x-api-key` sao redigidos automaticamente. As rotas
-de health nao poluem o log.
+`authorization`, `cookie`, `x-api-key`, o termo `search` e o
+`Content-Disposition` da resposta (nome original do anexo) sao redigidos
+automaticamente. As rotas de health nao poluem o log. Cada linha traz tambem
+`level_name` (`INFO`, `WARNING`, `ERROR`, `CRITICAL`), que o Alloy da VPS usa
+para o label `level` do Loki e os alertas de erro por stack.
+
+Com `UPTIME_KUMA_PUSH_URL`, um job da fila `operations` envia a cada 5 min um
+pulso ao monitor Push do Uptime Kuma, so com o PostgreSQL respondendo: prova
+que Redis, workers e banco estao vivos, o que `/health/live` nao prova.
 
 ## Seguranca
 

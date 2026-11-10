@@ -115,7 +115,7 @@ services:
     volumes:
       # Sobrevive a deploy e recriação do container; some só com
       # `docker volume rm`. Nunca servido direto: a API autoriza cada download.
-      # Backup semanal do volume: docs/deploy-vps.md.
+      # Backup diário junto com o banco: scripts/ops/backup.sh (docs/deploy-vps.md).
       - vitacare-storage:/app/storage
     ports:
       # 127.0.0.1 por padrão: o público entra pelo Nginx Proxy Manager (rede

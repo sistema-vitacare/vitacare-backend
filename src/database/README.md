@@ -27,6 +27,13 @@ a migration de producao usa o build em `dist/`. Validar `migration:show`,
 `migration:run` e `migration:revert` somente em banco descartavel antes de
 aplicar qualquer migration no ambiente alvo.
 
+Na imagem, `docker-entrypoint.sh migrate` aplica e `docker-entrypoint.sh revert`
+desfaz **uma** migration (a ultima), com conexao unica e sem timeout. O job
+`homologacao` do CI exercita `revert` + `migrate` e o rollback da imagem
+anterior sobre o schema novo a cada execucao. Em producao, revert nunca e
+automatico: backup antes (`scripts/ops/backup.sh`) e o plano de
+[docs/deploy-vps.md](../../docs/deploy-vps.md#migrations-e-rollback).
+
 ```bash
 npm run migration:create -- src/database/migrations/CreateAlgo
 npm run migration:generate -- src/database/migrations/CreateAlgo
