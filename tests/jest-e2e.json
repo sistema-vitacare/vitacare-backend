@@ -21,6 +21,10 @@
     "^@/(.*)$": "<rootDir>/src/$1"
   },
   "testEnvironment": "node",
-  "globalSetup": "<rootDir>/tests/ensureNodeVersion.cjs",
-  "maxWorkers": 1
+  "globalSetup": "<rootDir>/tests/e2eGlobalSetup.cjs",
+  "maxWorkers": 1,
+  "reporters": [
+    "default",
+    "<rootDir>/tests/skippedTestsReporter.cjs"
+  ]
 }
