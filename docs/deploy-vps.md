@@ -132,11 +132,14 @@ volume se chama `vitacare_vitacare-storage` (prefixo = nome da stack).
 ## Hierarquia de timeouts (crescente de dentro para fora)
 
 ```text
-statement_timeout (30s) < requestTimeout do Node (60s) < proxy do NPM (≥ 90s, fase com domínio)
-keepalive do proxy (≤ 60s) < keepAliveTimeout do Node (65s)
+statement_timeout (30s) < requestTimeout do Node (60s)
+keepAliveTimeout do Node (65s) > keepalive de qualquer cliente ou balanceador (≤ 60s)
 ```
 
 ## Passo a passo do zero ao ar (acesso por IP, sem domínio)
+
+O acesso é **sempre** por `http://<IP-da-VPS>:1050`, sem domínio nem HTTPS
+(decisão de Mateus em 2026-11-10; ver [Acesso por IP, sem HTTPS](#acesso-por-ip-sem-https)).
 
 ### 0. Pré-requisitos na VPS
 
@@ -302,7 +305,7 @@ workflow do passo 1: três jobs verdes (`testes`, `imagem`, `deploy`), com
 
 | Monitor | Tipo | Alvo | Intervalo |
 | --- | --- | --- | --- |
-| `vitacare` app | HTTP | `http://<IP-da-VPS>:1050/health/ready` (com domínio: `https://api.<dominio>/health/ready`) | 60 s |
+| `vitacare` app | HTTP | `http://<IP-da-VPS>:1050/health/ready` | 60 s |
 | `vitacare workers` | Push | token em `UPTIME_KUMA_PUSH_URL` (passo 4) | 600 s |
 | `vitacare backup` | Push | token na linha do cron abaixo | 90000 s (25 h) |
 
@@ -441,7 +444,7 @@ Sem SLA ou SLO de disponibilidade: não declarar.
 
 ## Antes de dados reais (checklist)
 
-- [ ] Domínio + HTTPS no Nginx Proxy Manager (Parte B), `APP_BIND` de volta a `127.0.0.1`, regra 1050 removida do firewall.
+- [ ] Ciência dos riscos do acesso por IP sem HTTPS ([abaixo](#acesso-por-ip-sem-https)) registrada na decisão LGPD (P31); firewall só com as portas necessárias.
 - [ ] `CORS_ORIGINS` só com a origem do frontend.
 - [ ] Monitores `vitacare` app, `vitacare workers` e `vitacare backup` no Kuma, UP.
 - [ ] Cron do `backup.sh` com push; primeira pasta conferida.
@@ -486,13 +489,22 @@ Sem SLA ou SLO de disponibilidade: não declarar.
 > trouxe migration, o código antigo precisa ser compatível com o schema novo ou
 > exige `migration:revert` consciente (nunca automático).
 
-## Com domínio (Parte B)
+## Acesso por IP, sem HTTPS
 
-No NPM: Proxy Host `api.<dominio>` → `app-vitacare:1050`, SSL Let's Encrypt,
-timeout ≥ 90s. Depois: apagar `APP_BIND` (volta a `127.0.0.1`), `APP_URL` no
-GitHub com `https://`, `CORS_ORIGINS` com a origem do frontend e regra 1050
-removida do firewall. A API lê o IP real por `X-Forwarded-For`
-(`TRUST_PROXY=loopback,uniquelocal`).
+Decisão de Mateus em 2026-11-10: o sistema não terá domínio nem HTTPS; o acesso
+é sempre por IP e porta. Diverge do TCC (p. PDF 50: "requisições HTTPS").
+
+- **Stack:** `APP_BIND=0.0.0.0` é permanente; a porta `1050` fica aberta no
+  firewall; `APP_URL=http://<IP-da-VPS>:1050` no GitHub; `CORS_ORIGINS` com
+  `http://<IP-da-VPS>:1040` (o frontend). Sem Nginx Proxy Manager na frente, a
+  conexão já é o cliente; `TRUST_PROXY=loopback,uniquelocal` continua inofensivo.
+- **Riscos aceitos:** tudo trafega sem criptografia — senha no login, o token
+  Bearer de cada requisição, dados de saúde e anexos — e pode ser lido ou
+  alterado por quem estiver no caminho (Wi-Fi público, rede da operadora).
+- **Efeito no navegador:** fora de HTTPS (exceto `localhost`) o navegador não
+  libera service worker nem Push API. O push do BE-17 e a instalação do PWA não
+  funcionam pelo `http://IP`; a caixa interna (`/notifications`) e o e-mail
+  continuam.
 
 ## Pendências
 
@@ -500,7 +512,7 @@ removida do firewall. A API lê o IP real por `X-Forwarded-For`
   `UPTIME_KUMA_PUSH_URL` e os três monitores; cron único do `backup.sh`;
   ensaio de restauração com tempo; medição de carga com o tamanho real.
 - **Cópia externa** dos backups (camada 3), criptografada.
-- **HTTPS** com domínio (Parte B) antes de dados reais.
+- **Sem HTTPS** por decisão (2026-11-10): riscos e efeito no push em [Acesso por IP, sem HTTPS](#acesso-por-ip-sem-https).
 - **LGPD (P31)** e retenção clínica: ver o checklist.
 - **S3**: anexos usam o volume local (decisão de 2026-11-05). **SMTP**: o envio
   de e-mail (BE-17) vale quando um servidor for configurado.

@@ -118,8 +118,8 @@ services:
       # Backup diário junto com o banco: scripts/ops/backup.sh (docs/deploy-vps.md).
       - vitacare-storage:/app/storage
     ports:
-      # 127.0.0.1 por padrão: o público entra pelo Nginx Proxy Manager (rede
-      # proxy, https). Sem domínio: APP_BIND=0.0.0.0 expõe http://IP:1050.
+      # 127.0.0.1 por padrão. O acesso é sempre por http://IP:1050, sem domínio
+      # nem HTTPS (decisão de 2026-11-10): a stack usa APP_BIND=0.0.0.0.
       - "${APP_BIND:-127.0.0.1}:1050:1050"
     labels:
       # Vira o label `stack` no Loki; igual ao nome da stack no Portainer.
@@ -147,7 +147,7 @@ services:
       start_period: 60s
     networks:
       - infra                      # postgresql e redis pelo nome
-      - proxy                      # Nginx Proxy Manager (fase com domínio)
+      - proxy                      # rede padrão das stacks; sem uso pela API (acesso por IP)
 
 volumes:
   # No host vira `vitacare_vitacare-storage` (prefixo = nome da stack).
