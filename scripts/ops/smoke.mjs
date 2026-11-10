@@ -525,20 +525,27 @@ const main = async () => {
   }
 
   const report = createReport();
+  let unexpected = false;
   try {
     if (args.mode !== 'verify') await readChecks(report);
     if (args.mode === 'full') await fullJourney(report);
     if (args.mode === 'verify') await verifyState(report);
   } catch (error) {
-    if (!(error instanceof CheckFailed))
+    if (!(error instanceof CheckFailed)) {
+      unexpected = true;
       console.log(`FALHOU  erro inesperado: ${error.message}`);
+    }
   }
 
   const passed = report.results.filter((result) => result.ok).length;
   console.log(
-    `\n${passed}/${report.results.length} verificacoes ok (modo ${args.mode})`,
+    `\n${passed}/${report.results.length} verificacoes ok (modo ${args.mode})${
+      unexpected ? ', com erro inesperado' : ''
+    }`,
   );
-  process.exit(report.failed > 0 || report.results.length === 0 ? 1 : 0);
+  process.exit(
+    unexpected || report.failed > 0 || report.results.length === 0 ? 1 : 0,
+  );
 };
 
 await main();

@@ -9,9 +9,9 @@ mesmo tempo.
 ```text
 merge na main
   └─ GitHub Actions: testes (Postgres + Redis reais)
-       └─ homologacao: imagem buildada uma vez, deploy do zero, smoke completo,
-          backup → restore → verify, revert/migrate, rollback para a :latest
-            └─ a MESMA imagem no GHCR (:latest e :sha-<commit>) → webhook
+       └─ homologacao (só lê o GHCR): imagem buildada uma vez, deploy do zero,
+          smoke completo, backup → restore → verify, revert/migrate, rollback
+            └─ publicacao: a MESMA imagem (artefato) no GHCR (:latest e :sha-<commit>) → webhook
                  └─ Portainer relê o compose, baixa a imagem, recria app-vitacare
                       └─ entrypoint: migrations pendentes → API NestJS na porta 1050
                            └─ smoke de leitura confere data.version = commit
@@ -35,7 +35,7 @@ stdout JSON (pino, level_name) → Alloy → Loki · cAdvisor → Prometheus · 
 | `docker-entrypoint.sh` | `RUN_MIGRATIONS=true` → migrations; depois `exec node dist/main.js` |
 | `docker-compose.prod.yml` | o que a stack do Portainer lê |
 | `.env.production.example` | modelo das variáveis da stack |
-| `.github/workflows/deploy.yml` | testes → homologação (publica a imagem testada) → webhook → smoke de leitura |
+| `.github/workflows/deploy.yml` | testes → homologação (só lê o GHCR) → publicação da imagem testada (só na `main`) → webhook → smoke de leitura |
 | `scripts/ops/smoke.mjs` | smoke por HTTP: `read` (produção), `full` (homologação), `verify` (após restore/rollback) |
 | `scripts/ops/backup.sh` · `restore.sh` | backup diário de banco **e** anexos; restauração conferida |
 | `scripts/ops/ci-homologation.sh` | roteiro do job `homologacao`, também rodável localmente |
@@ -327,8 +327,11 @@ obrigatório antes de dados reais.
    /opt/vitacare/restore.sh /root/backups/vitacare/vitacare-<data> --yes
    ```
 
-   Recusa sem `--yes`, com `SHA256SUMS` que não confere, com o volume montado
-   em algum container e (pelo `DROP` sem `FORCE`) com conexão aberta no banco.
+   Restaura o banco **ao lado** (`vitacare__incoming`) e só troca pelo atual
+   depois do `pg_restore` completo: uma falha deixa o banco atual intacto.
+   Recusa, sem alterar nada, sem `--yes`, com `SHA256SUMS` que não confere, com
+   o volume montado em algum container, com volume padrão inexistente, com o
+   role do dono ausente e com conexão aberta no banco (`DROP` sem `FORCE`).
 4. **Subir a stack** (Start) e conferir: `node scripts/ops/smoke.mjs --base-url http://<IP-da-VPS>:1050`
    (de qualquer checkout) → `7/7 verificacoes ok (modo read)`; login de um administrador e
    download de um anexo recente.

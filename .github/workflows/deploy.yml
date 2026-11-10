@@ -1,16 +1,18 @@
 # CI e deploy de produção.
 #
 #   push/PR em develop ou PR para main → `testes` e `homologacao`
-#   push na main (o merge de develop) → testes → homologacao (publica) → deploy
+#   push na main (o merge de develop) → testes → homologacao → publicacao → deploy
 #
 #   1. testes: audit, lint, build, unitários e e2e contra PostgreSQL e Redis
 #      REAIS de serviço (as suítes atrás de VITACARE_TEST_* deixam de ser puladas)
 #   2. homologacao (BE-25): builda a imagem, sobe com os limites de produção,
 #      migra pelo entrypoint, seed, smoke completo, backup → restauração →
 #      verify, revert/migrate e rollback para a :latest; tudo descartado no
-#      fim (scripts/ops/ci-homologation.sh). Na main, publica no GHCR
-#      ghcr.io/sistema-vitacare/vitacare-backend a MESMA imagem testada.
-#   3. deploy: POST no webhook da stack; o Portainer baixa a imagem e recria o
+#      fim (scripts/ops/ci-homologation.sh). Só LÊ o GHCR: roda código de PR.
+#   3. publicacao (só no push da main): publica no GHCR
+#      ghcr.io/sistema-vitacare/vitacare-backend a MESMA imagem testada,
+#      recebida da homologação por artefato (docker save/load, sem rebuild).
+#   4. deploy: POST no webhook da stack; o Portainer baixa a imagem e recria o
 #      container (o entrypoint aplica as migrations), e o job roda o smoke de
 #      leitura até GET /api/v1 mostrar este commit em data.version.
 # Qualquer etapa que falha interrompe as seguintes: nada quebrado chega à VPS.
@@ -112,9 +114,11 @@ jobs:
     needs: testes
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    # Só leitura: este job executa o código do PR (Dockerfile, scripts, smoke).
+    # Com escrita, um PR não revisado poderia publicar a :latest da produção.
     permissions:
       contents: read
-      packages: write   # push no GHCR com o GITHUB_TOKEN, só na main
+      packages: read   # pull da :latest para o ensaio de rollback
 
     services:
       postgres:
@@ -136,6 +140,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - uses: actions/setup-node@v4
         with:
@@ -157,7 +163,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       # `load`: a imagem fica no Docker do runner; é ESTA que é testada e,
-      # na main, publicada (mesmo digest), sem segundo build.
+      # na main, entregue ao job publicacao, sem segundo build.
       - name: Build da imagem
         uses: docker/build-push-action@v6
         with:
@@ -186,10 +192,44 @@ jobs:
           REDIS_PORT: "6379"
         run: sh scripts/ops/ci-homologation.sh
 
+      - name: Guarda a imagem homologada
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+        run: docker save vitacare-backend:ci | gzip > vitacare-backend-ci.tar.gz
+
+      - uses: actions/upload-artifact@v4
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+        with:
+          name: imagem-homologada
+          path: vitacare-backend-ci.tar.gz
+          retention-days: 1
+
+  publicacao:
+    needs: homologacao
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      packages: write   # push no GHCR com o GITHUB_TOKEN, só aqui
+
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: imagem-homologada
+
+      - run: |
+          gunzip -c vitacare-backend-ci.tar.gz | docker load
+          echo "GHCR_IMAGE=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_ENV"
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
       # :latest é o que a stack usa; :sha-<commit> fica para rollback
       # (APP_IMAGE=...:sha-<commit> na stack).
       - name: Publica a imagem homologada
-        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
         run: |
           for tag in latest "sha-${GITHUB_SHA}"; do
             docker tag vitacare-backend:ci "$GHCR_IMAGE:$tag"
@@ -197,7 +237,7 @@ jobs:
           done
 
   deploy:
-    needs: homologacao
+    needs: publicacao
     if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 20
