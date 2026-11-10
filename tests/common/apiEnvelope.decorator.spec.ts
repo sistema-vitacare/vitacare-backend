@@ -1,5 +1,7 @@
 import { Controller, Get, HttpStatus, Module } from '@nestjs/common';
 import {
+  ApiOkResponse,
+  ApiProduces,
   ApiProperty,
   DocumentBuilder,
   type OpenAPIObject,
@@ -21,6 +23,16 @@ class ProbeController {
   find(): ProbeDto {
     return { id: 'x' };
   }
+
+  @Get('file')
+  @ApiProduces('application/pdf', 'application/json')
+  @ApiOkResponse({
+    content: {
+      'application/pdf': { schema: { type: 'string', format: 'binary' } },
+    },
+  })
+  @ApiErrors({ status: HttpStatus.NOT_FOUND, codes: ['PROBE_NOT_FOUND'] })
+  file(): void {}
 }
 
 @Module({ controllers: [ProbeController] })
@@ -58,8 +70,12 @@ describe('ApiEnvelope e ApiErrors', () => {
     return document;
   };
 
-  const responseOf = (document: OpenAPIObject, status: string): ProbeResponse =>
-    document.paths['/probe'].get?.responses[status] as ProbeResponse;
+  const responseOf = (
+    document: OpenAPIObject,
+    status: string,
+    path = '/probe',
+  ): ProbeResponse =>
+    document.paths[path].get?.responses[status] as ProbeResponse;
 
   it('documenta data e meta no corpo de sucesso', async () => {
     const document = await documentOf();
@@ -82,5 +98,15 @@ describe('ApiEnvelope e ApiErrors', () => {
     expect(responseOf(document, '409').description).toContain(
       'PROBE_DUPLICATE',
     );
+  });
+
+  it('publica o erro so como JSON mesmo em rota que produz arquivo', async () => {
+    const document = await documentOf();
+    const content = responseOf(document, '404', '/probe/file').content ?? {};
+
+    expect(Object.keys(content)).toEqual(['application/json']);
+    expect(content['application/json'].schema).toEqual({
+      $ref: '#/components/schemas/ErrorResponseDto',
+    });
   });
 });

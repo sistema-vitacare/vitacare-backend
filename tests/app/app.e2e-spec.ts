@@ -329,6 +329,9 @@ describe('Pipeline HTTP (e2e)', () => {
         'http://localhost:5173',
       );
       expect(response.headers['access-control-allow-credentials']).toBe('true');
+      expect(response.headers['access-control-expose-headers']).toBe(
+        'Content-Disposition',
+      );
     });
 
     it('nao libera origem desconhecida', async () => {
@@ -365,6 +368,12 @@ describe('Pipeline HTTP (e2e)', () => {
       expect(Object.keys(schema.properties)).toEqual(
         expect.arrayContaining(['data', 'meta']),
       );
+    });
+
+    it('publica o contrato so em JSON, sem a rota YAML', async () => {
+      const response = await request(server()).get('/api/docs-yaml');
+
+      expect(response.status).toBe(404);
     });
 
     it('nao envelopa o proprio documento OpenAPI', async () => {
