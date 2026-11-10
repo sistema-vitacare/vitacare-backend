@@ -13,7 +13,7 @@ source: src/modules/Audit/audit.controller.ts
 
 Consulta da trilha de auditoria (RF017; UC06 passos 1–4; RNF007; Figura 45; BE-23). Cada entrada mostra data e hora, responsável (usuário ou Sistema/Automação) com o **perfil no instante da ação**, ação com rótulo e gravidade, item relacionado e IP. Filtro sem resultado é o fluxo alternativo do UC06: `200` com lista vazia e `meta.message`.
 
-Decisões de Mateus em 2026-11-09: perfil e IP gravados no momento da ação (eventos anteriores ao BE-23 saem com os dois nulos); gravidade por catálogo fixo por ação; leituras não são auditadas; o **master consulta todas as organizações e o admin só a própria**; item = tipo + id + nome legível. Chamada do agente pendente de confirmação: para o master, o nome de paciente, formulário e medicamento de outra organização sai `null` (o alcance do master sobre dados clínicos segue pendente); nomes de usuário e organização saem sempre.
+Decisões de Mateus em 2026-11-09: perfil e IP gravados no momento da ação (eventos anteriores ao BE-23 saem com os dois nulos); gravidade por catálogo fixo por ação; leituras não são auditadas; o **master consulta todas as organizações e o admin só a própria**; item = tipo + id + nome legível. Decisão de Mateus em 2026-11-09 (segunda rodada): o master vê os **dados pessoais de outra organização mascarados** — nome do responsável, do paciente e do usuário afetado mascarado com a inicial de cada palavra (`"Paulo Lima"` → `"P**** L***"`); o nome da organização e o IP saem completos. Chamada do agente pendente de confirmação: nome de formulário e medicamento de outra organização sai `null`, e a busca por nome só procura na organização da sessão, para o nome mascarado não ser descoberto por tentativa.
 
 Acesso: `Bearer` com `audit_events:read` — `admin` (só eventos da organização da sessão) e `platform_admin` (todas). Profissional, cuidador e familiar recebem `403`. A consulta não é auditada.
 
@@ -31,7 +31,7 @@ Path: nenhum. Body: nenhum.
 | `severity` | `info` \| `normal` \| `warning` \| `critical` | não | — | Gravidade calculada pelo catálogo (info, normal, atenção, crítico da Figura 45). |
 | `actorUserId` | uuid | não | — | Usuário responsável. |
 | `actorType` | `user` \| `system` | não | — | `system` = eventos de Sistema/Automação. |
-| `search` | texto ≤ 100 | não | — | Nome do responsável (sem diferenciar maiúsculas; `%` e `_` valem como texto) **ou** código/rótulo da ação (também sem acento). |
+| `search` | texto ≤ 100 | não | — | Nome do responsável, só em eventos da organização da sessão (sem diferenciar maiúsculas; `%` e `_` valem como texto), **ou** código/rótulo da ação (também sem acento). |
 | `organizationId` | uuid | não | — | Só o master: filtra uma organização (sem ele, todas). Para o admin é **ignorado** e vale a organização da sessão. |
 | `page` | inteiro ≥ 1 | não | `1` | Página. |
 | `limit` | inteiro 1–100 | não | `20` | Itens por página. |
@@ -95,14 +95,14 @@ Sem resultado: `"data": []`, `meta.pagination.total = 0` e `meta.message = "Nenh
 | `occurredAt` | instante ISO 8601 (UTC) | não | Data e hora da ação. |
 | `organization.id`, `organization.name` | uuid, texto | não | Organização do evento (nome fantasia). |
 | `actor.type` | `user` \| `system` | não | `system` = Sistema/Automação (job, avaliação de alerta, ação do master registrada na organização alvo). |
-| `actor.user` | objeto `{ id, name }` | sim | Usuário responsável; `null` em evento de sistema. |
+| `actor.user` | objeto `{ id, name }` | sim | Usuário responsável; `null` em evento de sistema. Para o master, `name` de outra organização sai mascarado. |
 | `actor.profile` | objeto `{ code, name }` | sim | Perfil **no instante da ação** (`admin`, `professional`, `caregiver`, `family`, `platform_admin`); `null` em evento de sistema e nos eventos anteriores ao BE-23. |
 | `action` | texto | não | Código `dominio.acao`. |
 | `actionLabel` | texto | não | Rótulo em português; ação fora do catálogo (legada) sai com o próprio código. |
 | `severity` | `info` \| `normal` \| `warning` \| `critical` | não | Do catálogo; em `alert.generated`, a severidade do alerta gerado. |
 | `entity.type` | texto | não | Tipo do item (`user`, `patient`, `follow_up_form`, `follow_up_record`, `alert`, `medication`, `organization`, ...). |
 | `entity.id` | uuid | sim | Item; `null` quando o evento não tem item (ex.: exportação da auditoria). |
-| `entity.label` | texto | sim | Nome do usuário, organização, paciente, formulário ou medicamento; `null` nos demais tipos, em item apagado e, para o master, nos nomes clínicos de outra organização. |
+| `entity.label` | texto | sim | Nome do usuário, organização, paciente, formulário ou medicamento; `null` nos demais tipos e em item apagado. Para o master, em outra organização: usuário e paciente mascarados (`P**** L***`), formulário e medicamento `null`. |
 | `ipAddress` | texto IPv4/IPv6 | sim | IP do cliente pela regra `TRUST_PROXY`; `null` em evento de sistema/job e nos anteriores ao BE-23. |
 | `requestId` | texto | sim | Liga o evento ao log da requisição; `null` em job. |
 

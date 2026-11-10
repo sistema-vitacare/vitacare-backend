@@ -13,7 +13,7 @@ source: src/modules/Audit/audit.controller.ts
 
 Exportação do UC06 passo 5 ("Exportar CSV" da Figura 45; RF017; BE-23). Decisões de Mateus em 2026-11-09: **CSV gerado na hora**, com os mesmos filtros da [lista](audit-events-listar.md), nada guardado no servidor; nova tentativa após falha = repetir o pedido (fluxo alternativo do UC06); limite de eventos por arquivo; a própria exportação vira evento auditado.
 
-Acesso: `Bearer` com `audit_events:export` — `admin` (só a própria organização) e `platform_admin` (todas, ou a de `organizationId`). Cada pedido é reautorizado. Para o master, nome clínico de outra organização sai vazio, como na lista.
+Acesso: `Bearer` com `audit_events:export` — `admin` (só a própria organização) e `platform_admin` (todas, ou a de `organizationId`). Cada pedido é reautorizado. Para o master, os nomes de pessoas de outra organização saem mascarados (`P**** L***`) e formulário/medicamento vazios, como na lista.
 
 ## Request
 
@@ -43,7 +43,7 @@ Formato: UTF-8 **com BOM**, separador `;`, linhas terminadas em CRLF, aspas RFC 
 | --- | --- |
 | `Data/hora` | Instante ISO 8601 no horário de Brasília com deslocamento (ex.: `2026-10-01T00:00:00-03:00`). |
 | `Organização` | Nome fantasia. |
-| `Usuário` | Nome do responsável; `Sistema` em evento de sistema. |
+| `Usuário` | Nome do responsável (mascarado para o master em outra organização); `Sistema` em evento de sistema. |
 | `Perfil` | Nome do perfil no instante da ação; vazio se não gravado. |
 | `Ação` | Rótulo em português. |
 | `Código da ação` | Código `dominio.acao`. |
