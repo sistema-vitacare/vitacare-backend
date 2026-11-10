@@ -5,8 +5,7 @@ import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import type Redis from 'ioredis';
 import { LoggerModule } from 'nestjs-pino';
 import { AppController } from './app.controller';
-import { redactRequestLog } from './common/http/logRedaction';
-import { requestIdFromHeaders } from './common/http/requestId';
+import { buildHttpLoggerOptions } from './common/http/httpLogger.options';
 import appConfig from './config/app.config';
 import authConfig from './config/auth.config';
 import databaseConfig from './config/database.config';
@@ -14,12 +13,14 @@ import { environmentValidationSchema } from './config/env.validation';
 import redisConfig from './config/redis.config';
 import mailConfig from './config/mail.config';
 import notificationConfig from './config/notification.config';
+import operationsConfig from './config/operations.config';
 import securityConfig from './config/security.config';
 import storageConfig from './config/storage.config';
 import { DatabaseModule } from './database/database.module';
 import { REDIS_CLIENT } from './redis/redis.constants';
 import { RedisThrottlerStorage } from './redis/redisThrottler.storage';
 import { HealthModule } from './health/health.module';
+import { HeartbeatModule } from './health/heartbeat/heartbeat.module';
 import { AccessModule } from './modules/Access/access.module';
 import { AlertModule } from './modules/Alert/alert.module';
 import { AutomationModule } from './modules/Automation/automation.module';
@@ -43,18 +44,6 @@ import { QueueModule } from './queue/queue.module';
 import { RedisModule } from './redis/redis.module';
 import { StorageModule } from './storage/storage.module';
 
-// pino-pretty e devDependency: a imagem de runtime instala com --omit=dev e nao
-// o tem. Fora de producao usamos o log formatado quando o pacote existe e
-// caimos em JSON puro quando nao existe, em vez de derrubar o boot.
-function prettyTransport() {
-  try {
-    require.resolve('pino-pretty');
-    return { target: 'pino-pretty', options: { singleLine: true } };
-  } catch {
-    return undefined;
-  }
-}
-
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -70,6 +59,7 @@ function prettyTransport() {
         mailConfig,
         notificationConfig,
         storageConfig,
+        operationsConfig,
       ],
       validationSchema: environmentValidationSchema,
       validationOptions: {
@@ -80,25 +70,10 @@ function prettyTransport() {
     LoggerModule.forRootAsync({
       inject: [ConfigService],
       useFactory: (config: ConfigService) => ({
-        pinoHttp: {
+        pinoHttp: buildHttpLoggerOptions({
           level: config.getOrThrow<string>('app.logLevel'),
-          // Em producao o log vai em JSON puro para o coletor de logs.
-          transport:
-            config.getOrThrow<string>('app.environment') === 'production'
-              ? undefined
-              : prettyTransport(),
-          genReqId: requestIdFromHeaders,
-          serializers: { req: redactRequestLog },
-          redact: [
-            'req.headers.authorization',
-            'req.headers.cookie',
-            'req.headers["x-api-key"]',
-          ],
-          autoLogging: {
-            ignore: (req: { url?: string }) =>
-              req.url === '/health/live' || req.url === '/health/ready',
-          },
-        },
+          environment: config.getOrThrow<string>('app.environment'),
+        }),
       }),
     }),
     ThrottlerModule.forRootAsync({
@@ -138,6 +113,7 @@ function prettyTransport() {
     QueueModule,
     StorageModule,
     HealthModule,
+    HeartbeatModule,
   ],
   controllers: [AppController],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],

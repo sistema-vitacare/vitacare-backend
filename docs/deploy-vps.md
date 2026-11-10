@@ -8,10 +8,14 @@ mesmo tempo.
 
 ```text
 merge na main
-  └─ GitHub Actions: testes (Postgres + Redis reais) → imagem no GHCR → webhook
-       └─ Portainer relê o compose, baixa a imagem, recria app-vitacare
-            └─ entrypoint: migrations pendentes → API NestJS na porta 1050
-                 └─ stdout JSON (pino) → Alloy → Loki · cAdvisor → Prometheus
+  └─ GitHub Actions: testes (Postgres + Redis reais)
+       └─ homologacao (só lê o GHCR): imagem buildada uma vez, deploy do zero,
+          smoke completo, backup → restore → verify, revert/migrate, rollback
+            └─ publicacao: a MESMA imagem (artefato) no GHCR (:latest e :sha-<commit>) → webhook
+                 └─ Portainer relê o compose, baixa a imagem, recria app-vitacare
+                      └─ entrypoint: migrations pendentes → API NestJS na porta 1050
+                           └─ smoke de leitura confere data.version = commit
+stdout JSON (pino, level_name) → Alloy → Loki · cAdvisor → Prometheus · heartbeat → Kuma
 ```
 
 | Item | Valor |
@@ -31,7 +35,11 @@ merge na main
 | `docker-entrypoint.sh` | `RUN_MIGRATIONS=true` → migrations; depois `exec node dist/main.js` |
 | `docker-compose.prod.yml` | o que a stack do Portainer lê |
 | `.env.production.example` | modelo das variáveis da stack |
-| `.github/workflows/deploy.yml` | testes → imagem → webhook → confere a versão |
+| `.github/workflows/deploy.yml` | testes → homologação (só lê o GHCR) → publicação da imagem testada (só na `main`) → webhook → smoke de leitura |
+| `scripts/ops/smoke.mjs` | smoke por HTTP: `read` (produção), `full` (homologação), `verify` (após restore/rollback) |
+| `scripts/ops/backup.sh` · `restore.sh` | backup diário de banco **e** anexos; restauração conferida |
+| `scripts/ops/ci-homologation.sh` | roteiro do job `homologacao`, também rodável localmente |
+| `scripts/ops/load.mjs` | medição de desempenho (RNF008) contra homologação |
 | `compose.yaml` | desenvolvimento (build local, porta 3000, sem migration automática) |
 
 ## Equivalências com o molde Laravel
@@ -48,7 +56,8 @@ merge na main
 | `/up` | `/health/live` (processo) e `/health/ready` (PostgreSQL + Redis) |
 | volume `<sistema>-storage:/var/www/storage/app` | volume `vitacare-storage:/app/storage` (anexos privados; ver abaixo) |
 | `storage:link` (arquivos públicos via nginx) | **não existe** de propósito: anexo é dado de saúde e só sai pela API autenticada |
-| queue-worker / scheduler | **ainda não existem** (ver Pendências) |
+| queue-worker / scheduler | workers BullMQ no próprio processo; job schedulers no Redis |
+| heartbeat do scheduler (`UPTIME_KUMA_PUSH_URL`) | igual: fila `operations`, pulso a cada 5 min só com o banco respondendo |
 
 ## Recursos
 
@@ -86,9 +95,13 @@ volume se chama `vitacare_vitacare-storage` (prefixo = nome da stack).
   cada requisição.
 - **Tamanho:** até 10 MB por arquivo e 5 por registro. Acompanhar com
   `docker run --rm -v vitacare_vitacare-storage:/d alpine du -sh /d`.
-- Banco e volume precisam ser restaurados **juntos** (mesmo dia): linha sem
+- Banco e volume são copiados e restaurados **juntos**, pelo mesmo backup
+  (`backup.sh`/`restore.sh`, [Recuperação](#recuperação-rto-4-h)): linha sem
   arquivo responde `404 ATTACHMENT_CONTENT_MISSING` e loga `error`; arquivo sem
-  linha fica inacessível.
+  linha fica inacessível e aparece em `storage-orphans.js`.
+- **Retenção:** o anexo fica enquanto a linha existir; a remoção pela API apaga
+  o arquivo. Prazo de guarda clínica e descarte de paciente inativo dependem da
+  decisão LGPD (P31), ainda pendente.
 
 ## Hierarquia de timeouts (crescente de dentro para fora)
 
@@ -155,6 +168,13 @@ DB_PASSWORD=<senha do passo 2>
 REDIS_PASSWORD=<a mesma da stack infra>
 APP_BIND=0.0.0.0
 CORS_ORIGINS=http://<IP-da-VPS>:1040
+```
+
+Heartbeat dos workers (BE-25). No Kuma, monitor **Push** `vitacare workers`,
+intervalo 600 s; copiar o token:
+
+```dotenv
+UPTIME_KUMA_PUSH_URL=http://uptime-kuma:3001/api/push/<token>
 ```
 
 Notificações (BE-17), opcionais. Sem elas, a caixa interna funciona, o push
@@ -244,20 +264,166 @@ no primeiro acesso e cadastra cada organização com o primeiro administrador em
 
 Settings → Secrets and variables → Actions: secret `PORTAINER_WEBHOOK_URL` (URL
 do passo 5) e variable `APP_URL=http://<IP-da-VPS>:1050`. *Re-run all jobs* do
-workflow do passo 1: três jobs verdes, "Versão `<sha>` no ar".
+workflow do passo 1: três jobs verdes (`testes`, `homologacao`, `deploy`), com
+"7/7 verificacoes ok (modo read)" no fim do deploy. O resumo do job
+`homologacao` mostra o tempo de restauração e se o rollback para a `:latest`
+anterior funcionou sobre o schema novo.
 
 ### 10. Monitoramento e backup
 
-- Uptime Kuma: HTTP em `http://<IP-da-VPS>:1050/health/ready`, 60s.
-- Cron do root:
+**Uptime Kuma** (`http://<IP-da-VPS>:3001`), cada um com a notificação SMTP:
 
-  ```cron
-  20 3 * * * docker exec postgresql pg_dump -U mavila -Fc vitacare > /root/backups/vitacare-$(date +\%F).dump && find /root/backups -name 'vitacare-*.dump' -mtime +14 -delete
-  # Anexos (volume), semanal, 30 dias — A CONFIGURAR (molde vps-hostinger-backup)
-  50 3 * * 0 docker run --rm -v vitacare_vitacare-storage:/d:ro -v /root/backups:/b alpine tar czf /b/vitacare-uploads-$(date +\%F).tgz -C /d attachments && find /root/backups -name 'vitacare-uploads-*.tgz' -mtime +30 -delete
-  ```
+| Monitor | Tipo | Alvo | Intervalo |
+| --- | --- | --- | --- |
+| `vitacare` app | HTTP | `http://<IP-da-VPS>:1050/health/ready` (com domínio: `https://api.<dominio>/health/ready`) | 60 s |
+| `vitacare workers` | Push | token em `UPTIME_KUMA_PUSH_URL` (passo 4) | 600 s |
+| `vitacare backup` | Push | token na linha do cron abaixo | 90000 s (25 h) |
 
-- Logs: Grafana → Loki `{stack="vitacare"}`.
+**Backup diário** (RPO 24 h): banco e anexos na mesma execução, porque só se
+restauram juntos. Copiar os scripts uma vez (e a cada mudança deles):
+
+```bash
+mkdir -p /opt/vitacare && cd /opt/vitacare
+for f in backup.sh restore.sh; do
+  curl -fsSLO "https://raw.githubusercontent.com/sistema-vitacare/vitacare-backend/main/scripts/ops/$f"
+done
+chmod 700 backup.sh restore.sh
+docker volume ls | grep vitacare     # confere o nome: vitacare_vitacare-storage
+/opt/vitacare/backup.sh              # primeira execução à mão
+```
+
+(Repositório privado: `curl` com `-H "Authorization: token <fine-grained, Contents: Read>"`, ou `scp` do checkout.)
+
+Cron do root (`crontab -e`), **substitui** as duas linhas antigas (dump diário e volume semanal):
+
+```cron
+20 3 * * * KUMA_PUSH_URL=http://127.0.0.1:3001/api/push/<token-backup> /opt/vitacare/backup.sh >> /var/log/vitacare-backup.log 2>&1
+```
+
+Cada execução cria `/root/backups/vitacare/vitacare-<AAAA-MM-DDTHHMM>/` com
+`db.dump`, `storage.tgz` (sem `tmp/`) e `SHA256SUMS`, só para o root
+(`0700`/`0600`), e apaga as pastas com mais de 14 dias. O Kuma só recebe o push
+se tudo deu certo. A API não é parada: um anexo enviado entre o dump e o `tar`
+vira no máximo um arquivo órfão; um removido nesse intervalo deixaria linha sem
+arquivo após um restore (raro às 03:20).
+
+**Cópia externa (camada 3 de `vps-hostinger-backup`) ainda não existe**: sem
+ela, perder a VPS ou a conta perde os backups. Pendente com Mateus.
+
+**Logs**: Grafana → Loki. Ver [Observabilidade](#observabilidade).
+
+## Recuperação (RTO 4 h)
+
+Orçamento de 4 h do incidente à API no ar com os dados do último backup.
+Ensaio local (BE-25): restauração em segundos para o conjunto de teste; o tempo
+real depende do tamanho do banco e do volume, por isso o ensaio na VPS abaixo é
+obrigatório antes de dados reais.
+
+1. **Parar a stack**: Portainer → Stacks → `vitacare` → **Stop**.
+2. **Escolher o backup**: `ls /root/backups/vitacare/`.
+3. **Restaurar banco e volume juntos**:
+
+   ```bash
+   /opt/vitacare/restore.sh /root/backups/vitacare/vitacare-<data> --yes
+   ```
+
+   Restaura o banco **ao lado** (`vitacare__incoming`) e só troca pelo atual
+   depois do `pg_restore` completo: uma falha deixa o banco atual intacto.
+   Recusa, sem alterar nada, sem `--yes`, com `SHA256SUMS` que não confere, com
+   o volume montado em algum container, com volume padrão inexistente, com o
+   role do dono ausente e com conexão aberta no banco (`DROP` sem `FORCE`).
+4. **Subir a stack** (Start) e conferir: `node scripts/ops/smoke.mjs --base-url http://<IP-da-VPS>:1050`
+   (de qualquer checkout) → `7/7 verificacoes ok (modo read)`; login de um administrador e
+   download de um anexo recente.
+5. **Órfãos**: `docker exec app-vitacare node dist/cli/storage-orphans.js`
+   lista arquivos sem linha ativa (normais após restaurar um banco mais antigo
+   que o volume); revisar e só então `--delete`.
+
+**Ensaio sem tocar em produção** (fazer antes de dados reais e a cada trimestre):
+
+```bash
+time /opt/vitacare/restore.sh /root/backups/vitacare/vitacare-<data> --yes \
+  --target-db vitacare_restore --target-volume vitacare-restore
+docker run --rm --network infra -e DB_HOST=postgresql -e DB_DATABASE=vitacare_restore \
+  -e DB_USERNAME=vitacare -e DB_PASSWORD=<senha> -e REDIS_HOST=redis -e REDIS_PASSWORD=<senha> \
+  -e REDIS_KEY_PREFIX=vitacare-restore: -e QUEUE_PREFIX=vitacare-restore \
+  -v vitacare-restore:/app/storage -p 127.0.0.1:1059:1050 -d --name vitacare-restore-check \
+  ghcr.io/sistema-vitacare/vitacare-backend:latest
+curl -s http://127.0.0.1:1059/health/ready
+docker rm -f vitacare-restore-check && docker volume rm vitacare-restore
+docker exec -it postgresql psql -U mavila -d postgres -c 'DROP DATABASE vitacare_restore'
+```
+
+Anotar o `time` na nota da tarefa no vault: é a medição do RTO.
+
+## Migrations e rollback
+
+- **Antes de um merge com migration**: `/opt/vitacare/backup.sh` à mão e
+  confirmar a pasta nova. O CI já provou `revert` + `migrate` e, no resumo do
+  job `homologacao`, se a imagem anterior roda sobre o schema novo.
+- **Rollback de imagem** (código antigo compatível com o schema novo — o resumo
+  do CI diz): `APP_IMAGE=ghcr.io/sistema-vitacare/vitacare-backend:sha-<commit>`
+  → Update the stack; apagar a variável para voltar.
+- **Rollback com schema** (o resumo avisou incompatibilidade): parar a stack,
+  `docker run --rm --network infra <variáveis do banco> ghcr.io/sistema-vitacare/vitacare-backend:sha-<commit-novo> revert`
+  (uma migration por execução; o `down` pode apagar dado da migration), então
+  `APP_IMAGE` com o commit anterior. Se o `down` não servir: restauração.
+- Nunca automático; nunca `migration:revert` sem backup do dia.
+
+## Observabilidade
+
+Os 12 alertas genéricos da stack `obs` valem para a `vitacare` sem cadastro.
+Com `level_name` no JSON, "Muitos erros numa aplicação" passa a contar os erros
+da API.
+
+```logql
+{stack="vitacare", level="ERROR"}                                   # erros com stack
+{stack="vitacare"} |= "request completed" | json | res_statusCode >= 500
+# p95 por rota em 5 min (ms), para comparar com as metas
+quantile_over_time(0.95, {stack="vitacare"} |= "request completed" | json | unwrap responseTime [5m]) by (req_url)
+```
+
+Nada de dado clínico no log: corpo de requisição não é registrado; `search` e o
+nome de arquivo do `Content-Disposition` saem `[Redacted]`; o heartbeat e os
+scripts não imprimem token, senha nem URL de push.
+
+## Metas (decididas por Mateus em 2026-11-10)
+
+| Meta | Valor | Medido localmente em 2026-11-10 (512 MiB, 1 CPU, 1.000 pacientes, 5.000 registros) |
+| --- | --- | --- |
+| RPO | 24 h | backup diário único (banco + anexos), 14 dias |
+| RTO | 4 h | restauração 1 s e API de pé em 12–16 s com o conjunto de teste; **VPS a medir** |
+| p95 leitura | ≤ 500 ms | **591 ms sem pausa (não atingida)** · 181 ms com pausa de ~1 s |
+| p95 escrita | ≤ 1 s | 652 ms sem pausa · 273 ms com pausa |
+| p95 PDF/CSV | ≤ 5 s | 956 ms sem pausa · 352 ms com pausa |
+| Erros 5xx | 0 na carga | 0 nos dois cenários |
+| Carga | 50 usuários simultâneos, 1.000 pacientes | sem pausa: 157 req/s, CPU 100%; com pausa: 46 req/s |
+
+O cenário das metas usa sessões **sem pausa** (`load.mjs` padrão): mede a API
+saturada num núcleo. A leitura passa de 500 ms por fila de CPU, não por consulta
+lenta (com 5 sessões, p50 de 20–40 ms). Com pausa (`--think-ms 1000`), todas as
+metas são atingidas, mas o p99 chega a ~2,4 s quando um painel (`GET /dashboard`,
+várias consultas em paralelo no pool de 10) ou um CSV de ~10.000 eventos
+(montado de forma síncrona) coincide com a carga. Login: com 1 CPU o argon2id
+padrão faz ~3–4 hashes/s; 10 logins simultâneos levam até ~4,8 s. Saídas
+possíveis (decisão de Mateus): aceitar o modelo com pausa, `API_CPUS=2`,
+otimizar painel/CSV, ajustar o argon2.
+
+Sem SLA ou SLO de disponibilidade: não declarar.
+
+## Antes de dados reais (checklist)
+
+- [ ] Domínio + HTTPS no Nginx Proxy Manager (Parte B), `APP_BIND` de volta a `127.0.0.1`, regra 1050 removida do firewall.
+- [ ] `CORS_ORIGINS` só com a origem do frontend.
+- [ ] Monitores `vitacare` app, `vitacare workers` e `vitacare backup` no Kuma, UP.
+- [ ] Cron do `backup.sh` com push; primeira pasta conferida.
+- [ ] Cópia externa criptografada dos backups (camada 3).
+- [ ] Ensaio de restauração na VPS com o tempo anotado (RTO).
+- [ ] Medição de carga (`load.mjs`) contra um ambiente com o tamanho da VPS.
+- [ ] **LGPD (P31):** base legal, controlador/operador, encarregado e processo
+      de direitos do titular definidos por Mateus e orientação jurídica;
+      retenção clínica de registros e anexos de paciente inativo.
+- [ ] Senhas da stack e chaves VAPID trocadas das de teste; acesso ao Portainer e ao root restrito.
 
 ## Se algo falhar
 
@@ -279,10 +445,14 @@ workflow do passo 1: três jobs verdes, "Versão `<sha>` no ar".
 | Publicar | merge na `main` (alguns segundos fora do ar enquanto o container é recriado) |
 | Redeploy sem código novo | stack → **Pull and redeploy** |
 | Mudar variável | stack → Environment variables → **Update the stack** |
-| Rollback | `APP_IMAGE=ghcr.io/sistema-vitacare/vitacare-backend:sha-<commit>` → Update; apagar para voltar |
+| Rollback | `APP_IMAGE=ghcr.io/sistema-vitacare/vitacare-backend:sha-<commit>` → Update; apagar para voltar ([Migrations e rollback](#migrations-e-rollback)) |
 | Deploy sem migrations | `RUN_MIGRATIONS=false` → Update |
 | Rodar migrations à mão | `docker exec app-vitacare docker-entrypoint.sh migrate` |
-| Versão no ar | `GET <APP_URL>/api/v1` → `data.version` |
+| Desfazer a última migration | stack parada → `docker run --rm ... <imagem> revert` |
+| Versão no ar | `node scripts/ops/smoke.mjs --base-url <APP_URL>` (ou `GET <APP_URL>/api/v1` → `data.version`) |
+| Backup agora | `/opt/vitacare/backup.sh` |
+| Restaurar | [Recuperação](#recuperação-rto-4-h) |
+| Arquivos órfãos | `docker exec app-vitacare node dist/cli/storage-orphans.js` (`--delete` apaga) |
 
 > **Rollback e schema:** voltar a imagem **não** desfaz migration. Se a versão nova
 > trouxe migration, o código antigo precisa ser compatível com o schema novo ou
@@ -298,16 +468,13 @@ removida do firewall. A API lê o IP real por `X-Forwarded-For`
 
 ## Pendências
 
-- **Worker e agendamento**: o próprio container `api` roda os workers BullMQ
-  (filas `alerts`, varredura de avaliação do BE-15, `automation`, ausência e
-  lembretes do BE-16, e `notifications`, entrega por push e e-mail do BE-17,
-  a cada 10 s), com job schedulers gravados no Redis. Falta o heartbeat no
-  Uptime Kuma para acusar varredura parada.
-- **S3**: anexos usam o volume local (decisão de 2026-11-05); armazenamento de
-  relatórios PDF (BE-21) ainda não decidido. **SMTP**: decisão de não ter
-  (2026-09-22); o envio de e-mail de alerta (BE-17) já existe e passa a valer
-  quando um servidor for configurado.
-- **Backup do volume de anexos**: linha de cron acima ainda não configurada na
-  VPS; cópia externa (camada 3 do `vps-hostinger-backup`) também pendente.
-- **Órfãos no volume**: arquivo cuja compensação falhou fica inacessível; não há
-  limpeza periódica (BE-25).
+- **Na VPS (passos de Mateus, comandos acima):** variável
+  `UPTIME_KUMA_PUSH_URL` e os três monitores; cron único do `backup.sh`;
+  ensaio de restauração com tempo; medição de carga com o tamanho real.
+- **Cópia externa** dos backups (camada 3), criptografada.
+- **HTTPS** com domínio (Parte B) antes de dados reais.
+- **LGPD (P31)** e retenção clínica: ver o checklist.
+- **S3**: anexos usam o volume local (decisão de 2026-11-05). **SMTP**: o envio
+  de e-mail (BE-17) vale quando um servidor for configurado.
+- **Dependências**: `npm audit` sem `high`/`critical`; restam 3 `moderate`
+  (glob/minimatch via TypeORM, correção só no TypeORM 1.x, fora do semver).

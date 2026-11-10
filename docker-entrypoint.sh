@@ -3,13 +3,18 @@
 #   api      (padrao) aplica as migrations pendentes se RUN_MIGRATIONS=true e
 #            sobe o servidor HTTP
 #   migrate  so aplica as migrations e sai (uso manual)
+#   revert   desfaz UMA migration (a ultima) e sai; nunca automatico
 set -e
 
-run_migrations() {
-  # Migration longa nao pode morrer no statement_timeout da API, e uma
-  # conexao basta. As variaveis valem so para este comando.
+# Migration longa nao pode morrer no statement_timeout da API, e uma conexao
+# basta. As variaveis valem so para este comando.
+typeorm_migration() {
   DB_STATEMENT_TIMEOUT_MS=0 DB_POOL_SIZE=1 DB_APPLICATION_NAME=vitacare-migrate \
-    node node_modules/typeorm/cli.js migration:run -d dist/database/data-source.js
+    node node_modules/typeorm/cli.js "migration:$1" -d dist/database/data-source.js
+}
+
+run_migrations() {
+  typeorm_migration run
 }
 
 case "${1:-api}" in
@@ -26,6 +31,11 @@ case "${1:-api}" in
     ;;
   migrate)
     run_migrations
+    ;;
+  revert)
+    # O `down` pode apagar dados da migration desfeita: so com backup recente
+    # (scripts/ops/backup.sh) e a API parada ou na imagem anterior.
+    typeorm_migration revert
     ;;
   *)
     # Comando avulso (ex.: node dist/cli/seed-platform.js ...).
