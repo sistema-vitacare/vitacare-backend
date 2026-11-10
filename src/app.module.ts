@@ -20,6 +20,7 @@ import { DatabaseModule } from './database/database.module';
 import { REDIS_CLIENT } from './redis/redis.constants';
 import { RedisThrottlerStorage } from './redis/redisThrottler.storage';
 import { HealthModule } from './health/health.module';
+import { HeartbeatModule } from './health/heartbeat/heartbeat.module';
 import { AccessModule } from './modules/Access/access.module';
 import { AlertModule } from './modules/Alert/alert.module';
 import { AutomationModule } from './modules/Automation/automation.module';
@@ -112,6 +113,7 @@ import { StorageModule } from './storage/storage.module';
     QueueModule,
     StorageModule,
     HealthModule,
+    HeartbeatModule,
   ],
   controllers: [AppController],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],

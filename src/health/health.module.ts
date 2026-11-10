@@ -1,19 +1,11 @@
-import { BullModule } from '@nestjs/bullmq';
 import { Module } from '@nestjs/common';
 import { TerminusModule } from '@nestjs/terminus';
 import { HealthController } from './health.controller';
-import {
-  HeartbeatProcessor,
-  OPERATIONS_QUEUE,
-} from './heartbeat/heartbeat.processor';
 import { RedisHealthIndicator } from './indicators/redis.health';
 
 @Module({
-  imports: [
-    TerminusModule,
-    BullModule.registerQueue({ name: OPERATIONS_QUEUE }),
-  ],
+  imports: [TerminusModule],
   controllers: [HealthController],
-  providers: [RedisHealthIndicator, HeartbeatProcessor],
+  providers: [RedisHealthIndicator],
 })
 export class HealthModule {}
