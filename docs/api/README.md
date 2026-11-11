@@ -216,7 +216,7 @@ Garantias que já existiam e continuam testadas:
 - **Identificador alheio:** `patientId`, `followUpId` ou `attachmentId` de outro paciente ou de outra organização responde `404`, sem conteúdo.
 - **Sem vínculo:** `GET /patients` devolve lista vazia; a mensagem orientativa ("solicite permissão ao profissional responsável") fica com o frontend.
 
-**Fora do escopo:** próxima visita e adesão (Figura 37) dependem do BE-26.
+**Fora do escopo:** próxima visita, adesão e estado resumido da Figura 37 (adiados ou fora de escopo no BE-26; ver [Capacidades dos protótipos sem API](#capacidades-dos-protótipos-sem-api)).
 
 ### Evolução e indicadores
 
@@ -505,6 +505,32 @@ A mesma API e os mesmos contratos atendem o frontend React/PWA em computador, ta
 **Downloads.** As três rotas binárias são o [anexo](endpoints/follow-up-attachments-baixar.md), o [PDF do relatório](endpoints/patients-relatorio-pdf.md) e o [CSV da auditoria](endpoints/audit-events-exportar.md). Todas exigem Bearer, então o link direto não funciona: busque com `fetch` e o header, confira `response.ok` e o `Content-Type` (erro chega em JSON), leia o nome em `Content-Disposition: attachment; filename="..."` e entregue o `Blob` ao usuário. As respostas saem com `Cache-Control: private, no-store`, cada pedido é reautorizado, e PDF e CSV são gerados na hora: em falha (`500`), repita o pedido.
 
 **Mesmo comportamento em qualquer cliente.** Paginação, filtros, períodos e o recorte por perfil (inclusive a visão mascarada do familiar) são aplicados no servidor e valem igual para desktop e mobile.
+
+## Capacidades dos protótipos sem API
+
+Os protótipos do TCC (Figuras 31–46) mostram elementos que **não têm rota nem dado na API**. O encaminhamento de cada um foi decidido por Mateus em 2026-11-11 (BE-26; P23–P28 e P32). Nenhuma capacidade nova foi adotada. O frontend deve omitir ou adaptar estes elementos, sem simular dados:
+
+| Elemento da tela | Figura | Encaminhamento | O que o frontend usa |
+| --- | --- | --- | --- |
+| Link "Inscreva-se" | 31 | fora de escopo | nada; organizações são cadastradas pelo administrador master |
+| Busca global "paciente, registro ou alerta" | 33–46 | adiada | `GET /patients?search` ou campo oculto; registros e alertas pelos filtros de `GET /follow-ups` e `GET /alerts` |
+| Status Crítico/Observação, medições Normal/Atenção, estado "Estável" | 34, 36, 37 | fora de escopo (R04/R10) | só `status` cadastral `active`/`inactive`; alertas abertos e severidade podem aparecer como fatos, sem rótulo clínico |
+| Medicamento "Suspenso" e "suspensa em" | 41 | mapeado, sem estado novo | `status = inactive` e `deactivatedAt`; reativar por `POST /medications/{medicationId}/reactivate` |
+| "Há N dias" no medicamento | 41 | já atendido | calculado a partir de `startDate` |
+| Condição associada ao medicamento | 41 | adiada | nada no medicamento; as condições ficam no paciente (`mainCondition`, `secondaryConditions`) |
+| "Prescrever Med." | 41 | sem prescrição eletrônica | `POST /medications` (cadastro do UC08) |
+| Próxima visita, agenda, "visita agendada não confirmada" | 37, 42 | adiada | nada; a cobrança de registro é o alerta de ausência (`source = absence`) |
+| Adesão %, tomada, "medicamento não administrado" | 37, 41, 42 | adiada | nada; adesão pode ser um campo `scale` do formulário, que entra no histórico e na evolução |
+| Lembrete de medicação pendente após 30 min | 46 | adiada | nada; o lembrete do horário (`source = medication_reminder`) continua |
+| Relatórios Alertas e Intercorrências, Eficiência dos Cuidadores, filtro Condição | 43 | adiada | só o relatório individual (`GET /patients/{patientId}/report` e `/report/pdf`); contagens no painel |
+| Formato XLSX e lista de relatórios recentes | 43 | adiada / não guardado | PDF gerado na hora |
+| Relatório diário às 7h | 46 | adiada | nada |
+| Aviso ao admin quando familiar acessa | 46 | aviso adiado | consulta pela auditoria: `GET /audit-events` com a ação `auth.login_succeeded` |
+| 2FA dos administradores | 46 | adiada | nada; login só com e-mail e senha |
+| Seletor "sessão máxima sem atividade" | 46 | valor fixo | informativo: 30 min sem atividade e 12 h absolutas, iguais para todos |
+| Aba Integrações; plano "Pro - Clínica", armazenamento, registros/mês | 46 | fora de escopo / catálogo Basic e Enterprise | `GET /organizations/me/plan` |
+
+Já atendidos pela API: logout (`POST /auth/logout`); resolver alerta, aba Resolvidos e marcar todos como lidos (`POST /alerts/{alertId}/resolve`, filtro `status`, `POST /notifications/read-all`); push e e-mail por preferência (`/notifications/preferences`), com o push indisponível no navegador enquanto o acesso for por IP sem HTTPS.
 
 ## Manutenção do manual
 
