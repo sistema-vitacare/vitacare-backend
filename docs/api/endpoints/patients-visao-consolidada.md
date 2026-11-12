@@ -1,7 +1,7 @@
 ---
 title: Visão consolidada do paciente
 status: atual
-updated: 2026-11-06
+updated: 2026-11-12
 method: GET
 path: /api/v1/patients/{patientId}/overview
 source: src/modules/History/history.controller.ts
@@ -221,7 +221,25 @@ O limiar `180` do exemplo é ilustrativo: é a referência que o profissional co
 
 ## Paginação, datas e efeitos
 
-Sem paginação: os limites fixos são 5 valores por parâmetro, 10 medicamentos ativos e 5 alertas. Os contadores trazem o total real, e as listas completas ficam nas rotas citadas. Instantes em ISO 8601 UTC. Paciente sem registro: `200` com contadores zerados, `lastVisitedAt: null` e `measurements: []`; a mensagem informativa fica com o frontend. Somente leitura: nada é gravado nem auditado. Se o vínculo for revogado entre as consultas internas, a resposta é `404`, nunca parcial.
+Sem paginação: os limites fixos são 5 valores por parâmetro, 10 medicamentos ativos e 5 alertas. Os contadores trazem o total real, e as listas completas ficam nas rotas citadas. Instantes em ISO 8601 UTC. Paciente sem nenhum registro válido (UC12 e UC14, alternativos; BE-29): `200` com `counts.validFollowUps: 0`, `lastVisitedAt: null`, `measurements: []` e `meta.message` `Este paciente ainda não tem registro de acompanhamento.`; os blocos de medicamentos e alertas continuam com o valor real. Com ao menos um registro válido, `meta` não traz mensagem.
+
+```json
+{
+  "data": {
+    "patientId": "3c9e2a4b-1f6d-4e8a-9b7c-5d4e3f2a1b0c",
+    "counts": { "validFollowUps": 0, "openAlerts": 0, "activeMedications": 0 },
+    "lastVisitedAt": null,
+    "measurements": [],
+    "activeMedications": [],
+    "recentAlerts": []
+  },
+  "meta": {
+    "requestId": "a3f5b7c9-1d2e-4f60-8a9b-0c1d2e3f4a5b",
+    "timestamp": "2026-11-12T12:30:00.000Z",
+    "message": "Este paciente ainda não tem registro de acompanhamento."
+  }
+}
+``` Somente leitura: nada é gravado nem auditado. Se o vínculo for revogado entre as consultas internas, a resposta é `404`, nunca parcial.
 
 ## Origem e validação
 
@@ -230,6 +248,7 @@ Controller `src/modules/History/history.controller.ts`. Caso de uso, DTO, parser
 Testes:
 - `tests/modules/History/historyManagement.e2e-spec.ts`, em PostgreSQL: contadores, medições com `0`, anulado fora, cinco valores entre duas versões, paciente sem registro, perfil sem permissão, paciente inativo, sem vínculo, vínculo revogado e outra organização;
 - `tests/modules/History/history.e2e-spec.ts`: HTTP, `401`/`403`/`404`/`422` e contrato OpenAPI;
-- `tests/modules/History/getPatientOverview.useCase.spec.ts`.
+- `tests/modules/History/getPatientOverview.useCase.spec.ts` (inclui a mensagem sem registro, BE-29);
+- `tests/modules/PatientAccess/familyAccess.e2e-spec.ts`: mensagem com e sem registro, familiar e profissional (BE-29).
 
-Conferido em 2026-11-06. Vault: [[2026-10-29-be-18-history]], [[2026-11-06-historico-filtros-e-visao-consolidada]]. Requisitos: RF010; RF016; UC12. Versão: `v1`, criada no BE-18 (2026-11-06).
+Conferido em 2026-11-06. Vault: [[2026-10-29-be-18-history]], [[2026-11-06-historico-filtros-e-visao-consolidada]]. Requisitos: RF010; RF016; UC12. Versão: `v1`, criada no BE-18 (2026-11-06); `meta.message` no BE-29 (2026-11-12, [[2026-11-12-be-29-mensagens-orientativas]]), sem quebra de contrato.

@@ -5,7 +5,10 @@ import { AnnulFollowUpUseCase } from '@/modules/FollowUp/AnnulFollowUp/annulFoll
 import type { CreateFollowUpDto } from '@/modules/FollowUp/CreateFollowUp/createFollowUp.dto';
 import { CreateFollowUpUseCase } from '@/modules/FollowUp/CreateFollowUp/createFollowUp.useCase';
 import { GetFollowUpUseCase } from '@/modules/FollowUp/GetFollowUp/getFollowUp.useCase';
+import { ListFollowUpsQueryDto } from '@/modules/FollowUp/ListFollowUps/listFollowUps.dto';
+import { ListFollowUpsUseCase } from '@/modules/FollowUp/ListFollowUps/listFollowUps.useCase';
 import type { FollowUpRepository } from '@/modules/FollowUp/repositories/followUp.repository';
+import { FOLLOW_UPS_EMPTY_MESSAGE } from '@/modules/FollowUp/types/followUp.types';
 
 import { ACTOR_ID, sessionOf } from '../Patient/patient.fixtures';
 import {
@@ -223,5 +226,57 @@ describe('GetFollowUpUseCase', () => {
         ),
       ),
     ).toMatchObject({ code: 'FOLLOW_UP_NOT_FOUND', status: 404 });
+  });
+});
+
+describe('ListFollowUpsUseCase', () => {
+  const query = (page = 1) =>
+    Object.assign(new ListFollowUpsQueryDto(), {
+      patientId: FOLLOW_UP_PATIENT_ID,
+      page,
+      limit: 20,
+    });
+
+  it.each([
+    ProfileCode.ADMIN,
+    ProfileCode.PROFESSIONAL,
+    ProfileCode.FAMILY,
+  ] as const)(
+    '%s: periodo sem registro e 200 vazio com meta.message',
+    async (profile) => {
+      repository.list.mockResolvedValue([[], 0]);
+
+      const result = await new ListFollowUpsUseCase(followUps).execute(
+        query(),
+        sessionOf(profile),
+      );
+
+      expect(result.data).toEqual([]);
+      expect(result.extras.message).toBe(FOLLOW_UPS_EMPTY_MESSAGE);
+    },
+  );
+
+  it('pagina alem do fim com registros no filtro: sem meta.message', async () => {
+    repository.list.mockResolvedValue([[], 3]);
+
+    const result = await new ListFollowUpsUseCase(followUps).execute(
+      query(5),
+      professional,
+    );
+
+    expect(result.extras.message).toBeUndefined();
+  });
+
+  it('paciente fora do alcance continua 404, sem mensagem', async () => {
+    repository.list.mockResolvedValue(null);
+
+    expect(
+      await codeOf(
+        new ListFollowUpsUseCase(followUps).execute(
+          query(),
+          sessionOf(ProfileCode.FAMILY),
+        ),
+      ),
+    ).toMatchObject({ code: 'PATIENT_NOT_FOUND', status: 404 });
   });
 });

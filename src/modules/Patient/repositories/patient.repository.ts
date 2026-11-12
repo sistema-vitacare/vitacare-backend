@@ -142,6 +142,34 @@ const isPostgresError = (error: unknown): error is PostgresError =>
 export class PatientRepository {
   constructor(private readonly dataSource: DataSource) {}
 
+  /**
+   * Se quem le por vinculo tem ao menos um vigente na organizacao, com
+   * paciente em qualquer situacao. Escopo da organizacao inteira e sempre
+   * verdadeiro.
+   */
+  async hasCareLink(scope: PatientScope): Promise<boolean> {
+    if (scope.viewerUserId === null) return true;
+
+    try {
+      const [{ linked }] = await this.dataSource.query<
+        Array<{ linked: boolean }>
+      >(
+        `SELECT EXISTS (
+                  SELECT 1
+                    FROM user_patients link
+                   WHERE link.organization_id = $1
+                     AND link.user_id = $2
+                     AND link.role = ANY($3::varchar[])
+                     AND link.deleted_at IS NULL) AS linked`,
+        [scope.organizationId, scope.viewerUserId, scope.viewerLinkRoles],
+      );
+
+      return linked;
+    } catch (error) {
+      throw translatePgError(error, 'patients');
+    }
+  }
+
   async list(
     scope: PatientScope,
     filter: ListPatientsFilter,

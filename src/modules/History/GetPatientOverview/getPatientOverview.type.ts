@@ -8,6 +8,10 @@ export const MEASUREMENT_VALUES_PER_FIELD = 5;
 export const ACTIVE_MEDICATIONS_LIMIT = 10;
 export const RECENT_ALERTS_LIMIT = 5;
 
+/** UC12 e UC14 alternativos: paciente sem registro valido (BE-29, Mateus). */
+export const OVERVIEW_NO_FOLLOW_UPS_MESSAGE =
+  'Este paciente ainda não tem registro de acompanhamento.';
+
 /** Uma resposta `number`/`scale` de registro valido, ja ranqueada por campo. */
 export interface MeasurementRow {
   fieldKey: string;

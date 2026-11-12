@@ -1,7 +1,7 @@
 ---
 title: Evolução e indicadores do paciente
 status: atual
-updated: 2026-11-09
+updated: 2026-11-12
 method: GET
 path: /api/v1/patients/{patientId}/evolution
 source: src/modules/Indicator/indicator.controller.ts
@@ -194,7 +194,22 @@ Conta do exemplo: média (105 + 98 + 142) / 3 = 115; variação 142 − 105 = 37
 - **Só registros válidos** entram, para todos os perfis; anulado nunca é medição.
 - **Séries e unidades (chamada do agente):** uma série reúne um campo (`fieldKey`) de um formulário. Se uma versão nova muda a unidade de um campo `number` (texto exato; sem unidade é uma unidade própria) ou a faixa de um `scale`, os valores antigos e novos ficam em **séries separadas**, com o mesmo `fieldKey`, e nunca entram numa mesma média. Mudar só as casas decimais não separa. Campos de formulários diferentes nunca se juntam, mesmo com o mesmo nome; pressão arterial segue em duas séries (sistólica e diastólica).
 - **Arredondamento (chamada do agente):** indicadores com 3 casas decimais, a precisão máxima de um campo `number`; os pontos saem com o valor gravado.
-- **Período sem dados:** `200` com `series: []`; a mensagem informativa fica com o frontend (UC14, alternativo).
+- **Período sem dados (UC14, alternativo; BE-29):** `200` com `series: []` e `meta.message` `Nenhuma medição no período selecionado.`. Série com medição mas sem amostra para algum indicador continua sem mensagem, com o motivo em `unavailable`.
+
+```json
+{
+  "data": {
+    "patientId": "3c9e2a4b-1f6d-4e8a-9b7c-5d4e3f2a1b0c",
+    "period": { "from": "2026-10-14", "to": "2026-11-12", "timeZone": "America/Sao_Paulo" },
+    "series": []
+  },
+  "meta": {
+    "requestId": "a3f5b7c9-1d2e-4f60-8a9b-0c1d2e3f4a5b",
+    "timestamp": "2026-11-12T12:30:00.000Z",
+    "message": "Nenhuma medição no período selecionado."
+  }
+}
+```
 
 ## Erros
 
@@ -257,5 +272,6 @@ Testes:
 - `tests/modules/Indicator/evolutionPeriod.policy.spec.ts`: período padrão, parcial, 366/367 dias.
 - `tests/modules/Indicator/indicatorManagement.e2e-spec.ts`, em PostgreSQL com login real: fixture conhecida, limites do dia local, anulado e texto fora, filtros, período vazio, unidade trocada em nova versão, familiar igual ao profissional, cuidador `403`, outra organização, sem vínculo e vínculo revogado `404`, `422`.
 - `tests/modules/Indicator/indicator.e2e-spec.ts`: repasse de período e filtros, `401/403/404/422` e contrato OpenAPI.
+- `tests/modules/PatientAccess/familyAccess.e2e-spec.ts`: mensagem de período sem medição para familiar e profissional (BE-29).
 
-Conferido com o código e o `/api/docs-json` em 2026-11-09. Vault: [[2026-10-29-be-20-indicators]], [[2026-11-09-evolucao-e-indicadores]]. Requisitos: RF011; UC10; UC14. Versão: `v1`, criada no BE-20 (2026-11-09).
+Conferido com o código e o `/api/docs-json` em 2026-11-09. Vault: [[2026-10-29-be-20-indicators]], [[2026-11-09-evolucao-e-indicadores]]. Requisitos: RF011; UC10; UC14. Versão: `v1`, criada no BE-20 (2026-11-09); `meta.message` no BE-29 (2026-11-12, [[2026-11-12-be-29-mensagens-orientativas]]), sem quebra de contrato.

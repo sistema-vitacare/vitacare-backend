@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 
 import type { RequestContext } from '@/common/context/requestContext.type';
 import { DomainException } from '@/common/errors/domain.exception';
+import { type EnvelopePayload, withMeta } from '@/common/http/envelope';
 import { Permissions } from '@/modules/Access/access.permissions';
 import { hasPermission } from '@/modules/Access/policies/access.policy';
 import { alertScope } from '@/modules/Alert/policies/alertScope.policy';
@@ -16,6 +17,7 @@ import { toPatientOverviewResponse } from './getPatientOverview.parser';
 import {
   ACTIVE_MEDICATIONS_LIMIT,
   MEASUREMENT_VALUES_PER_FIELD,
+  OVERVIEW_NO_FOLLOW_UPS_MESSAGE,
   RECENT_ALERTS_LIMIT,
 } from './getPatientOverview.type';
 
@@ -30,6 +32,7 @@ const patientNotFound = () =>
  * Visao consolidada do paciente (Figura 36): contadores, ultimas medicoes,
  * medicamentos ativos e alertas recentes, cada bloco so com a permissao de
  * leitura que o perfil tem. Fora do alcance, nada e contado nem devolvido.
+ * Sem registro valido, `meta.message` informa a ausencia de dados.
  */
 @Injectable()
 export class GetPatientOverviewUseCase {
@@ -42,7 +45,7 @@ export class GetPatientOverviewUseCase {
   async execute(
     patientId: string,
     ctx: RequestContext,
-  ): Promise<PatientOverviewDto> {
+  ): Promise<EnvelopePayload<PatientOverviewDto>> {
     const scope = patientScope(ctx);
     const records = await this.overview.findRecordSummary(
       scope,
@@ -88,7 +91,7 @@ export class GetPatientOverviewUseCase {
       throw patientNotFound();
     }
 
-    return toPatientOverviewResponse(
+    const response = toPatientOverviewResponse(
       {
         patientId,
         records,
@@ -99,6 +102,13 @@ export class GetPatientOverviewUseCase {
             : null,
       },
       ctx,
+    );
+
+    return withMeta(
+      response,
+      records.validFollowUps === 0
+        ? { message: OVERVIEW_NO_FOLLOW_UPS_MESSAGE }
+        : {},
     );
   }
 }

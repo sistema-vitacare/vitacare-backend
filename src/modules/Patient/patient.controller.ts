@@ -80,7 +80,11 @@ export class PatientController {
     summary:
       'Lista os pacientes ao alcance da sessao, paginados; por padrao so os ativos.',
   })
-  @ApiEnvelope(PatientDto, { isArray: true })
+  @ApiEnvelope(PatientDto, {
+    isArray: true,
+    description:
+      'Lista vazia traz `meta.message`: para cuidador ou familiar sem nenhum vinculo vigente, a orientacao "Você ainda não tem paciente vinculado. Peça ao profissional responsável para liberar o seu acesso." (familiar) ou "Você ainda não tem paciente vinculado. Peça ao profissional responsável ou ao administrador para vincular você a um paciente." (cuidador); nos demais casos, "Nenhum paciente encontrado para os filtros informados.".',
+  })
   @ApiErrors(UNAUTHENTICATED, FORBIDDEN, VALIDATION)
   async list(
     @Query() query: ListPatientsQueryDto,

@@ -1,6 +1,7 @@
 import { ProfileCode } from '@/common/context/requestContext.type';
 import { DomainException } from '@/common/errors/domain.exception';
 import type { AlertRepository } from '@/modules/Alert/repositories/alert.repository';
+import { OVERVIEW_NO_FOLLOW_UPS_MESSAGE } from '@/modules/History/GetPatientOverview/getPatientOverview.type';
 import { GetPatientOverviewUseCase } from '@/modules/History/GetPatientOverview/getPatientOverview.useCase';
 import type { PatientOverviewRepository } from '@/modules/History/repositories/patientOverview.repository';
 import type { MedicationRepository } from '@/modules/Medication/repositories/medication.repository';
@@ -79,10 +80,34 @@ describe('GetPatientOverviewUseCase', () => {
 
     expect(medications.list).not.toHaveBeenCalled();
     expect(alerts.list).not.toHaveBeenCalled();
-    expect(result).toMatchObject({
+    expect(result.data).toMatchObject({
       counts: { validFollowUps: 0, openAlerts: null, activeMedications: null },
       activeMedications: null,
       recentAlerts: null,
     });
+  });
+
+  it('sem registro valido: meta.message informa a ausencia de dados', async () => {
+    const result = await useCase.execute(
+      PATIENT_ID,
+      sessionOf(ProfileCode.FAMILY),
+    );
+
+    expect(result.extras).toEqual({ message: OVERVIEW_NO_FOLLOW_UPS_MESSAGE });
+  });
+
+  it('com registro valido: sem meta.message', async () => {
+    overview.findRecordSummary.mockResolvedValue({
+      ...summary,
+      validFollowUps: 1,
+      lastVisitedAt: new Date('2026-11-10T12:00:00.000Z'),
+    });
+
+    const result = await useCase.execute(
+      PATIENT_ID,
+      sessionOf(ProfileCode.FAMILY),
+    );
+
+    expect(result.extras).toEqual({});
   });
 });

@@ -90,7 +90,11 @@ export class FollowUpController {
     summary:
       'Lista os registros de acompanhamento de um paciente ao alcance da sessao, da visita mais recente para a mais antiga.',
   })
-  @ApiEnvelope(FollowUpDto, { isArray: true })
+  @ApiEnvelope(FollowUpDto, {
+    isArray: true,
+    description:
+      'Lista vazia traz `meta.message` "Nenhum registro de acompanhamento no período e nos filtros selecionados." (UC12/UC14 alternativos).',
+  })
   @ApiErrors(
     UNAUTHENTICATED,
     FORBIDDEN,
