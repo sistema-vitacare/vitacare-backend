@@ -46,6 +46,8 @@ const OUTSIDE_ENVELOPE: Record<string, string[]> = {
   ],
   'DELETE /api/v1/follow-ups/:followUpId/attachments/:attachmentId': [],
   'GET /api/v1/patients/:patientId/report/pdf': ['application/pdf'],
+  'GET /api/v1/management-reports/alerts/pdf': ['application/pdf'],
+  'GET /api/v1/management-reports/caregivers/pdf': ['application/pdf'],
   'GET /api/v1/audit-events/export': ['text/csv'],
 };
 

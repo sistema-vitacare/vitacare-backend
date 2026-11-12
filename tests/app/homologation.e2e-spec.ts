@@ -1180,6 +1180,70 @@ describeWithInfrastructure('homologacao funcional dos 14 casos de uso', () => {
     });
   });
 
+  describe('Relatorios gerenciais — Quadro 2 e Figura 43 (BE-30)', () => {
+    it('o administrador Enterprise gera alertas e cuidadores em JSON e PDF; recentes vem da auditoria; Basic e outros perfis nao', async () => {
+      const A = tenants.A;
+      const alerts = dataOf<{
+        totals: { issued: number; open: number; resolved: number };
+      }>(await http('get', '/management-reports/alerts', A.tokens.admin));
+      const caregivers = dataOf<{
+        summary: { caregivers: number; validFollowUps: number };
+      }>(await http('get', '/management-reports/caregivers', A.tokens.admin));
+
+      // Os mesmos numeros do painel: um registro valido e dois alertas.
+      expect(alerts.totals).toMatchObject({ issued: 2, open: 1, resolved: 1 });
+      expect(caregivers.summary).toMatchObject({
+        caregivers: 1,
+        validFollowUps: 1,
+      });
+
+      for (const kind of ['alerts', 'caregivers']) {
+        const pdf = await http(
+          'get',
+          `/management-reports/${kind}/pdf`,
+          A.tokens.admin,
+        )
+          .buffer(true)
+          .parse((response, done) => {
+            const chunks: Buffer[] = [];
+
+            response.on('data', (chunk: Buffer) => chunks.push(chunk));
+            response.on('end', () => done(null, Buffer.concat(chunks)));
+          });
+
+        expect(pdf.status).toBe(200);
+        expect(pdf.headers['content-type']).toBe('application/pdf');
+        expect((pdf.body as Buffer).subarray(0, 5).toString()).toBe('%PDF-');
+      }
+
+      const recent = dataOf<Array<{ type: string }>>(
+        await http('get', '/management-reports/recent', A.tokens.admin),
+      );
+
+      expect(recent.map((item) => item.type)).toEqual([
+        'caregiver_activity',
+        'alerts',
+        'patient_follow_up',
+      ]);
+      expect(
+        codeOf(
+          await http(
+            'get',
+            '/management-reports/alerts',
+            tenants.B.tokens.admin,
+          ),
+        ),
+      ).toBe('MANAGEMENT_REPORT_PLAN_FEATURE_UNAVAILABLE');
+
+      for (const role of ['professional', 'caregiver', 'family'] as const) {
+        expect(
+          (await http('get', '/management-reports/alerts', A.tokens[role]))
+            .status,
+        ).toBe(403);
+      }
+    });
+  });
+
   describe('UC06 — auditoria', () => {
     it('o administrador consulta e exporta so a propria trilha', async () => {
       const A = tenants.A;

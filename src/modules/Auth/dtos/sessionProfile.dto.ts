@@ -70,7 +70,7 @@ export class SessionPlanDto {
     isArray: true,
     example: ['patient_management', 'operational_dashboard'],
     description:
-      'Recursos do plano (Quadro 2). Sem `operational_dashboard`, o painel responde 403.',
+      'Recursos do plano (Quadro 2). Sem `operational_dashboard`, o painel responde 403; sem `management_reports`, os relatorios gerenciais tambem.',
   })
   features!: string[];
 

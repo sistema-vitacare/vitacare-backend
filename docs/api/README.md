@@ -119,6 +119,12 @@ O corpo das rotas de negócio é JSON quando aplicável. Autenticação usa Bear
 | `GET /api/v1/dashboard/users` | Detalhe de usuários: ativos, convidados e inativos por perfil | [dashboard-usuarios.md](endpoints/dashboard-usuarios.md) |
 | `GET /api/v1/dashboard/follow-ups` | Detalhe de registros: válidos no período por dia, formulário e autor | [dashboard-registros.md](endpoints/dashboard-registros.md) |
 | `GET /api/v1/dashboard/alerts` | Detalhe de alertas: emitidos no período por dia, severidade e origem, e pendentes agora | [dashboard-alertas.md](endpoints/dashboard-alertas.md) |
+| `GET /api/v1/management-reports` | Catálogo dos relatórios da Figura 43 com o total de exportações (admin, Enterprise) | [management-reports-catalogo.md](endpoints/management-reports-catalogo.md) |
+| `GET /api/v1/management-reports/recent` | Relatórios exportados recentemente, lidos da auditoria | [management-reports-recentes.md](endpoints/management-reports-recentes.md) |
+| `GET /api/v1/management-reports/alerts` | Alertas e intercorrências no período: origem, severidade, status, tempo até a resolução, pacientes, série diária | [management-reports-alertas.md](endpoints/management-reports-alertas.md) |
+| `GET /api/v1/management-reports/alerts/pdf` | O mesmo relatório em PDF (binário), gerado na hora e auditado | [management-reports-alertas-pdf.md](endpoints/management-reports-alertas-pdf.md) |
+| `GET /api/v1/management-reports/caregivers` | Atividade dos cuidadores no período: vínculos, registros, ausências e alertas resolvidos | [management-reports-cuidadores.md](endpoints/management-reports-cuidadores.md) |
+| `GET /api/v1/management-reports/caregivers/pdf` | O mesmo relatório em PDF (binário), gerado na hora e auditado | [management-reports-cuidadores-pdf.md](endpoints/management-reports-cuidadores-pdf.md) |
 | `GET /api/v1/audit-events` | Lista a auditoria por período, ação, usuário, sistema, gravidade e busca (admin da própria organização; master de todas) | [audit-events-listar.md](endpoints/audit-events-listar.md) |
 | `GET /api/v1/audit-events/actions` | Catálogo de ações auditadas, com rótulo e gravidade | [audit-events-acoes.md](endpoints/audit-events-acoes.md) |
 | `GET /api/v1/audit-events/export` | Exporta a auditoria em CSV (binário, fora do envelope), gerado na hora e auditado | [audit-events-exportar.md](endpoints/audit-events-exportar.md) |
@@ -252,6 +258,52 @@ O [relatório do paciente](endpoints/patients-relatorio.md) (`GET /patients/:pat
 ### Painel operacional da organização
 
 O [painel operacional](endpoints/dashboard-resumo.md) (`GET /dashboard`) e os quatro detalhes por indicador ([pacientes](endpoints/dashboard-pacientes.md), [usuários](endpoints/dashboard-usuarios.md), [registros](endpoints/dashboard-registros.md), [alertas](endpoints/dashboard-alertas.md)) atendem o UC05 (BE-22, 2026-11-09; RF015; Figura 33; decisões de Mateus). Só o **admin** (`dashboard:read`) e só organização cujo plano tem `operational_dashboard` — o **Enterprise** do Quadro 2; no Basic, `403 DASHBOARD_PLAN_FEATURE_UNAVAILABLE`. Pacientes e usuários ativos são a foto de agora (usuário ativo = `status = active`, sem os convidados `pending`). Registros contam pela data da **visita**, só válidos; alertas **emitidos** contam pela geração, de todas as origens e em qualquer status, e **pendentes** são os `open` agora. O período segue a regra do BE-20 (dias no fuso `America/Sao_Paulo`, padrão de 30 dias, no máximo 366) e cada número de período vem com o **período anterior de mesmo tamanho** e a diferença absoluta. O resumo traz ainda o gráfico de registros por dia, até 5 alertas prioritários (abertos, por severidade e recência) e os 5 últimos registros. Período sem registro responde `200` com zeros e `meta.message`; falha ao carregar é `500 INTERNAL_ERROR` sem `detail`, e a nova tentativa é repetir a chamada. Sem auditoria e sem cache. A migration `1791600000000-AddDashboardIndexes` só cria índices.
+
+### Relatórios gerenciais
+
+Os relatórios gerenciais do plano Enterprise (BE-30, 2026-11-12; Quadro 2; Figura 43; RF012, RF015; decisões de Mateus) são uma capacidade nova, sem UC no TCC. A especificação, no formato de UC, está no vault, em `2026-11-12-relatorios-gerenciais`.
+
+**Acesso:**
+
+- Só o **admin** gera, com a permissão nova `management_reports:generate`. O admin passa a ter 36 permissões.
+- Só organização cujo plano tem `management_reports`, o **Enterprise**. No Basic, a resposta é `403 MANAGEMENT_REPORT_PLAN_FEATURE_UNAVAILABLE`, antes de qualquer consulta.
+
+**Tipos de relatório:**
+
+- **Acompanhamento individual:** é o relatório do paciente acima.
+- **[Alertas e intercorrências](endpoints/management-reports-alertas.md):**
+  - parte dos alertas das três origens emitidos no período, com o status de agora;
+  - intercorrência = alerta `critical`;
+  - traz contagens por origem, severidade e status, o tempo até a resolução (média e mediana em horas), até 10 pacientes com mais alertas, a série diária e as 200 intercorrências mais recentes;
+  - acima de 10.000 alertas, a resposta é `422 MANAGEMENT_REPORT_TOO_MANY_ALERTS`.
+- **[Atividade dos cuidadores](endpoints/management-reports-cuidadores.md):**
+  - uma linha por cuidador, com pacientes vinculados, registros válidos e anulados, pacientes com e sem registro, alertas de ausência dos pacientes dele e alertas que ele resolveu;
+  - não há nota, percentual nem classificação.
+
+**Filtros:** período com a regra do BE-20 e `condition` por trecho da condição principal ou secundária, sem diferenciar maiúsculas. Período sem dados responde `200` com zeros e `meta.message`.
+
+**PDF e recentes:**
+
+- Os PDFs ([alertas](endpoints/management-reports-alertas-pdf.md), [cuidadores](endpoints/management-reports-cuidadores-pdf.md)) têm o mesmo conteúdo do JSON e seguem o visual do sistema.
+- São gerados na hora, não ficam guardados, e a exportação é auditada (`management_report.exported`). Não há CSV nem XLSX.
+- O [catálogo](endpoints/management-reports-catalogo.md) e os [recentes](endpoints/management-reports-recentes.md) são montados pelos eventos de exportação, gerenciais e do PDF do paciente.
+- A leitura em JSON não é auditada.
+
+**Privacidade:** nenhum relatório traz valor clínico registrado, CPF, contato ou endereço, e o nome do arquivo não leva nome de pessoa.
+
+### Recursos do plano
+
+Como cada recurso do Quadro 2 (`usage_plans.features`, exposto em `session.organization.plan.features` e `GET /organizations/me/plan`) é aplicado pela API:
+
+| Recurso | Planos | Aplicação |
+| --- | --- | --- |
+| `patient_management`, `health_records`, `patient_history`, `automatic_alerts`, `responsive_access` | Basic e Enterprise | Funcionalidades básicas, presentes nos dois planos; não há checagem porque nenhum plano fica sem elas. |
+| `extended_registration` | Enterprise | Aplicado pelos limites do plano (50 usuários e 1.000 pacientes ativos) e pela expansão contratada (`usage_plans.expandable`), em `checkPlanSeat` (BE-07/BE-08). |
+| `operational_dashboard` | Enterprise | Checado em `/dashboard` (`403 DASHBOARD_PLAN_FEATURE_UNAVAILABLE`, BE-22). |
+| `management_reports` | Enterprise | Checado em `/management-reports` (`403 MANAGEMENT_REPORT_PLAN_FEATURE_UNAVAILABLE`, BE-30). |
+| `custom_deployment` | Enterprise | Serviço contratado, sem checagem na API. |
+
+O relatório do paciente (UC10) é funcionalidade do caso de uso e existe nos dois planos. Termo vencido não tira recurso nenhum; ele só bloqueia o crescimento (BE-07).
 
 ### Auditoria
 
@@ -422,6 +474,8 @@ Escrita pode acrescentar `meta.message`:
 | `GET /api/v1/follow-ups/:followUpId/attachments/:attachmentId/content` | Conteúdo binário do anexo; os erros continuam no formato JSON. |
 | `DELETE /api/v1/follow-ups/:followUpId/attachments/:attachmentId` | `204 No Content`, sem corpo. |
 | `GET /api/v1/patients/:patientId/report/pdf` | PDF binário do relatório; os erros continuam no formato JSON. |
+| `GET /api/v1/management-reports/alerts/pdf` | PDF binário do relatório de alertas; os erros continuam no formato JSON. |
+| `GET /api/v1/management-reports/caregivers/pdf` | PDF binário da atividade dos cuidadores; os erros continuam no formato JSON. |
 | `GET /api/v1/audit-events/export` | CSV da auditoria (UTF-8 com BOM); os erros continuam no formato JSON. |
 
 ### Formato de erro
@@ -514,7 +568,7 @@ A mesma API e os mesmos contratos atendem o frontend React/PWA em computador, ta
 
 **Sessão.** Faça login, guarde o token só pelo tempo da sessão e envie-o em toda rota protegida. `401` em qualquer chamada significa sessão encerrada (logout, expiração, inativação, organização inativada ou troca de senha): volte ao login. Com `data.state = password_change_required`, só [primeiro acesso](endpoints/auth-primeiro-acesso.md) e [logout](endpoints/auth-logout.md) respondem. `403` é falta de permissão do perfil; `404` cobre recurso inexistente, de outra organização ou de paciente sem vínculo, sem distinção.
 
-**Sessão do usuário como cache.** Guarde `data.session` do login junto do token e use-o para montar o menu e redirecionar ao painel do perfil (`session.profile.code`), mostrar ou esconder ações (`session.permissions`) e esconder o painel no plano sem `operational_dashboard` (`session.organization.plan.features`). O CPF do login vem mascarado; a tela de dados pessoais lê [GET /profile](endpoints/profile-consultar.md), que traz o completo. Recarregue a sessão por `GET /profile` depois de [editar o próprio cadastro](endpoints/profile-atualizar.md) (ou use o `data` da própria resposta), depois de o admin trocar o seu perfil e ao receber um `403` inesperado: as permissões são relidas a cada requisição, e a lista guardada pode ter ficado velha. Depois de trocar o e-mail, o login seguinte já usa o e-mail novo; a troca de senha encerra todas as sessões e exige login de novo. A sessão restrita traz `permissions: []` e só serve para exibir nome e organização na tela de primeiro acesso.
+**Sessão do usuário como cache.** Guarde `data.session` do login junto do token e use-o para montar o menu e redirecionar ao painel do perfil (`session.profile.code`), mostrar ou esconder ações (`session.permissions`) e esconder o painel e os relatórios gerenciais no plano sem `operational_dashboard` ou `management_reports` (`session.organization.plan.features`). O CPF do login vem mascarado; a tela de dados pessoais lê [GET /profile](endpoints/profile-consultar.md), que traz o completo. Recarregue a sessão por `GET /profile` depois de [editar o próprio cadastro](endpoints/profile-atualizar.md) (ou use o `data` da própria resposta), depois de o admin trocar o seu perfil e ao receber um `403` inesperado: as permissões são relidas a cada requisição, e a lista guardada pode ter ficado velha. Depois de trocar o e-mail, o login seguinte já usa o e-mail novo; a troca de senha encerra todas as sessões e exige login de novo. A sessão restrita traz `permissions: []` e só serve para exibir nome e organização na tela de primeiro acesso.
 
 **Erros por campo.** `422` traz `error.fields` com `field` (campo aninhado como `pai.filho`), `code` e `message`; use-os para marcar o campo no formulário. Os demais erros trazem só `error.code` estável e `error.message` exibível. Trate pelo `code`, cite `meta.requestId` ao reportar e espere `429 RATE_LIMITED` se o limite de requisições estourar.
 
@@ -534,13 +588,13 @@ A mesma API e os mesmos contratos atendem o frontend React/PWA em computador, ta
 
 **Envio de arquivo.** O anexo vai em `multipart/form-data`, campo `file`, um arquivo por requisição: JPEG, PNG, WEBP ou PDF detectados pelo conteúdo, até 10 MiB ([enviar anexo](endpoints/follow-up-attachments-enviar.md)).
 
-**Downloads.** As três rotas binárias são o [anexo](endpoints/follow-up-attachments-baixar.md), o [PDF do relatório](endpoints/patients-relatorio-pdf.md) e o [CSV da auditoria](endpoints/audit-events-exportar.md). Todas exigem Bearer, então o link direto não funciona: busque com `fetch` e o header, confira `response.ok` e o `Content-Type` (erro chega em JSON), leia o nome em `Content-Disposition: attachment; filename="..."` e entregue o `Blob` ao usuário. As respostas saem com `Cache-Control: private, no-store`, cada pedido é reautorizado, e PDF e CSV são gerados na hora: em falha (`500`), repita o pedido.
+**Downloads.** As rotas binárias são o [anexo](endpoints/follow-up-attachments-baixar.md), o [PDF do relatório](endpoints/patients-relatorio-pdf.md), os PDFs gerenciais ([alertas](endpoints/management-reports-alertas-pdf.md), [cuidadores](endpoints/management-reports-cuidadores-pdf.md)) e o [CSV da auditoria](endpoints/audit-events-exportar.md). Todas exigem Bearer, então o link direto não funciona: busque com `fetch` e o header, confira `response.ok` e o `Content-Type` (erro chega em JSON), leia o nome em `Content-Disposition: attachment; filename="..."` e entregue o `Blob` ao usuário. As respostas saem com `Cache-Control: private, no-store`, cada pedido é reautorizado, e PDF e CSV são gerados na hora: em falha (`500`), repita o pedido.
 
 **Mesmo comportamento em qualquer cliente.** Paginação, filtros, períodos e o recorte por perfil (inclusive a visão mascarada do familiar) são aplicados no servidor e valem igual para desktop e mobile.
 
 ## Capacidades dos protótipos sem API
 
-Os protótipos do TCC (Figuras 31–46) mostram elementos que **não têm rota nem dado na API**. O encaminhamento de cada um foi decidido por Mateus em 2026-11-11 (BE-26; P23–P28 e P32). Nenhuma capacidade nova foi adotada. O frontend deve omitir ou adaptar estes elementos, sem simular dados:
+Os protótipos do TCC (Figuras 31–46) mostram elementos que **não têm rota nem dado na API**. O encaminhamento de cada um foi decidido por Mateus em 2026-11-11 (BE-26; P23–P28 e P32). Em 2026-11-12, o BE-30 reviu o item dos relatórios gerenciais, que passaram a existir; os demais continuam como estavam. O frontend deve omitir ou adaptar estes elementos, sem simular dados:
 
 | Elemento da tela | Figura | Encaminhamento | O que o frontend usa |
 | --- | --- | --- | --- |
@@ -554,15 +608,14 @@ Os protótipos do TCC (Figuras 31–46) mostram elementos que **não têm rota n
 | Próxima visita, agenda, "visita agendada não confirmada" | 37, 42 | adiada | nada; a cobrança de registro é o alerta de ausência (`source = absence`) |
 | Adesão %, tomada, "medicamento não administrado" | 37, 41, 42 | adiada | nada; adesão pode ser um campo `scale` do formulário, que entra no histórico e na evolução |
 | Lembrete de medicação pendente após 30 min | 46 | adiada | nada; o lembrete do horário (`source = medication_reminder`) continua |
-| Relatórios Alertas e Intercorrências, Eficiência dos Cuidadores, filtro Condição | 43 | adiada | só o relatório individual (`GET /patients/{patientId}/report` e `/report/pdf`); contagens no painel |
-| Formato XLSX e lista de relatórios recentes | 43 | adiada / não guardado | PDF gerado na hora |
+| Formato XLSX | 43 | adiada | PDF gerado na hora |
 | Relatório diário às 7h | 46 | adiada | nada |
 | Aviso ao admin quando familiar acessa | 46 | aviso adiado | consulta pela auditoria: `GET /audit-events` com a ação `auth.login_succeeded` |
 | 2FA dos administradores | 46 | adiada | nada; login só com e-mail e senha |
 | Seletor "sessão máxima sem atividade" | 46 | valor fixo | informativo: 30 min sem atividade e 12 h absolutas, iguais para todos |
 | Aba Integrações; plano "Pro - Clínica", armazenamento, registros/mês | 46 | fora de escopo / catálogo Basic e Enterprise | `GET /organizations/me/plan` |
 
-Já atendidos pela API: logout (`POST /auth/logout`); resolver alerta, aba Resolvidos e marcar todos como lidos (`POST /alerts/{alertId}/resolve`, filtro `status`, `POST /notifications/read-all`); push e e-mail por preferência (`/notifications/preferences`), com o push indisponível no navegador enquanto o acesso for por IP sem HTTPS.
+Já atendidos pela API: relatórios Alertas e Intercorrências e Atividade dos Cuidadores (o "Eficiência" da Figura 43), filtro Condição, cards "N gerados" e lista de recentes (`/management-reports`, BE-30, plano Enterprise); logout (`POST /auth/logout`); resolver alerta, aba Resolvidos e marcar todos como lidos (`POST /alerts/{alertId}/resolve`, filtro `status`, `POST /notifications/read-all`); push e e-mail por preferência (`/notifications/preferences`), com o push indisponível no navegador enquanto o acesso for por IP sem HTTPS.
 
 ## Manutenção do manual
 
