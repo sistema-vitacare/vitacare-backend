@@ -41,6 +41,7 @@ import { PatientModule } from './modules/Patient/patient.module';
 import { PatientAccessModule } from './modules/PatientAccess/patientAccess.module';
 import { ReportModule } from './modules/Report/report.module';
 import { DashboardModule } from './modules/Dashboard/dashboard.module';
+import { ManagementReportModule } from './modules/ManagementReport/managementReport.module';
 import { UserModule } from './modules/User/user.module';
 import { QueueModule } from './queue/queue.module';
 import { RedisModule } from './redis/redis.module';
@@ -107,6 +108,7 @@ import { StorageModule } from './storage/storage.module';
     IndicatorModule,
     ReportModule,
     DashboardModule,
+    ManagementReportModule,
     AlertModule,
     NotificationModule,
     AutomationModule,
