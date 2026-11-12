@@ -2,6 +2,18 @@ export type PatientStatus = 'active' | 'inactive';
 
 export type PatientSex = 'female' | 'male' | 'other';
 
+/** Listagem vazia com vinculo ou para quem le a organizacao (BE-29, Mateus). */
+export const PATIENTS_EMPTY_MESSAGE =
+  'Nenhum paciente encontrado para os filtros informados.';
+
+/** UC14 alternativo: familiar sem vinculo vigente (BE-29, Mateus). */
+export const FAMILY_NO_LINK_MESSAGE =
+  'Você ainda não tem paciente vinculado. Peça ao profissional responsável para liberar o seu acesso.';
+
+/** Cuidador sem vinculo vigente (BE-29, Mateus). */
+export const CAREGIVER_NO_LINK_MESSAGE =
+  'Você ainda não tem paciente vinculado. Peça ao profissional responsável ou ao administrador para vincular você a um paciente.';
+
 /** Papeis de vinculo de cuidado (BE-10), derivados do perfil do usuario. */
 export const CARE_LINK_ROLES = ['caregiver', 'family'] as const;
 

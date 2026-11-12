@@ -9,6 +9,10 @@ export const INDICATOR_DECIMALS = 3;
 export const EVOLUTION_DEFAULT_DAYS = 30;
 export const EVOLUTION_MAX_DAYS = 366;
 
+/** UC14 alternativo: periodo sem medicao (BE-29, Mateus). */
+export const EVOLUTION_EMPTY_MESSAGE =
+  'Nenhuma medição no período selecionado.';
+
 export type IndicatorName = keyof typeof MINIMUM_SAMPLES;
 
 export const UNAVAILABLE_REASONS = [

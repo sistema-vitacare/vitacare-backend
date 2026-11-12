@@ -6,6 +6,10 @@ export const FOLLOW_UP_STATUSES = ['valid', 'annulled'] as const;
 
 export type FollowUpStatus = (typeof FOLLOW_UP_STATUSES)[number];
 
+/** UC12 e UC14 alternativos: historico sem registro (BE-29, Mateus). */
+export const FOLLOW_UPS_EMPTY_MESSAGE =
+  'Nenhum registro de acompanhamento no período e nos filtros selecionados.';
+
 /** Valor como chega do cliente, antes de `parseFieldAnswer`. */
 export interface AnswerInput {
   fieldId: string;

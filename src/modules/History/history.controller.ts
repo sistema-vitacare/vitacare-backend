@@ -4,6 +4,7 @@ import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { CurrentContext } from '@/common/context/currentContext.decorator';
 import type { RequestContext } from '@/common/context/requestContext.type';
 import { ApiEnvelope } from '@/common/http/apiEnvelope.decorator';
+import type { EnvelopePayload } from '@/common/http/envelope';
 import { ApiErrors } from '@/common/http/apiErrors.decorator';
 import { BEARER_SECURITY_SCHEME } from '@/common/http/bearerAuth';
 import { UuidParam } from '@/common/http/uuidParam.pipe';
@@ -26,7 +27,10 @@ export class HistoryController {
     summary:
       'Visao consolidada de um paciente ao alcance da sessao: contadores, ultimas medicoes, medicamentos ativos e alertas recentes (UC12, Figura 36).',
   })
-  @ApiEnvelope(PatientOverviewDto)
+  @ApiEnvelope(PatientOverviewDto, {
+    description:
+      'Sem nenhum registro valido do paciente, `meta.message` traz "Este paciente ainda não tem registro de acompanhamento." (UC12/UC14 alternativos).',
+  })
   @ApiErrors(
     { status: 401, codes: ['AUTH_UNAUTHENTICATED'] },
     { status: 403, codes: ['AUTH_FORBIDDEN'] },
@@ -36,7 +40,7 @@ export class HistoryController {
   async overview(
     @Param('patientId', UuidParam('patientId')) patientId: string,
     @CurrentContext() ctx: RequestContext,
-  ): Promise<PatientOverviewDto> {
+  ): Promise<EnvelopePayload<PatientOverviewDto>> {
     return this.getPatientOverview.execute(patientId, ctx);
   }
 }

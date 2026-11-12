@@ -3,7 +3,12 @@ import {
   type RequestContext,
 } from '@/common/context/requestContext.type';
 
-import type { PatientLinkRole, PatientScope } from '../types/patient.types';
+import {
+  CAREGIVER_NO_LINK_MESSAGE,
+  FAMILY_NO_LINK_MESSAGE,
+  type PatientLinkRole,
+  type PatientScope,
+} from '../types/patient.types';
 
 /** Perfis que alcancam todos os pacientes da organizacao (decisao de 2026-11-04). */
 const ORGANIZATION_WIDE_PROFILES: ReadonlySet<ProfileCode> = new Set([
@@ -46,3 +51,16 @@ export const patientScope = (ctx: RequestContext): PatientScope =>
  */
 export const readsFullPatientRecord = (ctx: RequestContext): boolean =>
   ctx.profile !== ProfileCode.FAMILY;
+
+/**
+ * Orientacao para quem so ve pacientes vinculados e nao tem vinculo vigente
+ * nenhum (UC14 alternativo; BE-29, decisao de Mateus em 2026-11-12): a lista
+ * continua `200` vazia, com a mensagem no lugar do "acesso negado" do TCC.
+ */
+const NO_LINK_MESSAGES: Partial<Record<ProfileCode, string>> = {
+  [ProfileCode.CAREGIVER]: CAREGIVER_NO_LINK_MESSAGE,
+  [ProfileCode.FAMILY]: FAMILY_NO_LINK_MESSAGE,
+};
+
+export const noCareLinkMessage = (ctx: RequestContext): string | null =>
+  NO_LINK_MESSAGES[ctx.profile] ?? null;

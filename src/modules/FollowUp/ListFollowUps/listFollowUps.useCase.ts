@@ -10,12 +10,13 @@ import type { FollowUpDto } from '../dtos/followUp.dto';
 import { toFollowUpResponse } from '../parsers/followUp.parser';
 import { readsAnnulledFollowUps } from '../policies/followUpVisibility.policy';
 import { FollowUpRepository } from '../repositories/followUp.repository';
+import { FOLLOW_UPS_EMPTY_MESSAGE } from '../types/followUp.types';
 import type { ListFollowUpsQueryDto } from './listFollowUps.dto';
 
 /**
  * Historico do paciente (UC12): registros da visita mais recente para a mais
- * antiga, com os filtros combinados. Periodo sem registro e lista vazia; o
- * familiar nao ve anulados.
+ * antiga, com os filtros combinados. Periodo sem registro e lista vazia com
+ * `meta.message`; o familiar nao ve anulados.
  */
 @Injectable()
 export class ListFollowUpsUseCase {
@@ -48,10 +49,14 @@ export class ListFollowUpsUseCase {
 
     const [items, total] = result;
 
-    return paginate(
+    const page = paginate(
       items.map((item) => toFollowUpResponse(item, ctx)),
       total,
       query,
     );
+
+    if (total === 0) page.extras.message = FOLLOW_UPS_EMPTY_MESSAGE;
+
+    return page;
   }
 }
