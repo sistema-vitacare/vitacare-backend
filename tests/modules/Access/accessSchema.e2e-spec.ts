@@ -704,7 +704,8 @@ describeWithDatabase('perfis de acesso em PostgreSQL descartavel', () => {
       // Concessoes acrescentadas depois pelas migrations
       // 1790800000000-AddPatientCareLinks, 1791000000000-CreateFollowUpRecords,
       // 1791200000000-CreateMedications, 1791500000000-CreateAlertNotifications
-      // e 1791800000000-AddProfileManagePermission.
+      // 1791800000000-AddProfileManagePermission e
+      // 1792000000000-AddManagementReportsPermission.
       expect(current).toEqual({
         ...SNAPSHOT_PROFILES,
         admin: {
@@ -714,6 +715,7 @@ describeWithDatabase('perfis de acesso em PostgreSQL descartavel', () => {
             'follow_ups:annul',
             'alerts:resolve',
             'profile:manage',
+            'management_reports:generate',
           ].sort(),
         },
         professional: {
@@ -747,8 +749,9 @@ describeWithDatabase('perfis de acesso em PostgreSQL descartavel', () => {
       // Rotulos trocados depois pelas migrations 1790700000000-CreatePatients
       // e 1790900000000-CreateFollowUpForms; codigos novos da
       // 1791000000000-CreateFollowUpRecords, da
-      // 1791500000000-CreateAlertNotifications e da
-      // 1791800000000-AddProfileManagePermission.
+      // 1791500000000-CreateAlertNotifications, da
+      // 1791800000000-AddProfileManagePermission e da
+      // 1792000000000-AddManagementReportsPermission.
       expect(PERMISSION_LABELS).toEqual({
         ...SNAPSHOT_LABELS,
         'patients:deactivate': 'Inativar e reativar pacientes',
@@ -756,6 +759,7 @@ describeWithDatabase('perfis de acesso em PostgreSQL descartavel', () => {
         'follow_ups:annul': 'Anular registro de acompanhamento',
         'alerts:resolve': 'Resolver alertas',
         'profile:manage': 'Consultar e editar o proprio cadastro',
+        'management_reports:generate': 'Gerar relatorios gerenciais',
       });
       expect([...TENANT_PERMISSION_CODES].sort()).toEqual(
         [
@@ -763,6 +767,7 @@ describeWithDatabase('perfis de acesso em PostgreSQL descartavel', () => {
           'follow_ups:annul',
           'alerts:resolve',
           'profile:manage',
+          'management_reports:generate',
         ].sort(),
       );
     });

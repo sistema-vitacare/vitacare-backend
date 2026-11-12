@@ -105,6 +105,10 @@ export const AUDIT_ACTIONS: Readonly<Record<string, AuditActionEntry>> = {
     'info',
   ),
   'patient_report.exported': entry('Exportou relatório do paciente', 'warning'),
+  'management_report.exported': entry(
+    'Exportou relatório gerencial',
+    'warning',
+  ),
   'audit_events.exported': entry('Exportou a auditoria', 'warning'),
 };
 

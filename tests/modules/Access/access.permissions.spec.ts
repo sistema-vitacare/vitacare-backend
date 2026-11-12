@@ -19,11 +19,11 @@ const perms = (
 ) => TENANT_PROFILES[code].permissions as readonly string[];
 
 describe('matriz de permissoes dos perfis', () => {
-  it('catalogo de tenant tem 36 codigos validos e rotulados', () => {
-    expect(TENANT_PERMISSION_CODES).toHaveLength(36);
-    expect(new Set(TENANT_PERMISSION_CODES).size).toBe(36);
+  it('catalogo de tenant tem 37 codigos validos e rotulados', () => {
+    expect(TENANT_PERMISSION_CODES).toHaveLength(37);
+    expect(new Set(TENANT_PERMISSION_CODES).size).toBe(37);
     const all = Object.values(Permissions);
-    expect(all).toHaveLength(40);
+    expect(all).toHaveLength(41);
     for (const code of all) {
       expect(code).toMatch(/^[a-z][a-z0-9_]*:[a-z][a-z0-9_]*$/);
       expect(PERMISSION_LABELS[code]).toBeTruthy();
@@ -123,7 +123,7 @@ describe('matriz de permissoes dos perfis', () => {
         'patient_links:manage',
       ]),
     );
-    expect(perms(ProfileCode.ADMIN)).toHaveLength(35);
+    expect(perms(ProfileCode.ADMIN)).toHaveLength(36);
     for (const code of [
       'organization:read',
       'organization:update',
@@ -140,6 +140,7 @@ describe('matriz de permissoes dos perfis', () => {
       'dashboard:read',
       'audit_events:read',
       'audit_events:export',
+      'management_reports:generate',
     ]) {
       expect(perms(ProfileCode.ADMIN)).toContain(code);
     }

@@ -22,6 +22,7 @@ import { AddDashboardIndexes1791600000000 } from '@/database/migrations/17916000
 import { AuditEventQuery1791700000000 } from '@/database/migrations/1791700000000-AuditEventQuery';
 import { AddProfileManagePermission1791800000000 } from '@/database/migrations/1791800000000-AddProfileManagePermission';
 import { CreatePlanExpiryNotices1791900000000 } from '@/database/migrations/1791900000000-CreatePlanExpiryNotices';
+import { AddManagementReportsPermission1792000000000 } from '@/database/migrations/1792000000000-AddManagementReportsPermission';
 import { SnakeNamingStrategy } from '@/database/snakeNaming.strategy';
 
 const SRC_ROOT = join(__dirname, '..', '..', '..', 'src');
@@ -48,6 +49,7 @@ export const ALL_MIGRATIONS = [
   AuditEventQuery1791700000000,
   AddProfileManagePermission1791800000000,
   CreatePlanExpiryNotices1791900000000,
+  AddManagementReportsPermission1792000000000,
 ];
 
 export const TRUNCATE_AUTOMATION =

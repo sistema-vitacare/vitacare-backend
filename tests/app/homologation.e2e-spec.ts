@@ -198,7 +198,7 @@ describeWithInfrastructure('homologacao funcional dos 14 casos de uso', () => {
     it('aplica todas as migrations no banco vazio, como o entrypoint de producao', () => {
       expect(t.executedMigrations).toHaveLength(migrationFiles().length);
       expect(t.executedMigrations.at(-1)).toBe(
-        'CreatePlanExpiryNotices1791900000000',
+        'AddManagementReportsPermission1792000000000',
       );
     });
 

@@ -850,11 +850,13 @@ describeWithInfrastructure('sessao no login e proprio cadastro (BE-27)', () => {
         );
       const token = tenants.A.accounts.caregiver.token;
 
-      expect(t.executedMigrations.slice(-2)).toEqual([
+      expect(t.executedMigrations.slice(-3)).toEqual([
         'AddProfileManagePermission1791800000000',
         'CreatePlanExpiryNotices1791900000000',
+        'AddManagementReportsPermission1792000000000',
       ]);
 
+      await t.dataSource.undoLastMigration(); // AddManagementReportsPermission (BE-30), que vem depois
       await t.dataSource.undoLastMigration(); // CreatePlanExpiryNotices (BE-28), que vem depois
       await t.dataSource.undoLastMigration();
 
