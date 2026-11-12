@@ -2,14 +2,19 @@ import { Injectable } from '@nestjs/common';
 
 import type { RequestContext } from '@/common/context/requestContext.type';
 import { DomainException } from '@/common/errors/domain.exception';
+import { type EnvelopePayload, withMeta } from '@/common/http/envelope';
 import { OrganizationErrors } from '@/modules/Organization/organization.errors';
 import { canReachOrganization } from '@/modules/Organization/policies/organization.policy';
 
 import type { OrganizationPlanDto } from '../dtos/plan.dto';
 import { toOrganizationPlanResponse } from '../parsers/plan.parser';
+import { planExpiryWarningMessage } from '../policies/planExpiry.policy';
 import { PlanRepository } from '../repositories/plan.repository';
 
-/** Plano, vigencia, limites efetivos, uso e pedido pendente (UC04 passos 1-3). */
+/**
+ * Plano, vigencia, limites efetivos, uso e pedido pendente (UC04 passos 1-3).
+ * Com aviso de vencimento, `meta.message` o explica (UC04 alternativo, BE-28).
+ */
 @Injectable()
 export class GetOrganizationPlanUseCase {
   constructor(private readonly plans: PlanRepository) {}
@@ -17,7 +22,7 @@ export class GetOrganizationPlanUseCase {
   async execute(
     organizationId: string,
     ctx: RequestContext,
-  ): Promise<OrganizationPlanDto> {
+  ): Promise<EnvelopePayload<OrganizationPlanDto>> {
     const row = canReachOrganization(ctx, organizationId)
       ? await this.plans.findOrganizationPlan(organizationId)
       : null;
@@ -36,6 +41,12 @@ export class GetOrganizationPlanUseCase {
       take: 1,
     });
 
-    return toOrganizationPlanResponse(row, pending ?? null, ctx);
+    const plan = toOrganizationPlanResponse(row, pending ?? null, ctx);
+    const message = planExpiryWarningMessage(
+      plan.term.expiryWarning,
+      row.term.endsAt,
+    );
+
+    return withMeta(plan, message ? { message } : {});
   }
 }

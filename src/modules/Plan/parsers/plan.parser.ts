@@ -7,10 +7,12 @@ import type {
   PlanDto,
 } from '../dtos/plan.dto';
 import type { UsagePlan } from '../entities/usagePlan.entity';
+import { planExpiryWarning } from '../policies/planExpiry.policy';
 import type {
   OrganizationPlanRow,
   PlanActor,
   PlanChangeRequestRow,
+  PlanExpiryWarning,
 } from '../types/plan.types';
 
 export const toPlanResponse = (
@@ -58,10 +60,23 @@ export const toPlanChangeRequestResponse = (
   createdAt: new Date(request.createdAt).toISOString(),
 });
 
+/** O banco decide o vencido (`expired`); a politica, as janelas antes dele. */
+const termExpiryWarning = (
+  term: OrganizationPlanRow['term'],
+  now: Date,
+): PlanExpiryWarning | null => {
+  if (term.expired) return 'expired';
+
+  const warning = planExpiryWarning(term.endsAt, now);
+
+  return warning === 'expired' ? 'within_1_day' : warning;
+};
+
 export const toOrganizationPlanResponse = (
   row: OrganizationPlanRow,
   pending: PlanChangeRequestRow | null,
   ctx: RequestContext,
+  now: Date = new Date(),
 ): OrganizationPlanDto => ({
   organizationId: row.organizationId,
   plan: toPlanResponse(row.plan),
@@ -70,6 +85,7 @@ export const toOrganizationPlanResponse = (
     startsAt: row.term.startsAt.toISOString(),
     endsAt: row.term.endsAt?.toISOString() ?? null,
     status: row.term.expired ? 'expired' : 'active',
+    expiryWarning: termExpiryWarning(row.term, now),
     origin: row.term.origin,
     userLimit: row.term.userLimit,
     patientLimit: row.term.patientLimit,
