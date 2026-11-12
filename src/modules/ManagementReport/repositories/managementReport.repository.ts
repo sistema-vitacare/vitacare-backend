@@ -263,30 +263,54 @@ export class ManagementReportRepository {
     condition: string | null,
   ): Promise<CaregiverActivityRow[]> {
     return this.query<CaregiverActivityRow>(
-      `${CAREGIVER_SCOPE}
+      // Cada medida e agregada uma vez por usuario e juntada por chave: uma
+      // subconsulta correlacionada releria as CTEs inteiras para cada linha.
+      `${CAREGIVER_SCOPE},
+       linked AS (
+         SELECT user_id, count(DISTINCT patient_id)::int AS total
+           FROM links
+          GROUP BY user_id
+       ),
+       authored AS (
+         SELECT user_id,
+                count(*) FILTER (WHERE status = 'valid')::int AS valid,
+                count(*) FILTER (WHERE status = 'annulled')::int AS annulled
+           FROM records
+          GROUP BY user_id
+       ),
+       covered AS (
+         SELECT l.user_id, count(DISTINCT l.patient_id)::int AS total
+           FROM links l
+           JOIN (SELECT DISTINCT user_id, patient_id
+                   FROM records
+                  WHERE status = 'valid') r
+             ON r.user_id = l.user_id
+            AND r.patient_id = l.patient_id
+          GROUP BY l.user_id
+       ),
+       absent AS (
+         SELECT user_id, count(*)::int AS total
+           FROM absences
+          GROUP BY user_id
+       )
        SELECT u.id, u.name, u.status, ap.code AS profile,
-              (SELECT count(DISTINCT l.patient_id) FROM links l
-                WHERE l.user_id = u.id)::int AS "linkedPatients",
-              (SELECT count(*) FROM records r
-                WHERE r.user_id = u.id AND r.status = 'valid')::int AS "validFollowUps",
-              (SELECT count(*) FROM records r
-                WHERE r.user_id = u.id AND r.status = 'annulled')::int AS "annulledFollowUps",
-              (SELECT count(DISTINCT l.patient_id) FROM links l
-                WHERE l.user_id = u.id
-                  AND EXISTS (SELECT 1 FROM records r
-                               WHERE r.user_id = u.id
-                                 AND r.patient_id = l.patient_id
-                                 AND r.status = 'valid'))::int AS "patientsWithFollowUp",
-              (SELECT count(*) FROM absences x
-                WHERE x.user_id = u.id)::int AS "absenceAlerts",
-              COALESCE((SELECT rs.total FROM resolved rs
-                         WHERE rs.user_id = u.id), 0)::int AS "resolvedAlerts"
+              COALESCE(linked.total, 0) AS "linkedPatients",
+              COALESCE(authored.valid, 0) AS "validFollowUps",
+              COALESCE(authored.annulled, 0) AS "annulledFollowUps",
+              COALESCE(covered.total, 0) AS "patientsWithFollowUp",
+              COALESCE(absent.total, 0) AS "absenceAlerts",
+              COALESCE(resolved.total, 0) AS "resolvedAlerts"
          FROM people
          JOIN users u
            ON u.id = people.user_id
           AND u.organization_id = $1
          JOIN access_profiles ap
            ON ap.id = u.profile_id
+         LEFT JOIN linked ON linked.user_id = u.id
+         LEFT JOIN authored ON authored.user_id = u.id
+         LEFT JOIN covered ON covered.user_id = u.id
+         LEFT JOIN absent ON absent.user_id = u.id
+         LEFT JOIN resolved ON resolved.user_id = u.id
         ORDER BY u.name, u.id`,
       this.parameters(organizationId, period, condition),
     );
