@@ -196,7 +196,7 @@ O histórico do UC12 (BE-18, 2026-11-06; RF010/RF016; decisões de Mateus) é a 
 - `formId`: tipo de formulário;
 - `status`: situação do registro.
 
-O registro filtrado sai completo. Período sem registro é `200` com lista vazia e `total: 0`.
+O registro filtrado sai completo. Período sem registro é `200` com lista vazia, `total: 0` e `meta.message` "Nenhum registro de acompanhamento no período e nos filtros selecionados." (BE-29).
 
 A [visão consolidada](endpoints/patients-visao-consolidada.md) (`GET /patients/:patientId/overview`, Figura 36) reúne numa chamada:
 - os contadores: registros válidos, alertas abertos e medicamentos ativos;
@@ -204,7 +204,7 @@ A [visão consolidada](endpoints/patients-visao-consolidada.md) (`GET /patients/
 - os 5 últimos valores de cada campo `number`/`scale` de registros válidos, sem classificação clínica;
 - até 10 medicamentos ativos e os 5 alertas mais recentes, nos formatos de `GET /medications` e `GET /alerts`.
 
-Blocos de medicamento e alerta saem `null` para quem não tem `medications:read` ou `alerts:read`.
+Blocos de medicamento e alerta saem `null` para quem não tem `medications:read` ou `alerts:read`. Paciente sem nenhum registro válido traz `meta.message` "Este paciente ainda não tem registro de acompanhamento." (BE-29).
 
 As duas rotas exigem `patient_history:read` e o mesmo alcance de paciente: admin e profissional na organização inteira, cuidador e familiar só com vínculo vigente. O familiar não vê registros anulados no histórico (BE-19); a visão consolidada já conta só os válidos. Fora do alcance, a resposta é `404 PATIENT_NOT_FOUND` antes de qualquer contagem. O histórico de paciente inativo continua legível.
 
@@ -228,7 +228,8 @@ Garantias que já existiam e continuam testadas:
 - **Somente leitura:** toda escrita do familiar responde `403 AUTH_FORBIDDEN` (paciente, registro, anulação, anexo, medicamento, resolução de alerta, vínculo). Ele não gera relatório nem exporta auditoria.
 - **Vínculo a cada requisição:** o vínculo é relido a cada chamada. Revogado, as leituras passam a `404` na requisição seguinte.
 - **Identificador alheio:** `patientId`, `followUpId` ou `attachmentId` de outro paciente ou de outra organização responde `404`, sem conteúdo.
-- **Sem vínculo:** `GET /patients` devolve lista vazia; a mensagem orientativa ("solicite permissão ao profissional responsável") fica com o frontend.
+- **Sem vínculo (BE-29, decisão de Mateus em 2026-11-12):** a página do familiar continua acessível, sem "acesso negado". `GET /patients` devolve `200` com lista vazia e `meta.message` "Você ainda não tem paciente vinculado. Peça ao profissional responsável para liberar o seu acesso.", com ou sem filtros e em qualquer página; o cuidador sem vínculo recebe "Você ainda não tem paciente vinculado. Peça ao profissional responsável ou ao administrador para vincular você a um paciente.". Vínculo revogado conta como inexistente já na requisição seguinte, e a mensagem some quando um vínculo novo é criado. Com vínculo, busca sem resultado traz o aviso genérico "Nenhum paciente encontrado para os filtros informados." (inclusive quando o único vínculo é com paciente inativo e a lista é a de ativos). Detalhe por id fora do alcance continua `404 PATIENT_NOT_FOUND`, sem mensagem.
+- **Sem dados no período (BE-29):** histórico, visão consolidada e evolução vazios trazem `meta.message` informativa (ver as seções abaixo).
 
 **Fora do escopo:** próxima visita, adesão e estado resumido da Figura 37 (adiados ou fora de escopo no BE-26; ver [Capacidades dos protótipos sem API](#capacidades-dos-protótipos-sem-api)).
 
@@ -240,7 +241,7 @@ A [evolução do paciente](endpoints/patients-evolucao.md) (`GET /patients/:pati
 - **variação:** último valor − primeiro, com pelo menos 2;
 - **tendência:** inclinação da reta de mínimos quadrados em unidade por dia, com direção pelo sinal (`rising`, `falling`, `flat`), com pelo menos 3 medições em 2 instantes distintos.
 
-Indicador sem amostra mínima sai `null` e entra em `unavailable` com o motivo, como pede o UC10. Um ponto é uma medição de registro válido; o período é `from`/`to` em dias da visita no fuso `America/Sao_Paulo`, com padrão nos últimos 30 dias e no máximo 366 dias. Campos `number` com unidade diferente entre versões, ou `scale` com faixa diferente, viram séries separadas e nunca se misturam numa média; período sem medição é `200` com `series: []`. Indicadores com 3 casas decimais.
+Indicador sem amostra mínima sai `null` e entra em `unavailable` com o motivo, como pede o UC10. Um ponto é uma medição de registro válido; o período é `from`/`to` em dias da visita no fuso `America/Sao_Paulo`, com padrão nos últimos 30 dias e no máximo 366 dias. Campos `number` com unidade diferente entre versões, ou `scale` com faixa diferente, viram séries separadas e nunca se misturam numa média; período sem medição é `200` com `series: []` e `meta.message` "Nenhuma medição no período selecionado." (BE-29). Indicadores com 3 casas decimais.
 
 A rota exige `patient_evolution:read` (admin, profissional e familiar; o cuidador não tem) e o alcance de paciente das demais leituras; fora dele, `404 PATIENT_NOT_FOUND`. O familiar recebe a mesma resposta do profissional. O painel operacional da organização (BE-22) está em [Painel operacional da organização](#painel-operacional-da-organização).
 
@@ -407,7 +408,7 @@ Escrita pode acrescentar `meta.message`:
 | `data` | objeto, lista ou `null` | Conteúdo da operação. Operação sem conteúdo devolve `200` com `data: null`, não `204`; a única exceção é a remoção de anexo (`DELETE`, `204` sem corpo), decidida por Mateus em 2026-11-05. |
 | `meta.requestId` | texto | Identificador de correlação com o log. Sempre presente. Um `X-Request-Id` recebido no formato `[A-Za-z0-9-]{16,64}` (por exemplo o de um proxy nginx) é adotado, para correlacionar com o log do proxy; header ausente ou fora do formato gera um UUID. |
 | `meta.timestamp` | texto ISO 8601 | Momento em que a resposta foi construída. Sempre presente. |
-| `meta.message` | texto, opcional | Confirmação amigável definida pelo caso de uso. |
+| `meta.message` | texto, opcional | Texto amigável em português definido pelo caso de uso: confirmação de escrita ou aviso de resultado vazio (orientação de quem não tem vínculo, ausência de dados no período). Exibível ao usuário; o frontend não deve tomar decisão comparando o texto. |
 | `meta.pagination` | objeto, opcional | `page`, `limit`, `total` e `totalPages`. Só em resultado paginado. |
 
 ### Rotas fora do envelope
@@ -501,7 +502,7 @@ Códigos transversais de `error.code`: `BAD_REQUEST`, `VALIDATION_FAILED`, `UNAU
 
 Toda listagem paginada recebe `page` (inteiro, mínimo 1, padrão 1) e `limit` (inteiro de 1 a 100, padrão 20) e devolve `meta.pagination` (`page`, `limit`, `total`, `totalPages`). Página além da última responde `200` com `data: []` e o `total` real. São paginadas: `GET /organizations`, `/plan-change-requests`, `/users`, `/patients`, `/patient-links`, `/patient-links/eligible-users`, `/forms`, `/follow-ups`, `/alert-rules`, `/alerts`, `/medications`, `/notifications` e `/audit-events`. Os anexos de um registro (no máximo 5) e o catálogo de planos saem inteiros, sem `meta.pagination`.
 
-Filtros são parâmetros de query combinados com E; a nota de cada rota lista os aceitos, a ordenação fixa e os limites. Parâmetro desconhecido ou fora do formato responde `422 VALIDATION_FAILED` com o item em `fields`. Resultado vazio é sempre `200` com lista vazia, nunca `404`.
+Filtros são parâmetros de query combinados com E; a nota de cada rota lista os aceitos, a ordenação fixa e os limites. Parâmetro desconhecido ou fora do formato responde `422 VALIDATION_FAILED` com o item em `fields`. Resultado vazio é sempre `200` com lista vazia, nunca `404`. Algumas leituras acrescentam `meta.message` quando não há dados — `GET /patients` (orientação a cuidador e familiar sem vínculo ou aviso de busca vazia), `/follow-ups`, `/patients/:id/overview`, `/patients/:id/evolution` (BE-29), `/audit-events` e o painel; a página além da última, com `total` maior que zero, não traz a mensagem.
 
 Períodos (`from`/`to` em histórico, evolução, relatório, painel e auditoria) são dias `AAAA-MM-DD` inclusivos no fuso `America/Sao_Paulo`; a regra de padrão, máximo de 366 dias e `422 PERIOD_TOO_LONG` está na nota de cada rota. Instantes nas respostas saem em ISO 8601 UTC.
 
@@ -516,6 +517,20 @@ A mesma API e os mesmos contratos atendem o frontend React/PWA em computador, ta
 **Sessão do usuário como cache.** Guarde `data.session` do login junto do token e use-o para montar o menu e redirecionar ao painel do perfil (`session.profile.code`), mostrar ou esconder ações (`session.permissions`) e esconder o painel no plano sem `operational_dashboard` (`session.organization.plan.features`). O CPF do login vem mascarado; a tela de dados pessoais lê [GET /profile](endpoints/profile-consultar.md), que traz o completo. Recarregue a sessão por `GET /profile` depois de [editar o próprio cadastro](endpoints/profile-atualizar.md) (ou use o `data` da própria resposta), depois de o admin trocar o seu perfil e ao receber um `403` inesperado: as permissões são relidas a cada requisição, e a lista guardada pode ter ficado velha. Depois de trocar o e-mail, o login seguinte já usa o e-mail novo; a troca de senha encerra todas as sessões e exige login de novo. A sessão restrita traz `permissions: []` e só serve para exibir nome e organização na tela de primeiro acesso.
 
 **Erros por campo.** `422` traz `error.fields` com `field` (campo aninhado como `pai.filho`), `code` e `message`; use-os para marcar o campo no formulário. Os demais erros trazem só `error.code` estável e `error.message` exibível. Trate pelo `code`, cite `meta.requestId` ao reportar e espere `429 RATE_LIMITED` se o limite de requisições estourar.
+
+**Lista vazia e `meta.message`.** Quando `data` vier vazio (ou, na visão consolidada e na evolução, sem registros e com `series: []`), exiba `meta.message` se ele existir, no lugar de uma tabela ou gráfico vazio; sem `meta.message`, use o texto padrão da tela. É assim que o familiar e o cuidador sem paciente vinculado veem a orientação para pedir acesso ao profissional responsável (UC14, BE-29) — a resposta é `200`, não um erro. O texto vem pronto em português; não compare o conteúdo para decidir fluxo.
+
+```json
+{
+  "data": [],
+  "meta": {
+    "requestId": "a3f5b7c9-1d2e-4f60-8a9b-0c1d2e3f4a5b",
+    "timestamp": "2026-11-12T12:30:00.000Z",
+    "pagination": { "page": 1, "limit": 20, "total": 0, "totalPages": 0 },
+    "message": "Você ainda não tem paciente vinculado. Peça ao profissional responsável para liberar o seu acesso."
+  }
+}
+```
 
 **Envio de arquivo.** O anexo vai em `multipart/form-data`, campo `file`, um arquivo por requisição: JPEG, PNG, WEBP ou PDF detectados pelo conteúdo, até 10 MiB ([enviar anexo](endpoints/follow-up-attachments-enviar.md)).
 

@@ -1,7 +1,7 @@
 ---
 title: Listar pacientes
 status: atual
-updated: 2026-11-04
+updated: 2026-11-12
 method: GET
 path: /api/v1/patients
 source: src/modules/Patient/patient.controller.ts
@@ -139,7 +139,39 @@ Para a sessão `family`, cada item traz só o recorte da Figura 37 (BE-19): `cpf
 
 ## Paginação, ordem e filtros
 
-Ordem: nome e depois `id`, crescentes. Filtros combinam com E. `total` conta os pacientes que casam com os filtros dentro do alcance da sessão. Cuidador e familiar sem vínculo recebem `data: []` e `total: 0`.
+Ordem: nome e depois `id`, crescentes. Filtros combinam com E. `total` conta os pacientes que casam com os filtros dentro do alcance da sessão. Cuidador e familiar sem vínculo recebem `data: []` e `total: 0`, com a orientação abaixo.
+
+## Lista vazia e `meta.message` (BE-29)
+
+Com `total: 0`, a resposta continua `200` e traz `meta.message` (UC14, alternativo; decisões de Mateus em 2026-11-12: a página do familiar continua acessível, sem "acesso negado"):
+
+| Quem consulta | Situação | `meta.message` |
+| --- | --- | --- |
+| `family` | Nenhum vínculo `family` vigente na organização (nunca teve ou todos revogados) | `Você ainda não tem paciente vinculado. Peça ao profissional responsável para liberar o seu acesso.` |
+| `caregiver` | Nenhum vínculo `caregiver` vigente na organização | `Você ainda não tem paciente vinculado. Peça ao profissional responsável ou ao administrador para vincular você a um paciente.` |
+| `family` ou `caregiver` com vínculo vigente; `admin`; `professional` | Os filtros não acham paciente | `Nenhum paciente encontrado para os filtros informados.` |
+
+- A orientação vale **com ou sem filtros e em qualquer página**: sem vínculo, nenhum filtro acharia paciente.
+- Vínculo revogado conta como inexistente já na requisição seguinte; com um vínculo novo, a lista volta sem mensagem. Vínculo com paciente **inativo** é vínculo: sem filtro, a lista de ativos vem vazia com o aviso genérico, e o paciente aparece com `status=inactive`.
+- Página além da última, com `total` maior que zero, não traz mensagem.
+- O texto não leva dado de paciente. O frontend exibe `meta.message` no lugar da tabela vazia; detalhe por id de paciente fora do alcance continua `404 PATIENT_NOT_FOUND`, sem mensagem.
+
+```json
+{
+  "data": [],
+  "meta": {
+    "requestId": "a3f5b7c9-1d2e-4f60-8a9b-0c1d2e3f4a5b",
+    "timestamp": "2026-11-12T12:30:00.000Z",
+    "pagination": {
+      "page": 1,
+      "limit": 20,
+      "total": 0,
+      "totalPages": 0
+    },
+    "message": "Você ainda não tem paciente vinculado. Peça ao profissional responsável para liberar o seu acesso."
+  }
+}
+```
 
 ## Erros
 
@@ -175,4 +207,4 @@ Ordem: nome e depois `id`, crescentes. Filtros combinam com E. `total` conta os 
 
 ## Origem e validação
 
-Controller `src/modules/Patient/patient.controller.ts`; caso de uso `src/modules/Patient/ListPatients/listPatients.useCase.ts`; DTO de query `src/modules/Patient/ListPatients/listPatients.dto.ts`; DTO de resposta `src/modules/Patient/dtos/patient.dto.ts`; parser `src/modules/Patient/parsers/patient.parser.ts`; alcance `src/modules/Patient/policies/patient.policy.ts`; transação e consultas `src/modules/Patient/repositories/patient.repository.ts`; erros `src/modules/Patient/patient.errors.ts`; migration `src/database/migrations/1790700000000-CreatePatients.ts`. Testes: `tests/modules/Patient/patient.policy.spec.ts`, `tests/modules/Patient/patient.e2e-spec.ts` (HTTP com guard dublê e contrato OpenAPI das seis rotas) e `tests/modules/Patient/patientManagement.e2e-spec.ts` (PostgreSQL descartável com `AuthGuard` e `PermissionsGuard` reais, quatro organizações). Conferido contra o OpenAPI gerado (`/api/docs-json`, tag `patients`) e contra a aplicação compilada com HTTP real em 2026-11-04. Spec `docs/superpowers/specs/2026-11-04-be-09-pacientes-design.md`. Vault: [[2026-10-29-be-09-patients]] e [[2026-11-04-pacientes-cadastro-e-ciclo-de-vida]]. Requisitos: RF006, RF016; UC07.
+Controller `src/modules/Patient/patient.controller.ts`; caso de uso `src/modules/Patient/ListPatients/listPatients.useCase.ts`; DTO de query `src/modules/Patient/ListPatients/listPatients.dto.ts`; DTO de resposta `src/modules/Patient/dtos/patient.dto.ts`; parser `src/modules/Patient/parsers/patient.parser.ts`; alcance `src/modules/Patient/policies/patient.policy.ts`; transação e consultas `src/modules/Patient/repositories/patient.repository.ts`; erros `src/modules/Patient/patient.errors.ts`; migration `src/database/migrations/1790700000000-CreatePatients.ts`. Testes: `tests/modules/Patient/patient.policy.spec.ts`, `tests/modules/Patient/listPatients.useCase.spec.ts` (mensagens de lista vazia), `tests/modules/PatientAccess/familyAccess.e2e-spec.ts` (BE-29 em PostgreSQL com login real: familiar e cuidador sem vínculo, revogação, vínculo novo, busca vazia, duas organizações), `tests/modules/Patient/patient.e2e-spec.ts` (HTTP com guard dublê e contrato OpenAPI das seis rotas) e `tests/modules/Patient/patientManagement.e2e-spec.ts` (PostgreSQL descartável com `AuthGuard` e `PermissionsGuard` reais, quatro organizações). Conferido contra o OpenAPI gerado (`/api/docs-json`, tag `patients`) e contra a aplicação compilada com HTTP real em 2026-11-04. Spec `docs/superpowers/specs/2026-11-04-be-09-pacientes-design.md`. Vault: [[2026-10-29-be-09-patients]] e [[2026-11-04-pacientes-cadastro-e-ciclo-de-vida]]. Requisitos: RF006, RF016; UC07; UC14 (mensagens, BE-29: [[2026-11-12-be-29-mensagens-orientativas]]).
