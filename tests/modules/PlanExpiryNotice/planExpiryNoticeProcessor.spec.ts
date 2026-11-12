@@ -45,19 +45,24 @@ describe('PlanExpiryNoticeProcessor (BE-28)', () => {
     deliver.execute.mockResolvedValue(delivered());
   });
 
-  it('agenda a execucao diaria as 08:00 de Brasilia e uma recuperacao na subida', async () => {
+  it('agenda a execucao diaria as 08:00 de Brasilia e uma recuperacao na subida, com novas tentativas se falharem', async () => {
     processor.onApplicationBootstrap();
     await flush();
 
+    const retried = expect.objectContaining({
+      removeOnComplete: true,
+      attempts: 6,
+      backoff: { type: 'exponential', delay: 30_000 },
+    }) as unknown;
     expect(queue.upsertJobScheduler).toHaveBeenCalledWith(
       PLAN_EXPIRY_NOTICE_DAILY,
       { pattern: '0 8 * * *', tz: 'America/Sao_Paulo' },
-      expect.objectContaining({ name: PLAN_EXPIRY_NOTICE_DAILY }),
+      { name: PLAN_EXPIRY_NOTICE_DAILY, opts: retried },
     );
     expect(queue.add).toHaveBeenCalledWith(
       PLAN_EXPIRY_NOTICE_CATCH_UP,
       {},
-      expect.objectContaining({ removeOnComplete: true }),
+      retried,
     );
   });
 
@@ -86,37 +91,41 @@ describe('PlanExpiryNoticeProcessor (BE-28)', () => {
     expect(deliver.execute).toHaveBeenCalledTimes(1);
   });
 
-  it('com e-mail pendente, agenda uma nova tentativa no instante dele, com id que nao duplica', async () => {
+  const retryCall = () =>
+    queue.add.mock.calls.find(([name]) => name === PLAN_EXPIRY_NOTICE_RETRY) as
+      [string, object, { jobId: string; delay: number }] | undefined;
+
+  it('com e-mail pendente, agenda uma nova tentativa no segundo dele, com id que nao duplica', async () => {
     const at = new Date(Date.now() + 60_000);
     deliver.execute.mockResolvedValue(delivered(at));
 
     await processor.process(job(PLAN_EXPIRY_NOTICE_DAILY));
 
-    expect(queue.add).toHaveBeenCalledWith(
-      PLAN_EXPIRY_NOTICE_RETRY,
-      {},
-      expect.objectContaining({
-        jobId: `${PLAN_EXPIRY_NOTICE_RETRY}-${at.getTime()}`,
-        delay: expect.any(Number) as number,
-      }),
-    );
-    const delay = (
-      queue.add.mock.calls[0] as [string, object, { delay: number }]
-    )[2].delay;
-    expect(delay).toBeGreaterThan(0);
-    expect(delay).toBeLessThanOrEqual(60_000);
+    const expected = Math.ceil(at.getTime() / 1000) * 1000;
+    const [, , options] = retryCall()!;
+    expect(options.jobId).toBe(`${PLAN_EXPIRY_NOTICE_RETRY}-${expected}`);
+    expect(options.delay).toBeGreaterThan(59_000);
+    expect(options.delay).toBeLessThanOrEqual(61_000);
   });
 
-  it('sem pendente, nao agenda nada; tentativa vencida sai sem atraso', async () => {
+  it('sem pendente, nao agenda nada', async () => {
     await processor.process(job(PLAN_EXPIRY_NOTICE_RETRY));
-    expect(queue.add).not.toHaveBeenCalled();
 
-    deliver.execute.mockResolvedValue(delivered(new Date(Date.now() - 1000)));
+    expect(queue.add).not.toHaveBeenCalled();
+  });
+
+  it('tentativa ja vencida (relogio do banco atras) sai ao menos 1 s depois, com id diferente do job em execucao', async () => {
+    const before = Date.now();
+    const at = new Date(before - 1);
+    deliver.execute.mockResolvedValue(delivered(at));
+
     await processor.process(job(PLAN_EXPIRY_NOTICE_RETRY));
-    expect(queue.add).toHaveBeenCalledWith(
-      PLAN_EXPIRY_NOTICE_RETRY,
-      {},
-      expect.objectContaining({ delay: 0 }),
+
+    const [, , options] = retryCall()!;
+    expect(options.delay).toBeGreaterThanOrEqual(1_000);
+    expect(options.delay).toBeLessThanOrEqual(2_100);
+    expect(options.jobId).not.toBe(
+      `${PLAN_EXPIRY_NOTICE_RETRY}-${Math.ceil(at.getTime() / 1000) * 1000}`,
     );
   });
 

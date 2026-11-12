@@ -29,7 +29,19 @@ export const PLAN_EXPIRY_NOTICE_RETRY = 'plan-expiry-notice-retry';
 /** Reconexao ao Redis repete o erro a cada segundo: um log por minuto basta. */
 const CONNECTION_ERROR_LOG_INTERVAL_MS = 60_000;
 
-const JOB_OPTIONS = { removeOnComplete: true, removeOnFail: 100 };
+/**
+ * Execucao que falha (PostgreSQL ou Redis piscando) tenta de novo em 30 s,
+ * 1 min, 2 min, 4 min e 8 min, em vez de esperar a 08:00 seguinte.
+ */
+const JOB_OPTIONS = {
+  removeOnComplete: true,
+  removeOnFail: 100,
+  attempts: 6,
+  backoff: { type: 'exponential', delay: 30_000 },
+};
+
+/** Folga minima da nova tentativa: nunca o mesmo id do job em execucao. */
+const RETRY_MIN_DELAY_MS = 1_000;
 
 export interface NoticeRunResult {
   generated: GenerationCount | null;
@@ -109,13 +121,19 @@ export class PlanExpiryNoticeProcessor
   }
 
   /**
-   * Um job atrasado por instante de tentativa: o id repetido nao duplica. Se o
-   * Redis perder o job, a execucao das 08:00 seguinte envia o pendente.
+   * Um job atrasado por segundo de tentativa: o id repetido nao duplica. O
+   * instante sobe para o segundo seguinte e fica ao menos 1 s no futuro, para
+   * nao coincidir com o job em execucao nem disparar antes do relogio do
+   * banco. Se o Redis perder o job, a execucao das 08:00 seguinte envia.
    */
   private async scheduleRetry(at: Date | null): Promise<void> {
     if (!at) return;
 
-    const time = new Date(at).getTime();
+    const now = Date.now();
+    const time = Math.max(
+      Math.ceil(new Date(at).getTime() / 1000) * 1000,
+      Math.ceil((now + RETRY_MIN_DELAY_MS) / 1000) * 1000,
+    );
 
     await this.queue.add(
       PLAN_EXPIRY_NOTICE_RETRY,
@@ -123,7 +141,7 @@ export class PlanExpiryNoticeProcessor
       {
         ...JOB_OPTIONS,
         jobId: `${PLAN_EXPIRY_NOTICE_RETRY}-${time}`,
-        delay: Math.max(0, time - Date.now()),
+        delay: time - now,
       },
     );
   }

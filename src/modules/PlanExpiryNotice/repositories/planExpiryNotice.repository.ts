@@ -99,9 +99,11 @@ export class PlanExpiryNoticeRepository {
 
       if (!inserted) return null;
 
+      // Nada sai antes do marco, nem numa execucao adiantada pela tolerancia.
       const recipients = await manager.query<unknown[]>(
-        `INSERT INTO plan_expiry_notice_deliveries (organization_id, notice_id, user_id)
-         SELECT u.organization_id, $2, u.id
+        `INSERT INTO plan_expiry_notice_deliveries
+           (organization_id, notice_id, user_id, next_attempt_at)
+         SELECT u.organization_id, $2, u.id, greatest(now(), $3::timestamptz)
            FROM users u
            JOIN access_profiles profile
              ON profile.id = u.profile_id
@@ -112,7 +114,7 @@ export class PlanExpiryNoticeRepository {
             AND profile.code = 'admin'
          ON CONFLICT (notice_id, user_id) DO NOTHING
          RETURNING id`,
-        [term.organizationId, inserted.id],
+        [term.organizationId, inserted.id, notice.dueAt],
       );
 
       await insertAuditEvent(manager, {

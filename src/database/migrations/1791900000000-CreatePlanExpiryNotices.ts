@@ -7,9 +7,10 @@ import type { MigrationInterface, QueryRunner } from 'typeorm';
  * por termo e marco; `valid_until` diz ate quando ele ainda pode sair.
  * `plan_expiry_notice_deliveries` e o e-mail de cada administrador, com
  * tentativas e resultado, unico por aviso e usuario. O termo ganha a chave
- * composta com a organizacao para as FKs de tenant. Sem retroativo: termos
- * ja vencidos recebem o aviso de vencimento na primeira execucao. Migration
- * nao importa codigo da aplicacao.
+ * composta com a organizacao para as FKs de tenant. Sem caso especial na
+ * implantacao: um termo corrente ja vencido, de qualquer data, recebe o aviso
+ * de vencimento uma vez na primeira execucao. Migration nao importa codigo da
+ * aplicacao.
  */
 export class CreatePlanExpiryNotices1791900000000 implements MigrationInterface {
   name = 'CreatePlanExpiryNotices1791900000000';

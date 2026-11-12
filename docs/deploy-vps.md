@@ -256,6 +256,10 @@ SMTP, **só os gerados dali em diante saem**: os acumulados não são reenviados
 (decisão de Mateus em 2026-11-12). O aviso de vencimento continua visível na tela
 (`term.expiryWarning` em `GET /organizations/me/plan`).
 
+Na primeira execução depois do deploy do BE-28, toda organização com o termo
+corrente **já vencido**, de qualquer data, recebe o aviso de vencimento uma vez
+(com o SMTP desligado, fica só registrado).
+
 O link do e-mail usa `NOTIFICATION_APP_URL`. Falha temporária do servidor (4xx,
 rede) tenta de novo em 1 min, 5 min, 30 min e 2 h; recusa definitiva (5xx) fica
 `failed`. O log leva só o id e o código, nunca o endereço.

@@ -412,6 +412,27 @@ describeWithDatabase('aviso de vencimento do plano (e2e)', () => {
       expect(email.send).toHaveBeenCalledTimes(2);
     });
 
+    it('nada sai antes do marco, mesmo gerado por uma execucao adiantada', async () => {
+      const { org } = await tenant();
+      const tomorrow = new Date(reference.getTime() + DAY_MS);
+      await seed.term(org, new Date(tomorrow.getTime() - HOUR_MS));
+
+      await generate(tomorrow);
+      const count = await deliver();
+
+      expect(email.send).not.toHaveBeenCalled();
+      expect(count.sent).toBe(0);
+      expect(count.nextAttemptAt).toEqual(tomorrow);
+      const rows = await deliveriesOf(org);
+      expect(rows.map((row) => [row.status, row.attempts])).toEqual([
+        ['pending', 0],
+        ['pending', 0],
+      ]);
+      for (const row of rows) {
+        expect(row.dueInSeconds).toBeGreaterThan(0);
+      }
+    });
+
     it('admin inativado ou rebaixado antes do envio nao recebe', async () => {
       const { org, admins } = await tenant();
       await seed.term(org, expiredEnd());
