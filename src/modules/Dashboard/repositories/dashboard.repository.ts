@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 
 import { translatePgError } from '@/common/errors/pgError.translator';
+import { inPeriod, localDay } from '@/common/sql/localPeriod';
 import {
   ALERT_SEVERITIES,
   ALERT_SOURCES,
@@ -22,14 +23,6 @@ import type {
   PriorityAlertRow,
   UsersByProfileRow,
 } from '../types/dashboard.types';
-
-/** Dias locais inclusivos `$2..$3`, na forma que usa o indice por instante. */
-const inPeriod = (column: string) =>
-  `${column} >= $2::date::timestamp AT TIME ZONE 'America/Sao_Paulo'
-   AND ${column} < ($3::date + 1)::timestamp AT TIME ZONE 'America/Sao_Paulo'`;
-
-const localDay = (column: string) =>
-  `to_char((${column} AT TIME ZONE 'America/Sao_Paulo')::date, 'YYYY-MM-DD')`;
 
 const countBy = <K extends string>(
   keys: readonly K[],
