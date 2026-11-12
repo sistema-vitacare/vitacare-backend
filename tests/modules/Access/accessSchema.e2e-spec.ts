@@ -15,6 +15,7 @@ import { runPlatformSeed } from '@/database/seeds/platformSeed';
 import { SnakeNamingStrategy } from '@/database/snakeNaming.strategy';
 import {
   PERMISSION_LABELS,
+  type PermissionName,
   Permissions,
   PLATFORM_ADMIN_PERMISSIONS,
   TENANT_PERMISSION_CODES,
@@ -560,6 +561,7 @@ describeWithDatabase('perfis de acesso em PostgreSQL descartavel', () => {
           'medications:read',
           'patient_history:read',
           'patients:read',
+          'profile:manage',
         ]);
         expect(
           records
@@ -621,7 +623,15 @@ describeWithDatabase('perfis de acesso em PostgreSQL descartavel', () => {
       );
 
     const expectedCatalog = (codes: readonly string[]) =>
-      [...codes].sort().map((code) => ({ code, name: SNAPSHOT_LABELS[code] }));
+      [...codes].sort().map((code) => ({
+        code,
+        name:
+          SNAPSHOT_LABELS[code] ?? PERMISSION_LABELS[code as PermissionName],
+      }));
+
+    // A seed atual da plataforma ja concede `profile:manage` ao master (BE-27),
+    // entao o codigo existe no catalogo antes da sincronizacao antiga.
+    const SEEDED_LATER = ['profile:manage'];
 
     beforeAll(async () => {
       fullDataSource = new DataSource({
@@ -693,7 +703,8 @@ describeWithDatabase('perfis de acesso em PostgreSQL descartavel', () => {
 
       // Concessoes acrescentadas depois pelas migrations
       // 1790800000000-AddPatientCareLinks, 1791000000000-CreateFollowUpRecords,
-      // 1791200000000-CreateMedications e 1791500000000-CreateAlertNotifications.
+      // 1791200000000-CreateMedications, 1791500000000-CreateAlertNotifications
+      // e 1791800000000-AddProfileManagePermission.
       expect(current).toEqual({
         ...SNAPSHOT_PROFILES,
         admin: {
@@ -702,6 +713,7 @@ describeWithDatabase('perfis de acesso em PostgreSQL descartavel', () => {
             ...SNAPSHOT_PROFILES.admin.permissions,
             'follow_ups:annul',
             'alerts:resolve',
+            'profile:manage',
           ].sort(),
         },
         professional: {
@@ -711,6 +723,7 @@ describeWithDatabase('perfis de acesso em PostgreSQL descartavel', () => {
             'patient_links:manage',
             'follow_ups:annul',
             'alerts:resolve',
+            'profile:manage',
           ].sort(),
         },
         caregiver: {
@@ -719,6 +732,7 @@ describeWithDatabase('perfis de acesso em PostgreSQL descartavel', () => {
             ...SNAPSHOT_PROFILES.caregiver.permissions,
             'medications:read',
             'alerts:resolve',
+            'profile:manage',
           ].sort(),
         },
         family: {
@@ -726,22 +740,30 @@ describeWithDatabase('perfis de acesso em PostgreSQL descartavel', () => {
           permissions: [
             ...SNAPSHOT_PROFILES.family.permissions,
             'medications:read',
+            'profile:manage',
           ].sort(),
         },
       });
       // Rotulos trocados depois pelas migrations 1790700000000-CreatePatients
       // e 1790900000000-CreateFollowUpForms; codigos novos da
-      // 1791000000000-CreateFollowUpRecords e da
-      // 1791500000000-CreateAlertNotifications.
+      // 1791000000000-CreateFollowUpRecords, da
+      // 1791500000000-CreateAlertNotifications e da
+      // 1791800000000-AddProfileManagePermission.
       expect(PERMISSION_LABELS).toEqual({
         ...SNAPSHOT_LABELS,
         'patients:deactivate': 'Inativar e reativar pacientes',
         'forms:deactivate': 'Desativar e reativar formularios',
         'follow_ups:annul': 'Anular registro de acompanhamento',
         'alerts:resolve': 'Resolver alertas',
+        'profile:manage': 'Consultar e editar o proprio cadastro',
       });
       expect([...TENANT_PERMISSION_CODES].sort()).toEqual(
-        [...SNAPSHOT_TENANT_CODES, 'follow_ups:annul', 'alerts:resolve'].sort(),
+        [
+          ...SNAPSHOT_TENANT_CODES,
+          'follow_ups:annul',
+          'alerts:resolve',
+          'profile:manage',
+        ].sort(),
       );
     });
 
@@ -795,11 +817,11 @@ describeWithDatabase('perfis de acesso em PostgreSQL descartavel', () => {
       }
 
       expect(await catalog()).toEqual(
-        expectedCatalog(Object.keys(SNAPSHOT_LABELS)),
+        expectedCatalog([...Object.keys(SNAPSHOT_LABELS), ...SEEDED_LATER]),
       );
       expect(
         (await catalog()).filter(({ code }) => !code.startsWith('platform_')),
-      ).toEqual(expectedCatalog(SNAPSHOT_TENANT_CODES));
+      ).toEqual(expectedCatalog([...SNAPSHOT_TENANT_CODES, ...SEEDED_LATER]));
 
       // A plataforma nao ganha perfil nem concessao.
       expect(await grantsOf(platformId)).toEqual(platformBefore);
@@ -820,7 +842,7 @@ describeWithDatabase('perfis de acesso em PostgreSQL descartavel', () => {
       await runSync();
 
       expect(await catalog()).toEqual(
-        expectedCatalog(Object.keys(SNAPSHOT_LABELS)),
+        expectedCatalog([...Object.keys(SNAPSHOT_LABELS), ...SEEDED_LATER]),
       );
       expect(await grantsOf(platformId)).toEqual(platformBefore);
       expect(await livePermissionsOf(platformId, 'platform_admin')).toEqual(

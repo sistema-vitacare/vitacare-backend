@@ -1,7 +1,10 @@
 import { DomainException } from '@/common/errors/domain.exception';
 
 import { LoginUseCase } from '@/modules/Auth/Login/login.useCase';
-import type { LoginIdentity } from '@/modules/Auth/types/auth.types';
+import type {
+  LoginIdentity,
+  SessionProfileRow,
+} from '@/modules/Auth/types/auth.types';
 
 const activeIdentity: LoginIdentity = {
   userId: 'user-1',
@@ -15,6 +18,34 @@ const activeIdentity: LoginIdentity = {
   temporaryPasswordExpiresAt: null,
   profile: 'admin' as never,
   permissions: new Set<string>(),
+};
+
+const sessionRow: SessionProfileRow = {
+  user: {
+    id: 'user-1',
+    name: 'Ana Exemplo',
+    email: 'user@example.test',
+    cpf: '52998224725',
+    phone: null,
+    status: 'active',
+    createdAt: new Date('2026-11-01T12:00:00.000Z'),
+  },
+  profile: { code: 'admin' as never, name: 'Administrador' },
+  permissions: ['users:read', 'alerts:read', 'profile:manage'],
+  organization: {
+    id: 'org-1',
+    code: 'clinica-a',
+    tradeName: 'Clinica A',
+    legalName: null,
+    kind: 'tenant',
+    status: 'active',
+    plan: {
+      code: 'basic',
+      name: 'Basic',
+      features: ['patient_management'],
+      termStatus: 'active',
+    },
+  },
 };
 
 const credentials = {
@@ -32,6 +63,7 @@ const durations: Record<string, number> = {
 interface Doubles {
   identity?: LoginIdentity | null;
   organizationId?: string | null;
+  session?: SessionProfileRow | null;
   passwordMatches?: boolean;
   createLoginSession?: jest.Mock;
   assertLoginAllowed?: jest.Mock;
@@ -50,6 +82,11 @@ const build = (doubles: Doubles = {}) => {
     findForAuthentication: jest
       .fn()
       .mockResolvedValue({ organizationId, identity }),
+    findSessionProfile: jest
+      .fn()
+      .mockResolvedValue(
+        doubles.session === undefined ? sessionRow : doubles.session,
+      ),
   };
 
   const transactions = {
@@ -89,7 +126,7 @@ const build = (doubles: Doubles = {}) => {
 };
 
 const expectInvalidCredentials = async (doubles: Doubles): Promise<void> => {
-  const { useCase, limiter, transactions } = build(doubles);
+  const { useCase, limiter, transactions, identities } = build(doubles);
 
   await expect(
     useCase.execute(credentials, { ip: '127.0.0.1' }),
@@ -104,9 +141,69 @@ const expectInvalidCredentials = async (doubles: Doubles): Promise<void> => {
     '127.0.0.1',
   );
   expect(transactions.createLoginSession).not.toHaveBeenCalled();
+  expect(identities.findSessionProfile).not.toHaveBeenCalled();
 };
 
 describe('LoginUseCase', () => {
+  it('devolve a sessao com CPF mascarado e permissoes ordenadas (BE-27)', async () => {
+    const { useCase, identities } = build();
+
+    const result = await useCase.execute(credentials, { ip: '127.0.0.1' });
+
+    expect(identities.findSessionProfile).toHaveBeenCalledWith(
+      'user-1',
+      'org-1',
+    );
+    expect(result.session).toEqual({
+      user: {
+        id: 'user-1',
+        name: 'Ana Exemplo',
+        email: 'user@example.test',
+        cpf: '***.982.247-**',
+        phone: null,
+        status: 'active',
+        createdAt: '2026-11-01T12:00:00.000Z',
+      },
+      profile: { code: 'admin', name: 'Administrador' },
+      permissions: ['alerts:read', 'profile:manage', 'users:read'],
+      organization: {
+        id: 'org-1',
+        code: 'clinica-a',
+        name: 'Clinica A',
+        legalName: null,
+        kind: 'tenant',
+        status: 'active',
+        plan: {
+          code: 'basic',
+          name: 'Basic',
+          features: ['patient_management'],
+          termStatus: 'active',
+        },
+      },
+    });
+  });
+
+  it('sessao restrita identifica o usuario sem nenhuma permissao (BE-27)', async () => {
+    const { useCase } = build({
+      identity: { ...activeIdentity, mustChangePassword: true },
+    });
+
+    const result = await useCase.execute(credentials, { ip: '127.0.0.1' });
+
+    expect(result.state).toBe('password_change_required');
+    expect(result.session.permissions).toEqual([]);
+    expect(result.session.user.name).toBe('Ana Exemplo');
+    expect(result.session.organization.name).toBe('Clinica A');
+  });
+
+  it('cadastro ilegivel depois do login aceito e erro interno, nao credencial', async () => {
+    const { useCase } = build({ session: null });
+
+    await expect(
+      useCase.execute(credentials, { ip: '127.0.0.1' }),
+    ).rejects.not.toBeInstanceOf(DomainException);
+  });
+
   it('emite sessao normal com prazo absoluto e inatividade de configuracao', async () => {
     const { useCase, transactions, limiter } = build();
 

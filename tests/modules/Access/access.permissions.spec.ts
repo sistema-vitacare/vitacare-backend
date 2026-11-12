@@ -19,11 +19,11 @@ const perms = (
 ) => TENANT_PROFILES[code].permissions as readonly string[];
 
 describe('matriz de permissoes dos perfis', () => {
-  it('catalogo de tenant tem 35 codigos validos e rotulados', () => {
-    expect(TENANT_PERMISSION_CODES).toHaveLength(35);
-    expect(new Set(TENANT_PERMISSION_CODES).size).toBe(35);
+  it('catalogo de tenant tem 36 codigos validos e rotulados', () => {
+    expect(TENANT_PERMISSION_CODES).toHaveLength(36);
+    expect(new Set(TENANT_PERMISSION_CODES).size).toBe(36);
     const all = Object.values(Permissions);
-    expect(all).toHaveLength(39);
+    expect(all).toHaveLength(40);
     for (const code of all) {
       expect(code).toMatch(/^[a-z][a-z0-9_]*:[a-z][a-z0-9_]*$/);
       expect(PERMISSION_LABELS[code]).toBeTruthy();
@@ -60,11 +60,21 @@ describe('matriz de permissoes dos perfis', () => {
     expect(holders).toEqual(['caregiver']);
   });
 
-  it('familiar so tem leitura', () => {
-    for (const code of perms(ProfileCode.FAMILY))
+  it('todos os perfis, inclusive o master, gerenciam o proprio cadastro (BE-27)', () => {
+    for (const p of TENANT_PROFILE_CODES) {
+      expect(perms(p)).toContain('profile:manage');
+    }
+    expect(PLATFORM_ADMIN_PERMISSIONS).toContain('profile:manage');
+  });
+
+  it('familiar so tem leitura de dados de paciente', () => {
+    for (const code of perms(ProfileCode.FAMILY).filter(
+      (item) => item !== 'profile:manage',
+    ))
       expect(code.endsWith(':read')).toBe(true);
     expect(sorted(perms(ProfileCode.FAMILY))).toEqual(
       sorted([
+        'profile:manage',
         'patients:read',
         'patient_history:read',
         'patient_evolution:read',
@@ -83,12 +93,14 @@ describe('matriz de permissoes dos perfis', () => {
       'medications:read',
       'patient_history:read',
       'patients:read',
+      'profile:manage',
     ]);
   });
 
-  it('profissional exatamente 20 codigos', () => {
+  it('profissional exatamente 21 codigos', () => {
     expect(sorted(perms(ProfileCode.PROFESSIONAL))).toEqual(
       sorted([
+        'profile:manage',
         'patients:read',
         'patients:create',
         'patients:update',
@@ -111,7 +123,7 @@ describe('matriz de permissoes dos perfis', () => {
         'patient_links:manage',
       ]),
     );
-    expect(perms(ProfileCode.ADMIN)).toHaveLength(34);
+    expect(perms(ProfileCode.ADMIN)).toHaveLength(35);
     for (const code of [
       'organization:read',
       'organization:update',
@@ -151,6 +163,7 @@ describe('matriz de permissoes dos perfis', () => {
   it('master: plataforma e auditoria de todas as organizacoes (BE-23)', () => {
     expect(sorted(PLATFORM_ADMIN_PERMISSIONS)).toEqual(
       sorted([
+        'profile:manage',
         'organization:read',
         'organization:update',
         'users:reset_password',

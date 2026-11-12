@@ -42,16 +42,18 @@ describe('access.policy', () => {
     expect(() => assertPermission(ctx(['a']), 'a')).not.toThrow();
   });
 
-  it('familiar so tem permissoes de leitura', () => {
+  // `profile:manage` so alcanca o proprio cadastro (BE-27), nunca dado de paciente.
+  it('familiar so tem permissoes de leitura, alem do proprio cadastro', () => {
+    const OWN_PROFILE = 'profile:manage';
     const familyCodes = TENANT_PROFILES[ProfileCode.FAMILY].permissions;
     const family = ctx([...familyCodes]);
 
     expect(familyCodes.length).toBeGreaterThan(0);
     for (const code of familyCodes) {
-      expect(code.endsWith(':read')).toBe(true);
+      expect(code === OWN_PROFILE || code.endsWith(':read')).toBe(true);
     }
     for (const code of TENANT_PERMISSION_CODES) {
-      if (!code.endsWith(':read')) {
+      if (code !== OWN_PROFILE && !code.endsWith(':read')) {
         expect(hasPermission(family, code)).toBe(false);
       }
     }
