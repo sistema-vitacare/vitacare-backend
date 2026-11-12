@@ -1,7 +1,7 @@
 ---
 title: Manual de integração da API VitaCare
 status: atual
-updated: 2026-11-10
+updated: 2026-11-12
 ---
 
 # Manual de integração da API VitaCare
@@ -28,6 +28,9 @@ O corpo das rotas de negócio é JSON quando aplicável. Autenticação usa Bear
 | `POST /api/v1/auth/password-recovery/request` | Solicita recuperação | [auth-solicitar-recuperacao.md](endpoints/auth-solicitar-recuperacao.md) |
 | `POST /api/v1/auth/password-recovery/reset` | Redefine com token | [auth-redefinir-senha.md](endpoints/auth-redefinir-senha.md) |
 | `POST /api/v1/auth/users/:userId/temporary-password` | Redefinição administrativa | [auth-redefinir-senha-usuario.md](endpoints/auth-redefinir-senha-usuario.md) |
+| `GET /api/v1/profile` | Consulta o próprio cadastro (sessão com CPF completo) | [profile-consultar.md](endpoints/profile-consultar.md) |
+| `PATCH /api/v1/profile` | Edita nome, telefone e e-mail do próprio cadastro | [profile-atualizar.md](endpoints/profile-atualizar.md) |
+| `PUT /api/v1/profile/password` | Troca a própria senha (equivale a `PUT /auth/password`) | [profile-alterar-senha.md](endpoints/profile-alterar-senha.md) |
 | `GET /api/v1/organizations/me` | Consulta a organização da sessão | [organizations-consultar-propria.md](endpoints/organizations-consultar-propria.md) |
 | `PATCH /api/v1/organizations/me` | Atualiza a organização da sessão | [organizations-atualizar-propria.md](endpoints/organizations-atualizar-propria.md) |
 | `POST /api/v1/organizations` | Cadastra organização e primeiro administrador (plataforma) | [organizations-criar.md](endpoints/organizations-criar.md) |
@@ -139,6 +142,8 @@ Cada requisição recompõe o contexto no banco, então revogação, expiração
 | `password_change` | Login de conta com troca obrigatória | 10 minutos absolutos | Apenas [primeiro acesso](endpoints/auth-primeiro-acesso.md) e [logout](endpoints/auth-logout.md) |
 
 Cada requisição aceita renova a janela de inatividade da sessão normal; o prazo absoluto não é renovado. A organização efetiva **sempre** vem da sessão: nenhuma rota aceita `organizationId` do cliente como prova de autorização. Autorização por permissão nomeada usa o formato `recurso:acao`; falta de permissão responde `403 AUTH_FORBIDDEN`.
+
+**Sessão no login e próprio cadastro (BE-27, decisões de Mateus em 2026-11-12).** O [login](endpoints/auth-login.md) devolve, além do token, `data.session`: usuário (com CPF **mascarado**), perfil, permissões efetivas em ordem alfabética e organização, com o plano resumido (código, nome, recursos e estado do termo; sem limites, uso nem preço). As permissões saem da mesma consulta que a API aplica a cada requisição. Na sessão restrita, o bloco identifica o usuário e a organização com `permissions: []`. Todo perfil, inclusive o master, tem a permissão `profile:manage`, que alcança **só o próprio cadastro**: [GET /profile](endpoints/profile-consultar.md) devolve o mesmo bloco com o CPF completo, [PATCH /profile](endpoints/profile-atualizar.md) edita nome, telefone e e-mail (trocar o e-mail pede a senha atual, apaga os links de recuperação pendentes e não encerra sessões) e [PUT /profile/password](endpoints/profile-alterar-senha.md) troca a senha como `PUT /auth/password`. Nenhuma dessas rotas recebe identificador de usuário. CPF, perfil e situação continuam só com o admin.
 
 Todo usuário de organização cliente tem um de quatro **perfis fixos**: `admin`, `professional`, `caregiver` e `family`. O catálogo de permissões e a matriz de cada perfil são consultados em [GET /access-profiles](endpoints/access-profiles-listar.md); o administrador troca o perfil de um usuário por [PATCH /users/:userId/profile](endpoints/users-alterar-perfil.md). As permissões são relidas do banco a cada requisição, então a troca vale na chamada seguinte do usuário, sem revogar a sessão.
 
@@ -497,6 +502,8 @@ A mesma API e os mesmos contratos atendem o frontend React/PWA em computador, ta
 **Origem e CORS.** O frontend de outra origem só é aceito se estiver em `CORS_ORIGINS`; em produção, lista vazia desliga o CORS. O preflight libera `Authorization` e `Content-Type`, e a resposta expõe `Content-Disposition`, para o navegador entregar ao frontend o nome dos arquivos baixados. A sessão vai no header `Authorization: Bearer <token>`, não em cookie, então `CORS_CREDENTIALS` fica `false`.
 
 **Sessão.** Faça login, guarde o token só pelo tempo da sessão e envie-o em toda rota protegida. `401` em qualquer chamada significa sessão encerrada (logout, expiração, inativação, organização inativada ou troca de senha): volte ao login. Com `data.state = password_change_required`, só [primeiro acesso](endpoints/auth-primeiro-acesso.md) e [logout](endpoints/auth-logout.md) respondem. `403` é falta de permissão do perfil; `404` cobre recurso inexistente, de outra organização ou de paciente sem vínculo, sem distinção.
+
+**Sessão do usuário como cache.** Guarde `data.session` do login junto do token e use-o para montar o menu e redirecionar ao painel do perfil (`session.profile.code`), mostrar ou esconder ações (`session.permissions`) e esconder o painel no plano sem `operational_dashboard` (`session.organization.plan.features`). O CPF do login vem mascarado; a tela de dados pessoais lê [GET /profile](endpoints/profile-consultar.md), que traz o completo. Recarregue a sessão por `GET /profile` depois de [editar o próprio cadastro](endpoints/profile-atualizar.md) (ou use o `data` da própria resposta), depois de o admin trocar o seu perfil e ao receber um `403` inesperado: as permissões são relidas a cada requisição, e a lista guardada pode ter ficado velha. Depois de trocar o e-mail, o login seguinte já usa o e-mail novo; a troca de senha encerra todas as sessões e exige login de novo. A sessão restrita traz `permissions: []` e só serve para exibir nome e organização na tela de primeiro acesso.
 
 **Erros por campo.** `422` traz `error.fields` com `field` (campo aninhado como `pai.filho`), `code` e `message`; use-os para marcar o campo no formulário. Os demais erros trazem só `error.code` estável e `error.message` exibível. Trate pelo `code`, cite `meta.requestId` ao reportar e espere `429 RATE_LIMITED` se o limite de requisições estourar.
 

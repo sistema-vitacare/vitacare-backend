@@ -1,7 +1,7 @@
 ---
 title: Editar usuário
 status: atual
-updated: 2026-11-03
+updated: 2026-11-12
 method: PATCH
 path: /api/v1/users/{userId}
 source: src/modules/User/user.controller.ts
@@ -11,7 +11,7 @@ source: src/modules/User/user.controller.ts
 
 ## Propósito e acesso
 
-O administrador corrige nome, e-mail, CPF ou telefone de um usuário da própria organização (RF004 "editar"; UC03). Vale para qualquer status do alvo e também para a **própria conta**. Perfil muda por [PATCH /users/{userId}/profile](users-alterar-perfil.md); status, por [inativar](users-inativar.md) e [reativar](users-reativar.md).
+O administrador corrige nome, e-mail, CPF ou telefone de um usuário da própria organização (RF004 "editar"; UC03). Vale para qualquer status do alvo e também para a **própria conta**. Perfil muda por [PATCH /users/{userId}/profile](users-alterar-perfil.md); status, por [inativar](users-inativar.md) e [reativar](users-reativar.md). Desde o BE-27 (2026-11-12) qualquer usuário edita o **próprio** nome, telefone e e-mail por [PATCH /profile](profile-atualizar.md), sem CPF; esta rota continua sendo a do admin sobre qualquer usuário da organização.
 
 Autenticação: `Authorization: Bearer <token>` de sessão **normal** com a permissão `users:update`. Pela matriz do BE-05 só o perfil `admin` de cada organização cliente a tem; `professional`, `caregiver`, `family` e o administrador master (`platform_admin`) recebem `403 AUTH_FORBIDDEN`. A organização vem **sempre** da sessão; usuário de outra organização responde `404 USER_NOT_FOUND`, igual a um inexistente.
 
