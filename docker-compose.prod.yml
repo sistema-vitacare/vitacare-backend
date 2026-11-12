@@ -86,7 +86,8 @@ services:
       THROTTLE_LIMIT: ${THROTTLE_LIMIT:-120}
 
       # --- E-mail: decisão de 2026-09-22, não existe SMTP no projeto. Ligado,
-      # serve à recuperação de senha e aos e-mails de alerta (BE-17).
+      # serve à recuperação de senha, aos e-mails de alerta (BE-17) e ao aviso
+      # de vencimento do plano (BE-28), sem mudança de código.
       SMTP_ENABLED: ${SMTP_ENABLED:-false}
       SMTP_HOST: ${SMTP_HOST:-}
       SMTP_PORT: ${SMTP_PORT:-587}

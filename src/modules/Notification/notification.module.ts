@@ -44,6 +44,19 @@ export const NOTIFICATION_USE_CASES = [
 
 export const NOTIFICATION_REPOSITORIES = [NotificationRepository];
 
+/**
+ * E-mail pelo SMTP do projeto; desligado (`SMTP_ENABLED=false`), nada sai e a
+ * entrega fica `skipped`. Tambem usado pelo aviso de vencimento (BE-28).
+ */
+export const emailSenderProvider: Provider = {
+  provide: EMAIL_SENDER,
+  inject: [ConfigService],
+  useFactory: (config: ConfigService): EmailSender =>
+    config.get<boolean>('mail.enabled')
+      ? new SmtpNotificationMailer(config)
+      : new DisabledChannelSender(),
+};
+
 /** Canal sem configuracao vira o desligado, como o mailer da recuperacao. */
 export const notificationChannelProviders: Provider[] = [
   {
@@ -54,14 +67,7 @@ export const notificationChannelProviders: Provider[] = [
         ? new WebPushSender(config)
         : new DisabledChannelSender(),
   },
-  {
-    provide: EMAIL_SENDER,
-    inject: [ConfigService],
-    useFactory: (config: ConfigService): EmailSender =>
-      config.get<boolean>('mail.enabled')
-        ? new SmtpNotificationMailer(config)
-        : new DisabledChannelSender(),
-  },
+  emailSenderProvider,
 ];
 
 /**

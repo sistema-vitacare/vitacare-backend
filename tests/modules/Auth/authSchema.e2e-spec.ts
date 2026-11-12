@@ -18,6 +18,7 @@ import { CreateAlerts1791300000000 } from '@/database/migrations/1791300000000-C
 import { CreateScheduledAlerts1791400000000 } from '@/database/migrations/1791400000000-CreateScheduledAlerts';
 import { CreateAlertNotifications1791500000000 } from '@/database/migrations/1791500000000-CreateAlertNotifications';
 import { AuditEventQuery1791700000000 } from '@/database/migrations/1791700000000-AuditEventQuery';
+import { CreatePlanExpiryNotices1791900000000 } from '@/database/migrations/1791900000000-CreatePlanExpiryNotices';
 import { SnakeNamingStrategy } from '@/database/snakeNaming.strategy';
 import { ChangePasswordUseCase } from '@/modules/Auth/ChangePassword/changePassword.useCase';
 import { CompleteFirstAccessUseCase } from '@/modules/Auth/CompleteFirstAccess/completeFirstAccess.useCase';
@@ -258,6 +259,7 @@ describeWithDatabase('autenticacao em PostgreSQL descartavel', () => {
         CreateScheduledAlerts1791400000000,
         CreateAlertNotifications1791500000000,
         AuditEventQuery1791700000000,
+        CreatePlanExpiryNotices1791900000000,
       ],
       namingStrategy: new SnakeNamingStrategy(),
       synchronize: false,
@@ -276,7 +278,7 @@ describeWithDatabase('autenticacao em PostgreSQL descartavel', () => {
     }
 
     migrated = (await dataSource.runMigrations()).length;
-    expect(migrated).toBe(17);
+    expect(migrated).toBe(18);
 
     passwords = new PasswordHasher();
     tokens = new TokenService();
@@ -1047,7 +1049,7 @@ describeWithDatabase('autenticacao em PostgreSQL descartavel', () => {
   });
 
   describe('schema completo', () => {
-    it('mapeia as trinta tabelas nas entidades TypeORM', () => {
+    it('mapeia as trinta e duas tabelas nas entidades TypeORM', () => {
       expect(
         dataSource.entityMetadatas.map((metadata) => metadata.tableName).sort(),
       ).toEqual([
@@ -1076,6 +1078,8 @@ describeWithDatabase('autenticacao em PostgreSQL descartavel', () => {
         'patients',
         'permissions',
         'plan_change_requests',
+        'plan_expiry_notice_deliveries',
+        'plan_expiry_notices',
         'profile_permissions',
         'push_subscriptions',
         'usage_plans',

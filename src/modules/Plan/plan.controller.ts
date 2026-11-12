@@ -97,7 +97,7 @@ export class PlanController {
   @ApiErrors(UNAUTHENTICATED, FORBIDDEN, ORGANIZATION_NOT_FOUND)
   async getOwn(
     @CurrentContext() ctx: RequestContext,
-  ): Promise<OrganizationPlanDto> {
+  ): Promise<EnvelopePayload<OrganizationPlanDto>> {
     return this.getOrganizationPlan.execute(ctx.organizationId, ctx);
   }
 
@@ -112,7 +112,7 @@ export class PlanController {
     @Param('organizationId', UuidParam('organizationId'))
     organizationId: string,
     @CurrentContext() ctx: RequestContext,
-  ): Promise<OrganizationPlanDto> {
+  ): Promise<EnvelopePayload<OrganizationPlanDto>> {
     return this.getOrganizationPlan.execute(organizationId, ctx);
   }
 

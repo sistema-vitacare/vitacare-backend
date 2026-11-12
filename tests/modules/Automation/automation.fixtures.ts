@@ -21,6 +21,7 @@ import { CreateAlertNotifications1791500000000 } from '@/database/migrations/179
 import { AddDashboardIndexes1791600000000 } from '@/database/migrations/1791600000000-AddDashboardIndexes';
 import { AuditEventQuery1791700000000 } from '@/database/migrations/1791700000000-AuditEventQuery';
 import { AddProfileManagePermission1791800000000 } from '@/database/migrations/1791800000000-AddProfileManagePermission';
+import { CreatePlanExpiryNotices1791900000000 } from '@/database/migrations/1791900000000-CreatePlanExpiryNotices';
 import { SnakeNamingStrategy } from '@/database/snakeNaming.strategy';
 
 const SRC_ROOT = join(__dirname, '..', '..', '..', 'src');
@@ -46,10 +47,11 @@ export const ALL_MIGRATIONS = [
   AddDashboardIndexes1791600000000,
   AuditEventQuery1791700000000,
   AddProfileManagePermission1791800000000,
+  CreatePlanExpiryNotices1791900000000,
 ];
 
 export const TRUNCATE_AUTOMATION =
-  'TRUNCATE notification_deliveries, push_subscriptions, alert_notifications, notification_preferences, alerts, follow_up_absence_monitors, alert_rules, medication_reminders, medications, follow_up_attachments, follow_up_response_items, follow_up_responses, follow_up_records, follow_up_form_patients, follow_up_form_fields, follow_up_form_versions, follow_up_forms, user_patients, patients, organization_plan_terms, plan_change_requests, audit_events, auth_sessions, password_reset_tokens, users, profile_permissions, permissions, access_profiles, organizations, usage_plans CASCADE';
+  'TRUNCATE plan_expiry_notice_deliveries, plan_expiry_notices, notification_deliveries, push_subscriptions, alert_notifications, notification_preferences, alerts, follow_up_absence_monitors, alert_rules, medication_reminders, medications, follow_up_attachments, follow_up_response_items, follow_up_responses, follow_up_records, follow_up_form_patients, follow_up_form_fields, follow_up_form_versions, follow_up_forms, user_patients, patients, organization_plan_terms, plan_change_requests, audit_events, auth_sessions, password_reset_tokens, users, profile_permissions, permissions, access_profiles, organizations, usage_plans CASCADE';
 
 export const testDataSource = (url: string) =>
   new DataSource({

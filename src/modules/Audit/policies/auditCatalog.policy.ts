@@ -41,6 +41,10 @@ export const AUDIT_ACTIONS: Readonly<Record<string, AuditActionEntry>> = {
   'organization.deactivated': entry('Inativou organização', 'warning'),
   'organization.reactivated': entry('Reativou organização'),
   'plan.assigned': entry('Atribuiu plano', 'warning'),
+  'plan_expiry_notice.generated': entry(
+    'Gerou aviso de vencimento do plano',
+    'warning',
+  ),
   'plan_change_request.created': entry('Solicitou mudança de plano'),
   'plan_change_request.cancelled': entry('Cancelou solicitação de plano'),
   'plan_change_request.approved': entry(

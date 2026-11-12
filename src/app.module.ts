@@ -33,6 +33,7 @@ import { HistoryModule } from './modules/History/history.module';
 import { IndicatorModule } from './modules/Indicator/indicator.module';
 import { MedicationModule } from './modules/Medication/medication.module';
 import { NotificationModule } from './modules/Notification/notification.module';
+import { PlanExpiryNoticeModule } from './modules/PlanExpiryNotice/planExpiryNotice.module';
 import { OrganizationModule } from './modules/Organization/organization.module';
 import { PlanModule } from './modules/Plan/plan.module';
 import { ProfileModule } from './modules/Profile/profile.module';
@@ -109,6 +110,7 @@ import { StorageModule } from './storage/storage.module';
     AlertModule,
     NotificationModule,
     AutomationModule,
+    PlanExpiryNoticeModule,
     AuditModule,
     AuthModule,
     RedisModule,

@@ -925,6 +925,66 @@ describeWithDatabase('planos de uso em PostgreSQL (e2e)', () => {
 
       expect((await createUser(tenants.B)).status).toBe(201);
     });
+
+    it('avisa o vencimento na consulta, na regra dos e-mails (BE-28)', async () => {
+      const moveEnd = (endsAt: string) =>
+        dataSource.query(
+          `UPDATE organization_plan_terms
+              SET starts_at = now() - interval '3 days', ends_at = ${endsAt}
+            WHERE organization_id = $1 AND superseded_at IS NULL`,
+          [tenants.B.id],
+        );
+      const consult = async (token = tenants.B.adminToken) => {
+        const response = await http(
+          'get',
+          token === masterToken
+            ? `/api/v1/organizations/${tenants.B.id}/plan`
+            : '/api/v1/organizations/me/plan',
+          token,
+        );
+
+        expect(response.status).toBe(200);
+
+        return response.body as {
+          data: { term: { status: string; expiryWarning: string | null } };
+          meta: { message?: string };
+        };
+      };
+
+      await moveEnd("'2099-01-01T00:00:00Z'");
+      const far = await consult();
+      expect(far.data.term.expiryWarning).toBeNull();
+      expect(far.meta.message).toBeUndefined();
+
+      await moveEnd("now() + interval '2 days'");
+      const soon = await consult();
+      expect(soon.data.term).toMatchObject({
+        status: 'active',
+        expiryWarning: 'within_7_days',
+      });
+      expect(soon.meta.message).toMatch(
+        /^O plano vence em \d{2}\/\d{2}\/\d{4} às \d{2}:\d{2} \(horário de Brasília\)\./,
+      );
+
+      await moveEnd("now() + interval '1 hour'");
+      expect((await consult()).data.term.expiryWarning).toBe('within_1_day');
+      expect((await consult(masterToken)).data.term.expiryWarning).toBe(
+        'within_1_day',
+      );
+
+      await moveEnd("now() - interval '1 day'");
+      const expired = await consult();
+      expect(expired.data.term).toMatchObject({
+        status: 'expired',
+        expiryWarning: 'expired',
+      });
+      expect(expired.meta.message).toContain('O plano venceu em');
+      expect(expired.meta.message).toContain(
+        'a consulta e os registros continuam',
+      );
+
+      await moveEnd("'2099-01-01T00:00:00Z'");
+    });
   });
 
   describe('consumo e limites de usuarios (BE-08)', () => {

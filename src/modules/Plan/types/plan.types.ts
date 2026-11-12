@@ -26,6 +26,24 @@ export const PLAN_TERM_STATUSES = ['active', 'expired'] as const;
 
 export type PlanTermStatus = (typeof PLAN_TERM_STATUSES)[number];
 
+/** Marcos do aviso de vencimento por e-mail (BE-28), as 08:00 de Brasilia. */
+export const PLAN_EXPIRY_MILESTONES = [
+  'seven_days',
+  'one_day',
+  'expired',
+] as const;
+
+export type PlanExpiryMilestone = (typeof PLAN_EXPIRY_MILESTONES)[number];
+
+/** Aviso na consulta do plano, pela mesma regra dos marcos (BE-28). */
+export const PLAN_EXPIRY_WARNINGS = [
+  'within_7_days',
+  'within_1_day',
+  'expired',
+] as const;
+
+export type PlanExpiryWarning = (typeof PLAN_EXPIRY_WARNINGS)[number];
+
 export const PLAN_CHANGE_REQUEST_STATUSES = [
   'pending',
   'approved',

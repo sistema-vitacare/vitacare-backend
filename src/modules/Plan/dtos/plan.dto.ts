@@ -2,10 +2,12 @@ import { ApiProperty } from '@nestjs/swagger';
 
 import {
   PLAN_CHANGE_REQUEST_STATUSES,
+  PLAN_EXPIRY_WARNINGS,
   PLAN_FEATURES,
   PLAN_TERM_ORIGINS,
   PLAN_TERM_STATUSES,
   type PlanChangeRequestStatus,
+  type PlanExpiryWarning,
   type PlanFeature,
   type PlanTermOrigin,
   type PlanTermStatus,
@@ -73,6 +75,14 @@ export class PlanTermDto {
     description: '`expired` bloqueia novos cadastros, nunca a leitura.',
   })
   status!: PlanTermStatus;
+
+  @ApiProperty({
+    enum: PLAN_EXPIRY_WARNINGS,
+    nullable: true,
+    description:
+      'Aviso de vencimento (BE-28), na mesma regra dos e-mails aos administradores: `within_7_days` desde as 08:00 de Brasilia sete dias antes da data de fim, `within_1_day` desde as 08:00 do dia anterior a data de fim, `expired` desde o fim (igual a `status = expired`). `null` sem data de fim ou antes da janela.',
+  })
+  expiryWarning!: PlanExpiryWarning | null;
 
   @ApiProperty({ enum: PLAN_TERM_ORIGINS })
   origin!: PlanTermOrigin;

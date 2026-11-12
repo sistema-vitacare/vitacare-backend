@@ -12,6 +12,10 @@ import {
   NOTIFICATION_DELIVERY_SWEEP,
   NOTIFICATIONS_QUEUE,
 } from '@/modules/Notification/notification.processor';
+import {
+  PLAN_EXPIRY_NOTICE_DAILY,
+  PLAN_EXPIRY_NOTICES_QUEUE,
+} from '@/modules/PlanExpiryNotice/planExpiryNotice.processor';
 
 import {
   bootFullApp,
@@ -194,7 +198,7 @@ describeWithInfrastructure('homologacao funcional dos 14 casos de uso', () => {
     it('aplica todas as migrations no banco vazio, como o entrypoint de producao', () => {
       expect(t.executedMigrations).toHaveLength(migrationFiles().length);
       expect(t.executedMigrations.at(-1)).toBe(
-        'AddProfileManagePermission1791800000000',
+        'CreatePlanExpiryNotices1791900000000',
       );
     });
 
@@ -212,7 +216,7 @@ describeWithInfrastructure('homologacao funcional dos 14 casos de uso', () => {
       );
     });
 
-    it('agenda as varreduras das quatro rotinas nas filas do Redis', async () => {
+    it('agenda as varreduras das quatro rotinas e o aviso diario de vencimento nas filas do Redis', async () => {
       const schedulers = async (name: string) =>
         (await t.app.get<Queue>(getQueueToken(name)).getJobSchedulers()).map(
           (scheduler) => scheduler.key,
@@ -224,8 +228,9 @@ describeWithInfrastructure('homologacao funcional dos 14 casos de uso', () => {
             ...(await schedulers(ALERTS_QUEUE)),
             ...(await schedulers(AUTOMATION_QUEUE)),
             ...(await schedulers(NOTIFICATIONS_QUEUE)),
+            ...(await schedulers(PLAN_EXPIRY_NOTICES_QUEUE)),
           ],
-          (keys) => keys.length === 4,
+          (keys) => keys.length === 5,
           10000,
         ),
       ).toEqual(
@@ -234,8 +239,19 @@ describeWithInfrastructure('homologacao funcional dos 14 casos de uso', () => {
           ABSENCE_SWEEP,
           MEDICATION_REMINDER_SWEEP,
           NOTIFICATION_DELIVERY_SWEEP,
+          PLAN_EXPIRY_NOTICE_DAILY,
         ]),
       );
+
+      // BE-28: so as 08:00 de Brasilia, sem rodar o tempo todo.
+      const [daily] = await t.app
+        .get<Queue>(getQueueToken(PLAN_EXPIRY_NOTICES_QUEUE))
+        .getJobSchedulers();
+      expect(daily).toMatchObject({
+        key: PLAN_EXPIRY_NOTICE_DAILY,
+        pattern: '0 8 * * *',
+        tz: 'America/Sao_Paulo',
+      });
     });
   });
 

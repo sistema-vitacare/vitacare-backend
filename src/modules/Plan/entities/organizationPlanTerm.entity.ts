@@ -5,6 +5,7 @@ import {
   ForeignKey,
   Index,
   PrimaryColumn,
+  Unique,
 } from 'typeorm';
 
 import { Organization } from '@/modules/Organization/entities/organization.entity';
@@ -19,6 +20,8 @@ import { UsagePlan } from './usagePlan.entity';
  */
 @Entity('organization_plan_terms')
 @Index('organization_plan_terms_current_unique', { synchronize: false })
+@Index('organization_plan_terms_expiring_idx', { synchronize: false })
+@Unique('organization_plan_terms_id_org_unique', ['id', 'organizationId'])
 @ForeignKey(() => Organization, ['organizationId'], ['id'], {
   name: 'organization_plan_terms_organization_fk',
   onDelete: 'RESTRICT',

@@ -1,7 +1,7 @@
 ---
 title: Consultar o plano de qualquer organização (plataforma)
 status: atual
-updated: 2026-11-03
+updated: 2026-11-12
 method: GET
 path: /api/v1/organizations/{organizationId}/plan
 source: src/modules/Plan/plan.controller.ts
@@ -37,7 +37,7 @@ curl -i 'https://api.example.com/api/v1/organizations/0f1e2d3c-4b5a-4968-8776-65
 
 ## Resposta de sucesso
 
-`200 OK`, com o JSON e a tabela de propriedades de [plans-consultar-proprio.md](plans-consultar-proprio.md).
+`200 OK`, com o JSON e a tabela de propriedades de [plans-consultar-proprio.md](plans-consultar-proprio.md), inclusive `term.expiryWarning` e o `meta.message` do aviso de vencimento (BE-28, 2026-11-12). O master vê o mesmo aviso que a organização, mas não recebe o e-mail: só os administradores ativos da organização recebem (decisão de Mateus em 2026-11-12).
 
 ## Erros
 
@@ -68,4 +68,4 @@ curl -i 'https://api.example.com/api/v1/organizations/0f1e2d3c-4b5a-4968-8776-65
 
 ## Origem e validação
 
-Mesmo caso de uso da rota `me` (`GetOrganizationPlan`), com alcance da plataforma por `canReachOrganization`. Testes `tests/modules/Plan/planManagement.e2e-spec.ts` (master `200` em tenant, `404` na plataforma; admin de outra organização `403`) e `tests/modules/Plan/plan.e2e-spec.ts` (OpenAPI). Conferido contra `/api/docs-json` em 2026-11-03. Vault: [[2026-10-29-be-07-plans]].
+Mesmo caso de uso da rota `me` (`GetOrganizationPlan`), com alcance da plataforma por `canReachOrganization`. Testes `tests/modules/Plan/planManagement.e2e-spec.ts` (master `200` em tenant, `404` na plataforma; admin de outra organização `403`) e `tests/modules/Plan/plan.e2e-spec.ts` (OpenAPI). Conferido contra `/api/docs-json` em 2026-11-12; aviso de vencimento no bloco "avisa o vencimento na consulta" do mesmo e2e. Vault: [[2026-10-29-be-07-plans]] e [[2026-11-12-be-28-aviso-vencimento-plano]].

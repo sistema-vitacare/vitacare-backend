@@ -1,7 +1,7 @@
 ---
 title: Consultar o plano da própria organização
 status: atual
-updated: 2026-11-04
+updated: 2026-11-12
 method: GET
 path: /api/v1/organizations/me/plan
 source: src/modules/Plan/plan.controller.ts
@@ -14,7 +14,8 @@ source: src/modules/Plan/plan.controller.ts
 UC04 passos 1–3 (RF018): o administrador vê o plano contratado, os recursos, os **limites efetivos**, a **vigência** (termo corrente), o uso atual e a solicitação de mudança em análise, se houver.
 
 - **Limite efetivo** = limite expandido do termo corrente, se o master definiu; senão, o do catálogo. Pelo Quadro 2 do TCC só o Enterprise (`plan.expandable = true`) é expandido, e só para cima (decisão de Mateus em 2026-11-04).
-- **Vigência:** `term.endsAt = null` não vence. Com `endsAt` no passado, `term.status = "expired"`: a organização continua lendo e registrando tudo, mas **novos cadastros e reativações de usuário** são bloqueados (`409 USER_PLAN_EXPIRED`) até o master renovar. Política de vencimento decidida pelo agente em 2026-11-03, pendente de confirmação. Este estado é a notificação ao administrador nesta entrega; aviso ativo por e-mail/push continua pendente: o BE-17 notifica só alertas de paciente.
+- **Vigência:** `term.endsAt = null` não vence. Com `endsAt` no passado, `term.status = "expired"`: a organização continua lendo e registrando tudo, mas **novos cadastros e reativações de usuário** são bloqueados (`409 USER_PLAN_EXPIRED`) até o master renovar. Política de vencimento decidida pelo agente em 2026-11-03, pendente de confirmação.
+- **Aviso de vencimento (BE-28, decisão de Mateus em 2026-11-12):** `term.expiryWarning` mostra na tela o mesmo aviso que os administradores ativos recebem por e-mail às 08:00 de Brasília: `within_7_days` desde as 08:00 do sétimo dia antes da data de fim, `within_1_day` desde as 08:00 do dia anterior à data de fim, e `expired` desde o fim (igual a `status = expired`). Com aviso, `meta.message` explica a data de fim, o efeito do vencimento e como pedir a renovação. Assim o UC04 ("sistema notifica o administrador") fica cumprido também enquanto o SMTP está desligado. O e-mail sai de um job, sem rota; a geração fica na auditoria (`plan_expiry_notice.generated`).
 - **Uso:** `usage.users` conta `pending` + `active` com a mesma consulta que decide o limite no cadastro e na reativação (`checkPlanSeat`, BE-08), então o número exibido é o aplicado. Uso acima do limite — depois de um rebaixamento de plano — é possível e aparece como está: ninguém é inativado, só novos cadastros e reativações ficam bloqueados. `usage.patients` conta os pacientes `active` com a mesma consulta que decide o limite no [cadastro](patients-criar.md) e na [reativação](patients-reativar.md) de pacientes (BE-09, 2026-11-04); paciente inativo não conta.
 
 Autenticação: `Authorization: Bearer <token>` de sessão **normal** com `plan:read` (só o perfil `admin`). Demais perfis e o administrador master (a organização de plataforma não tem plano) → `403 AUTH_FORBIDDEN`. A organização vem **sempre** da sessão.
@@ -57,8 +58,9 @@ curl -i 'https://api.example.com/api/v1/organizations/me/plan' \
     "term": {
       "id": "9c8b7a6f-5e4d-4c3b-8a29-18f7e6d5c4b3",
       "startsAt": "2026-11-01T10:00:00.000Z",
-      "endsAt": "2027-11-01T03:00:00.000Z",
+      "endsAt": "2026-11-17T02:59:00.000Z",
       "status": "active",
+      "expiryWarning": "within_7_days",
       "origin": "assignment",
       "userLimit": null,
       "patientLimit": null
@@ -81,7 +83,8 @@ curl -i 'https://api.example.com/api/v1/organizations/me/plan' \
   },
   "meta": {
     "requestId": "a3f5b7c9-1d2e-4f60-8a9b-0c1d2e3f4a5b",
-    "timestamp": "2026-11-03T12:30:00.000Z"
+    "timestamp": "2026-11-12T12:30:00.000Z",
+    "message": "O plano vence em 16/11/2026 às 23:59 (horário de Brasília). Depois disso, novos cadastros e reativações de usuários e pacientes ficam bloqueados até a renovação. Solicite a renovação na área de plano."
   }
 }
 ```
@@ -95,6 +98,7 @@ curl -i 'https://api.example.com/api/v1/organizations/me/plan' \
 | `data.term.startsAt` | texto ISO 8601 (UTC) | não | Início da vigência. |
 | `data.term.endsAt` | texto ISO 8601 (UTC) | sim | Fim da vigência; `null` = sem vencimento. |
 | `data.term.status` | texto, enum | não | `active` ou `expired` (`endsAt` ≤ agora). |
+| `data.term.expiryWarning` | texto, enum | sim | Aviso de vencimento (BE-28): `within_7_days`, `within_1_day` ou `expired`, nas janelas descritas acima (08:00 de Brasília). `null` sem `endsAt` ou antes da janela de 7 dias. |
 | `data.term.origin` | texto, enum | não | Como o termo nasceu: `initial` (cadastro da organização), `assignment` (atribuição do master), `change_request` (aprovação de solicitação) ou `migration` (organização existente antes do BE-07). |
 | `data.term.userLimit` | inteiro ≥ 0 | sim | Limite de usuários expandido (só plano expansível, ≥ o do catálogo); `null` = o do catálogo. |
 | `data.term.patientLimit` | inteiro ≥ 0 | sim | Limite de pacientes ativos expandido (mesma regra); `null` = o do catálogo. |
@@ -103,6 +107,7 @@ curl -i 'https://api.example.com/api/v1/organizations/me/plan' \
 | `data.usage.users` | inteiro ≥ 0 | não | Usuários `pending` + `active`, o primeiro administrador incluído; mesma contagem do limite. Pode passar de `limits.users` após rebaixamento. |
 | `data.usage.patients` | inteiro ≥ 0 | não | Pacientes `active` (mesma contagem do limite). Pode passar do limite após rebaixamento. Era sempre `null` antes do BE-09 (2026-11-04). |
 | `data.pendingChangeRequest` | objeto | sim | Solicitação `pending` da organização (no máximo uma); `null` se não houver. Estrutura em [criar solicitação](plan-change-requests-criar.md). |
+| `meta.message` | texto | ausente | Só com `expiryWarning`: antes do fim, "O plano vence em DD/MM/AAAA às HH:mm (horário de Brasília). Depois disso, novos cadastros e reativações de usuários e pacientes ficam bloqueados até a renovação. Solicite a renovação na área de plano."; vencido, "O plano venceu em … Novos cadastros e reativações de usuários e pacientes estão bloqueados até a renovação; a consulta e os registros continuam. Solicite a renovação na área de plano." |
 
 ## Erros
 
@@ -114,4 +119,4 @@ curl -i 'https://api.example.com/api/v1/organizations/me/plan' \
 
 ## Origem e validação
 
-Controller `src/modules/Plan/plan.controller.ts`; caso de uso `src/modules/Plan/GetOrganizationPlan/getOrganizationPlan.useCase.ts`; parser `src/modules/Plan/parsers/plan.parser.ts`; DTO `OrganizationPlanDto` em `src/modules/Plan/dtos/plan.dto.ts`; repositório `src/modules/Plan/repositories/plan.repository.ts`. Testes `tests/modules/Plan/plan.e2e-spec.ts`, `tests/modules/Plan/plan.parser.spec.ts` e `tests/modules/Plan/planManagement.e2e-spec.ts` (termo inicial, limite expandido, `expired` com leitura preservada, perfis e master). Conferido contra `/api/docs-json` em 2026-11-04. Vault: [[2026-10-29-be-07-plans]], [[2026-11-03-planos-vigencia-e-solicitacao]] e [[2026-11-04-planos-regras-quadro-2]].
+Controller `src/modules/Plan/plan.controller.ts`; caso de uso `src/modules/Plan/GetOrganizationPlan/getOrganizationPlan.useCase.ts`; parser `src/modules/Plan/parsers/plan.parser.ts`; janelas e mensagem do aviso em `src/modules/Plan/policies/planExpiry.policy.ts` (BE-28); DTO `OrganizationPlanDto` em `src/modules/Plan/dtos/plan.dto.ts`; repositório `src/modules/Plan/repositories/plan.repository.ts`. Testes `tests/modules/Plan/plan.e2e-spec.ts`, `tests/modules/Plan/plan.parser.spec.ts` e `tests/modules/Plan/planManagement.e2e-spec.ts` (termo inicial, limite expandido, `expired` com leitura preservada, perfis e master; `expiryWarning` e `meta.message` no bloco "avisa o vencimento na consulta"), `tests/modules/Plan/planExpiry.policy.spec.ts` (janelas às 08:00 de Brasília). Conferido contra `/api/docs-json` em 2026-11-12. Vault: [[2026-10-29-be-07-plans]], [[2026-11-03-planos-vigencia-e-solicitacao]], [[2026-11-04-planos-regras-quadro-2]] e [[2026-11-12-be-28-aviso-vencimento-plano]].
