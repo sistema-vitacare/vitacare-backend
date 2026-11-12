@@ -250,6 +250,81 @@ describe('ManagementReport HTTP (e2e)', () => {
     });
   });
 
+  it.each(['alerts', 'caregivers'])(
+    '/%s/pdf: PDF sem nome de pessoa, sem cache e auditado depois de pronto',
+    async (kind) => {
+      const response = await request(server())
+        .get(
+          `/api/v1/management-reports/${kind}/pdf?from=2026-10-01&to=2026-10-31&condition=diab`,
+        )
+        .set('Authorization', 'Bearer admin')
+        .buffer(true)
+        .parse((res, done) => {
+          const chunks: Buffer[] = [];
+
+          res.on('data', (chunk: Buffer) => chunks.push(chunk));
+          res.on('end', () => done(null, Buffer.concat(chunks)));
+        });
+
+      expect(response.status).toBe(200);
+      expect(response.headers['content-type']).toBe('application/pdf');
+      expect(response.headers['cache-control']).toBe('private, no-store');
+      expect(response.headers['content-disposition']).toBe(
+        `attachment; filename="relatorio-${kind === 'alerts' ? 'alertas' : 'atividade-cuidadores'}-2026-10-01-a-2026-10-31.pdf"`,
+      );
+      expect((response.body as Buffer).subarray(0, 5).toString()).toBe('%PDF-');
+      expect(repo.recordExport).toHaveBeenCalledWith(
+        expect.objectContaining({ organizationId: ORGANIZATION_ID }),
+        kind === 'alerts' ? 'alerts' : 'caregiver_activity',
+        { from: '2026-10-01', to: '2026-10-31' },
+        'diab',
+      );
+    },
+  );
+
+  it('PDF: outros perfis 403, plano sem recurso 403 e nada auditado', async () => {
+    for (const kind of ['alerts', 'caregivers']) {
+      for (const who of ['professional', 'caregiver', 'family']) {
+        expect(
+          (await call(`/management-reports/${kind}/pdf`, who)).status,
+        ).toBe(403);
+      }
+
+      repo.hasManagementReports.mockResolvedValue(false);
+      expect(
+        (await call(`/management-reports/${kind}/pdf`, 'admin')).body as object,
+      ).toMatchObject({
+        error: { code: 'MANAGEMENT_REPORT_PLAN_FEATURE_UNAVAILABLE' },
+      });
+      repo.hasManagementReports.mockResolvedValue(true);
+    }
+
+    expect(repo.recordExport).not.toHaveBeenCalled();
+  });
+
+  it('PDF publicado no OpenAPI como binario com erros em JSON', async () => {
+    const document = (await request(server()).get('/api/docs-json'))
+      .body as OpenApiDocument;
+
+    for (const kind of ['alerts', 'caregivers']) {
+      const operation =
+        document.paths[`/api/v1/management-reports/${kind}/pdf`]?.get;
+
+      expect(operation).toBeDefined();
+      expect(operation.security).toEqual([{ bearer: [] }]);
+      expect(operation.responses['200'].content).toHaveProperty(
+        'application/pdf',
+      );
+      expect(Object.keys(operation.responses).sort()).toEqual([
+        '200',
+        '401',
+        '403',
+        '422',
+        '500',
+      ]);
+    }
+  });
+
   it('publica as rotas JSON no OpenAPI com bearer, envelope e erros', async () => {
     const document = (await request(server()).get('/api/docs-json'))
       .body as OpenApiDocument;

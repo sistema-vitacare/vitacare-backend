@@ -1,20 +1,25 @@
 import { Module } from '@nestjs/common';
 
+import { ExportAlertsReportUseCase } from './ExportAlertsReport/exportAlertsReport.useCase';
+import { ExportCaregiverActivityReportUseCase } from './ExportCaregiverActivityReport/exportCaregiverActivityReport.useCase';
 import { GetAlertsReportUseCase } from './GetAlertsReport/getAlertsReport.useCase';
 import { GetCaregiverActivityReportUseCase } from './GetCaregiverActivityReport/getCaregiverActivityReport.useCase';
 import { ListManagementReportTypesUseCase } from './ListManagementReportTypes/listManagementReportTypes.useCase';
 import { ListRecentReportsUseCase } from './ListRecentReports/listRecentReports.useCase';
 import { ManagementReportController } from './managementReport.controller';
 import { ManagementReportRepository } from './repositories/managementReport.repository';
+import { ManagementReportPdfService } from './services/managementReportPdf.service';
 
 export const MANAGEMENT_REPORT_USE_CASES = [
   ListManagementReportTypesUseCase,
   ListRecentReportsUseCase,
   GetAlertsReportUseCase,
   GetCaregiverActivityReportUseCase,
+  ExportAlertsReportUseCase,
+  ExportCaregiverActivityReportUseCase,
 ];
 
-export const MANAGEMENT_REPORT_SERVICES = [];
+export const MANAGEMENT_REPORT_SERVICES = [ManagementReportPdfService];
 
 export const MANAGEMENT_REPORT_REPOSITORIES = [ManagementReportRepository];
 

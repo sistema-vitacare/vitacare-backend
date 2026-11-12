@@ -1,7 +1,12 @@
+import { StreamableFile } from '@nestjs/common';
+
 import { DomainException } from '@/common/errors/domain.exception';
 
 import { ManagementReportErrors } from '../managementReport.errors';
-import { MANAGEMENT_REPORT_MAX_ALERTS } from '../types/managementReport.types';
+import {
+  MANAGEMENT_REPORT_MAX_ALERTS,
+  type ManagementReportPeriod,
+} from '../types/managementReport.types';
 
 /** Segundos -> horas com 3 casas, como os indicadores do BE-20. */
 export const toHours = (seconds: number | null): number | null =>
@@ -29,3 +34,15 @@ export const assertAlertVolume = (total: number): void => {
     detail: `${total} alertas no periodo; o limite e ${MANAGEMENT_REPORT_MAX_ALERTS}.`,
   });
 };
+
+/** PDF para download; o nome leva so o tipo e o periodo, nunca nome de pessoa. */
+export const pdfFile = (
+  file: Buffer,
+  name: string,
+  { from, to }: ManagementReportPeriod,
+): StreamableFile =>
+  new StreamableFile(file, {
+    type: 'application/pdf',
+    length: file.length,
+    disposition: `attachment; filename="${name}-${from}-a-${to}.pdf"`,
+  });

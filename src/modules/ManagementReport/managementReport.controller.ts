@@ -1,5 +1,11 @@
-import { Controller, Get, Query } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { Controller, Get, Header, Query, StreamableFile } from '@nestjs/common';
+import {
+  ApiBearerAuth,
+  ApiOkResponse,
+  ApiOperation,
+  ApiProduces,
+  ApiTags,
+} from '@nestjs/swagger';
 
 import { CurrentContext } from '@/common/context/currentContext.decorator';
 import type { RequestContext } from '@/common/context/requestContext.type';
@@ -12,6 +18,8 @@ import { Permissions } from '@/modules/Access/access.permissions';
 import { RequirePermissions } from '@/modules/Auth/guards/requiredPermissions.decorator';
 
 import { ManagementReportQueryDto } from './dtos/managementReport.dto';
+import { ExportAlertsReportUseCase } from './ExportAlertsReport/exportAlertsReport.useCase';
+import { ExportCaregiverActivityReportUseCase } from './ExportCaregiverActivityReport/exportCaregiverActivityReport.useCase';
 import { AlertsReportDto } from './GetAlertsReport/getAlertsReport.dto';
 import { GetAlertsReportUseCase } from './GetAlertsReport/getAlertsReport.useCase';
 import { CaregiverActivityReportDto } from './GetCaregiverActivityReport/getCaregiverActivityReport.dto';
@@ -36,6 +44,16 @@ const QUERY_ERRORS = [
   { status: 422, codes: ['VALIDATION_FAILED'] },
 ];
 
+const PDF_RESPONSE = ApiOkResponse({
+  description:
+    'PDF com Content-Disposition attachment, gerado na hora e sem guardar. Erros saem em JSON; em falha na geracao, repetir o pedido.',
+  content: {
+    'application/pdf': { schema: { type: 'string', format: 'binary' } },
+  },
+});
+
+const PDF_FAILURE = { status: 500, codes: ['MANAGEMENT_REPORT_EXPORT_FAILED'] };
+
 const ALERTS_ERRORS = [
   ...AUTH_ERRORS,
   {
@@ -58,6 +76,8 @@ export class ManagementReportController {
     private readonly listRecent: ListRecentReportsUseCase,
     private readonly getAlerts: GetAlertsReportUseCase,
     private readonly getCaregivers: GetCaregiverActivityReportUseCase,
+    private readonly exportAlerts: ExportAlertsReportUseCase,
+    private readonly exportCaregivers: ExportCaregiverActivityReportUseCase,
   ) {}
 
   @Get()
@@ -113,5 +133,37 @@ export class ManagementReportController {
     @CurrentContext() ctx: RequestContext,
   ): Promise<EnvelopePayload<CaregiverActivityReportDto>> {
     return this.getCaregivers.execute(query, ctx);
+  }
+
+  @Get('alerts/pdf')
+  @Header('Cache-Control', 'private, no-store')
+  @ApiOperation({
+    summary:
+      'Exporta "Alertas e intercorrencias" em PDF (binario, fora do envelope), registrado na auditoria como management_report.exported.',
+  })
+  @ApiProduces('application/pdf', 'application/json')
+  @PDF_RESPONSE
+  @ApiErrors(...ALERTS_ERRORS, PDF_FAILURE)
+  alertsPdf(
+    @Query() query: ManagementReportQueryDto,
+    @CurrentContext() ctx: RequestContext,
+  ): Promise<StreamableFile> {
+    return this.exportAlerts.execute(query, ctx);
+  }
+
+  @Get('caregivers/pdf')
+  @Header('Cache-Control', 'private, no-store')
+  @ApiOperation({
+    summary:
+      'Exporta "Atividade dos cuidadores" em PDF (binario, fora do envelope), registrado na auditoria como management_report.exported.',
+  })
+  @ApiProduces('application/pdf', 'application/json')
+  @PDF_RESPONSE
+  @ApiErrors(...QUERY_ERRORS, PDF_FAILURE)
+  caregiversPdf(
+    @Query() query: ManagementReportQueryDto,
+    @CurrentContext() ctx: RequestContext,
+  ): Promise<StreamableFile> {
+    return this.exportCaregivers.execute(query, ctx);
   }
 }
