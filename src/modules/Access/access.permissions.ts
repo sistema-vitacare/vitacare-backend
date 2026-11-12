@@ -8,8 +8,10 @@ import { ProfileCode } from '@/common/context/requestContext.type';
  * profissional tambem gerencia vinculos com pacientes e, desde o BE-12, anula
  * registros de acompanhamento. Desde o BE-14 (2026-11-05) cuidador e familiar
  * consultam medicamentos dos pacientes vinculados e, desde o BE-17
- * (2026-11-06), cuidador e profissional resolvem alertas. As quatro
- * `platform_organizations:*` so valem na organizacao de plataforma.
+ * (2026-11-06), cuidador e profissional resolvem alertas. Desde o BE-27
+ * (2026-11-12) todos os perfis, inclusive o master, tem `profile:manage`, que
+ * so alcanca o proprio cadastro. As quatro `platform_organizations:*` so valem
+ * na organizacao de plataforma.
  */
 export const Permissions = {
   PATIENTS_READ: 'patients:read',
@@ -47,6 +49,7 @@ export const Permissions = {
   DASHBOARD_READ: 'dashboard:read',
   AUDIT_EVENTS_READ: 'audit_events:read',
   AUDIT_EVENTS_EXPORT: 'audit_events:export',
+  PROFILE_MANAGE: 'profile:manage',
   PLATFORM_ORGANIZATIONS_CREATE: 'platform_organizations:create',
   PLATFORM_ORGANIZATIONS_READ: 'platform_organizations:read',
   PLATFORM_ORGANIZATIONS_UPDATE: 'platform_organizations:update',
@@ -91,6 +94,7 @@ export const PERMISSION_LABELS: Readonly<Record<PermissionName, string>> = {
   'dashboard:read': 'Consultar painel operacional',
   'audit_events:read': 'Consultar auditoria',
   'audit_events:export': 'Exportar auditoria',
+  'profile:manage': 'Consultar e editar o proprio cadastro',
   'platform_organizations:create': 'Cadastrar organizacoes',
   'platform_organizations:read': 'Consultar qualquer organizacao',
   'platform_organizations:update': 'Editar qualquer organizacao',
@@ -112,6 +116,7 @@ export type TenantProfileCode =
 const P = Permissions;
 
 const FAMILY_PERMISSIONS: readonly PermissionName[] = [
+  P.PROFILE_MANAGE,
   P.PATIENTS_READ,
   P.PATIENT_HISTORY_READ,
   P.PATIENT_EVOLUTION_READ,
@@ -120,6 +125,7 @@ const FAMILY_PERMISSIONS: readonly PermissionName[] = [
 ];
 
 const CAREGIVER_PERMISSIONS: readonly PermissionName[] = [
+  P.PROFILE_MANAGE,
   P.PATIENTS_READ,
   P.PATIENT_HISTORY_READ,
   P.ALERTS_READ,
@@ -130,6 +136,7 @@ const CAREGIVER_PERMISSIONS: readonly PermissionName[] = [
 ];
 
 const PROFESSIONAL_PERMISSIONS: readonly PermissionName[] = [
+  P.PROFILE_MANAGE,
   P.PATIENTS_READ,
   P.PATIENTS_CREATE,
   P.PATIENTS_UPDATE,
@@ -212,12 +219,13 @@ export const TENANT_PROFILE_CODES: readonly TenantProfileCode[] = Object.keys(
   TENANT_PROFILES,
 ) as TenantProfileCode[];
 
-/** Os 35 codigos de tenant (sem `platform_*`). */
+/** Os 36 codigos de tenant (sem `platform_*`). */
 export const TENANT_PERMISSION_CODES: readonly PermissionName[] = (
   Object.values(Permissions) as PermissionName[]
 ).filter((code) => !isPlatformPermission(code));
 
 export const PLATFORM_ADMIN_PERMISSIONS: readonly PermissionName[] = [
+  Permissions.PROFILE_MANAGE,
   Permissions.USERS_RESET_PASSWORD,
   Permissions.ORGANIZATION_READ,
   Permissions.ORGANIZATION_UPDATE,

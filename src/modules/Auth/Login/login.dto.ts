@@ -7,6 +7,8 @@ import {
   MinLength,
 } from 'class-validator';
 
+import { SessionProfileDto } from '../dtos/sessionProfile.dto';
+
 /** Codigo publico da organizacao: minusculas, digitos e hifens simples. */
 export const ORGANIZATION_CODE_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
@@ -62,4 +64,11 @@ export class LoginResponseDto {
     description: 'Inatividade tolerada; ausente na sessao restrita.',
   })
   idleTimeoutSeconds?: number;
+
+  @ApiProperty({
+    type: SessionProfileDto,
+    description:
+      'Usuario, perfil, permissoes e organizacao da sessao, para o frontend usar como cache. CPF mascarado. Na sessao restrita, `permissions` vem vazia.',
+  })
+  session!: SessionProfileDto;
 }

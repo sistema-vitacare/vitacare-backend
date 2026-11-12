@@ -1,11 +1,38 @@
 import { Injectable } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 
-import type { AuthLookup, LoginIdentity } from '../types/auth.types';
+import type { OrganizationKind } from '@/common/context/requestContext.type';
+import { readPlanSummary } from '@/modules/Plan/repositories/planSummary.query';
+
+import type {
+  AuthLookup,
+  LoginIdentity,
+  SessionProfileRow,
+} from '../types/auth.types';
+import { loadEffectivePermissions } from './effectivePermissions.query';
 
 /** Linha crua da busca: a organizacao sempre vem, a conta pode faltar. */
 interface LookupRow extends Omit<LoginIdentity, 'permissions' | 'userId'> {
   userId: string | null;
+}
+
+interface SessionUserRow {
+  userId: string;
+  name: string;
+  email: string;
+  cpf: string;
+  phone: string | null;
+  status: SessionProfileRow['user']['status'];
+  createdAt: Date;
+  profileId: string;
+  profileCode: SessionProfileRow['profile']['code'];
+  profileName: string;
+  organizationId: string;
+  organizationCode: string;
+  tradeName: string;
+  legalName: string | null;
+  organizationKind: OrganizationKind;
+  organizationStatus: SessionProfileRow['organization']['status'];
 }
 
 /**
@@ -90,5 +117,79 @@ export class AuthIdentityRepository {
     );
 
     return rows[0]?.passwordHash ?? null;
+  }
+
+  /**
+   * Bloco de sessao do usuario (BE-27), lido depois do login aceito e em
+   * `/profile`. Nao filtra situacao: quem chama ja autenticou o usuario. As
+   * permissoes saem da mesma consulta do guard.
+   */
+  async findSessionProfile(
+    userId: string,
+    organizationId: string,
+  ): Promise<SessionProfileRow | null> {
+    const [row] = await this.dataSource.query<SessionUserRow[]>(
+      `SELECT u.id AS "userId",
+              u.name,
+              u.email,
+              u.cpf,
+              u.phone,
+              u.status,
+              u.created_at AS "createdAt",
+              p.id AS "profileId",
+              p.code AS "profileCode",
+              p.name AS "profileName",
+              o.id AS "organizationId",
+              o.code AS "organizationCode",
+              o.trade_name AS "tradeName",
+              o.legal_name AS "legalName",
+              o.kind AS "organizationKind",
+              o.status AS "organizationStatus"
+         FROM users u
+         JOIN access_profiles p
+           ON p.id = u.profile_id
+          AND p.organization_id = u.organization_id
+         JOIN organizations o ON o.id = u.organization_id
+        WHERE u.id = $1
+          AND u.organization_id = $2`,
+      [userId, organizationId],
+    );
+
+    if (!row) {
+      return null;
+    }
+
+    const [permissions, plan] = await Promise.all([
+      loadEffectivePermissions(
+        this.dataSource,
+        row.profileId,
+        row.organizationId,
+        row.organizationKind,
+      ),
+      readPlanSummary(this.dataSource, row.organizationId),
+    ]);
+
+    return {
+      user: {
+        id: row.userId,
+        name: row.name,
+        email: row.email,
+        cpf: row.cpf,
+        phone: row.phone,
+        status: row.status,
+        createdAt: row.createdAt,
+      },
+      profile: { code: row.profileCode, name: row.profileName },
+      permissions,
+      organization: {
+        id: row.organizationId,
+        code: row.organizationCode,
+        tradeName: row.tradeName,
+        legalName: row.legalName,
+        kind: row.organizationKind,
+        status: row.organizationStatus,
+        plan,
+      },
+    };
   }
 }

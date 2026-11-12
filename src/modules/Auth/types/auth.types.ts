@@ -2,6 +2,7 @@ import {
   type OrganizationKind,
   ProfileCode,
 } from '@/common/context/requestContext.type';
+import type { PlanSummary } from '@/modules/Plan/repositories/planSummary.query';
 
 export interface LoginIdentity {
   userId: string;
@@ -40,4 +41,31 @@ export interface AuthenticatedPrincipal {
   profile: ProfileCode;
   permissions: ReadonlySet<string>;
   absoluteExpiresAt: Date;
+}
+
+/**
+ * Dados da sessao do usuario (BE-27): mesma leitura no login e em `/profile`.
+ * `permissions` vem da mesma consulta que o guard usa.
+ */
+export interface SessionProfileRow {
+  user: {
+    id: string;
+    name: string;
+    email: string;
+    cpf: string;
+    phone: string | null;
+    status: 'pending' | 'active' | 'inactive';
+    createdAt: Date;
+  };
+  profile: { code: ProfileCode; name: string };
+  permissions: string[];
+  organization: {
+    id: string;
+    code: string;
+    tradeName: string;
+    legalName: string | null;
+    kind: OrganizationKind;
+    status: 'active' | 'inactive';
+    plan: PlanSummary | null;
+  };
 }
