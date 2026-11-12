@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { DataSource, type EntityManager } from 'typeorm';
 
+import { escapeLike } from '@/common/sql/escapeLike';
 import { ProfileCode } from '@/common/context/requestContext.type';
 import { DomainException } from '@/common/errors/domain.exception';
 import { translatePgError } from '@/common/errors/pgError.translator';
@@ -104,9 +105,6 @@ const PATIENT_SELECT = `
      AND viewer_link.user_id = $2
      AND viewer_link.role = ANY($3::varchar[])
      AND viewer_link.deleted_at IS NULL`;
-
-/** `%`, `_` e `\` digitados na busca sao texto, nao curinga do ILIKE. */
-const escapeLike = (value: string): string => value.replace(/[\\%_]/g, '\\$&');
 
 /** Busca so com digitos e pontuacao de CPF tambem procura no CPF. */
 const cpfDigitsOf = (search: string): string | null => {

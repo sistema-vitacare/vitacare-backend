@@ -47,6 +47,7 @@ export const Permissions = {
   PLAN_READ: 'plan:read',
   PLAN_CHANGE_REQUESTS_CREATE: 'plan_change_requests:create',
   DASHBOARD_READ: 'dashboard:read',
+  MANAGEMENT_REPORTS_GENERATE: 'management_reports:generate',
   AUDIT_EVENTS_READ: 'audit_events:read',
   AUDIT_EVENTS_EXPORT: 'audit_events:export',
   PROFILE_MANAGE: 'profile:manage',
@@ -92,6 +93,7 @@ export const PERMISSION_LABELS: Readonly<Record<PermissionName, string>> = {
   'plan:read': 'Consultar plano e uso',
   'plan_change_requests:create': 'Solicitar alteracao de plano',
   'dashboard:read': 'Consultar painel operacional',
+  'management_reports:generate': 'Gerar relatorios gerenciais',
   'audit_events:read': 'Consultar auditoria',
   'audit_events:export': 'Exportar auditoria',
   'profile:manage': 'Consultar e editar o proprio cadastro',
@@ -172,6 +174,7 @@ const ADMINISTRATIVE_PERMISSIONS: readonly PermissionName[] = [
   P.PLAN_READ,
   P.PLAN_CHANGE_REQUESTS_CREATE,
   P.DASHBOARD_READ,
+  P.MANAGEMENT_REPORTS_GENERATE,
   P.AUDIT_EVENTS_READ,
   P.AUDIT_EVENTS_EXPORT,
 ];
@@ -219,7 +222,7 @@ export const TENANT_PROFILE_CODES: readonly TenantProfileCode[] = Object.keys(
   TENANT_PROFILES,
 ) as TenantProfileCode[];
 
-/** Os 36 codigos de tenant (sem `platform_*`). */
+/** Os 37 codigos de tenant (sem `platform_*`). */
 export const TENANT_PERMISSION_CODES: readonly PermissionName[] = (
   Object.values(Permissions) as PermissionName[]
 ).filter((code) => !isPlatformPermission(code));
