@@ -1,7 +1,7 @@
 ---
 title: Troca da própria senha
 status: atual
-updated: 2026-09-22
+updated: 2026-11-12
 method: PUT
 path: /api/v1/auth/password
 source: src/modules/Auth/auth.controller.ts
@@ -14,6 +14,8 @@ source: src/modules/Auth/auth.controller.ts
 Troca voluntária da senha do usuário autenticado (RF001, UC01). O alvo vem **sempre** da sessão: não existe identificador de usuário no corpo, e nenhum perfil troca a senha de outra pessoa por esta rota — para isso existe a [redefinição administrativa](auth-redefinir-senha-usuario.md).
 
 Autenticação: `Authorization: Bearer <token>` de sessão **normal**. Sessão restrita de primeiro acesso não serve aqui; ela usa a rota de [primeiro acesso](auth-primeiro-acesso.md).
+
+Desde o BE-27 (2026-11-12) a mesma troca também existe em [PUT /api/v1/profile/password](profile-alterar-senha.md), que usa o mesmo caso de uso, corpo, erros e auditoria e exige a permissão `profile:manage`. As duas rotas são equivalentes; esta continua publicada.
 
 Uma troca bem-sucedida revoga **todas** as sessões do usuário, inclusive a que fez a chamada. O cliente precisa fazer login novamente com a senha nova.
 

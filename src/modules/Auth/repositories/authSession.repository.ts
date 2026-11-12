@@ -2,16 +2,11 @@ import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { DataSource } from 'typeorm';
 
-import { isPlatformPermission } from '@/modules/Access/access.permissions';
-
 import type { AuthenticatedPrincipal } from '../types/auth.types';
+import { loadEffectivePermissions } from './effectivePermissions.query';
 
 interface SessionRow extends Omit<AuthenticatedPrincipal, 'permissions'> {
   profileId: string;
-}
-
-interface PermissionRow {
-  code: string;
 }
 
 /**
@@ -80,27 +75,17 @@ export class AuthSessionRepository {
       return null;
     }
 
-    const permissions = await this.dataSource.query<PermissionRow[]>(
-      `SELECT permission.code
-         FROM profile_permissions pp
-         JOIN permissions permission ON permission.id = pp.permission_id
-        WHERE pp.profile_id = $1
-          AND pp.organization_id = $2
-          AND pp.deleted_at IS NULL
-          AND permission.deleted_at IS NULL`,
-      [row.profileId, row.organizationId],
-    );
+    const { profileId, ...principal } = row;
 
-    const { profileId: _profileId, ...principal } = row;
-    const isPlatform = row.organizationKind === 'platform';
-
-    // Permissao de plataforma concedida a perfil de tenant nao vale nada.
     return {
       ...principal,
       permissions: new Set(
-        permissions
-          .map((item) => item.code)
-          .filter((code) => isPlatform || !isPlatformPermission(code)),
+        await loadEffectivePermissions(
+          this.dataSource,
+          profileId,
+          row.organizationId,
+          row.organizationKind,
+        ),
       ),
     };
   }

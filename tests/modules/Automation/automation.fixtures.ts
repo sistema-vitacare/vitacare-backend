@@ -20,6 +20,7 @@ import { CreateScheduledAlerts1791400000000 } from '@/database/migrations/179140
 import { CreateAlertNotifications1791500000000 } from '@/database/migrations/1791500000000-CreateAlertNotifications';
 import { AddDashboardIndexes1791600000000 } from '@/database/migrations/1791600000000-AddDashboardIndexes';
 import { AuditEventQuery1791700000000 } from '@/database/migrations/1791700000000-AuditEventQuery';
+import { AddProfileManagePermission1791800000000 } from '@/database/migrations/1791800000000-AddProfileManagePermission';
 import { SnakeNamingStrategy } from '@/database/snakeNaming.strategy';
 
 const SRC_ROOT = join(__dirname, '..', '..', '..', 'src');
@@ -44,6 +45,7 @@ export const ALL_MIGRATIONS = [
   CreateAlertNotifications1791500000000,
   AddDashboardIndexes1791600000000,
   AuditEventQuery1791700000000,
+  AddProfileManagePermission1791800000000,
 ];
 
 export const TRUNCATE_AUTOMATION =

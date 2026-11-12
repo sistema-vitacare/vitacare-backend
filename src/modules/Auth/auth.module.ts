@@ -77,6 +77,7 @@ export const passwordRecoveryMailerProviders: Provider[] = [
     { provide: APP_GUARD, useClass: PermissionsGuard },
   ],
   exports: [
+    ChangePasswordUseCase,
     AuthIdentityRepository,
     AuthSessionRepository,
     PasswordHasher,

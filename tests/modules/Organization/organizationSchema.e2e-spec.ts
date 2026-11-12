@@ -322,6 +322,7 @@ describeWithDatabase('organizacoes em PostgreSQL descartavel', () => {
         'platform_organizations:create',
         'platform_organizations:read',
         'platform_organizations:update',
+        'profile:manage',
         'users:reset_password',
       ]);
     }, 30000);

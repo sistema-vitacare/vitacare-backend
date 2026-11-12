@@ -846,7 +846,12 @@ describeWithDatabase('autorizacao por perfil em PostgreSQL (e2e)', () => {
 
       const permissions = [...(principal?.permissions ?? [])].sort();
 
-      expect(permissions.every((code) => code.endsWith(':read'))).toBe(true);
+      // `profile:manage` so alcanca o proprio cadastro (BE-27).
+      expect(
+        permissions
+          .filter((code) => code !== 'profile:manage')
+          .every((code) => code.endsWith(':read')),
+      ).toBe(true);
       expect(permissions).toEqual(
         [...TENANT_PROFILES.family.permissions].sort(),
       );

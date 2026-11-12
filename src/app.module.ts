@@ -35,6 +35,7 @@ import { MedicationModule } from './modules/Medication/medication.module';
 import { NotificationModule } from './modules/Notification/notification.module';
 import { OrganizationModule } from './modules/Organization/organization.module';
 import { PlanModule } from './modules/Plan/plan.module';
+import { ProfileModule } from './modules/Profile/profile.module';
 import { PatientModule } from './modules/Patient/patient.module';
 import { PatientAccessModule } from './modules/PatientAccess/patientAccess.module';
 import { ReportModule } from './modules/Report/report.module';
@@ -94,6 +95,7 @@ import { StorageModule } from './storage/storage.module';
     PlanModule,
     AccessModule,
     UserModule,
+    ProfileModule,
     PatientModule,
     PatientAccessModule,
     FormModule,

@@ -4,6 +4,8 @@ import { ConfigService } from '@nestjs/config';
 import { DomainException } from '@/common/errors/domain.exception';
 
 import { AuthErrors } from '../auth.errors';
+import type { SessionProfileDto } from '../dtos/sessionProfile.dto';
+import { toSessionProfileResponse } from '../parsers/sessionProfile.parser';
 import { AuthIdentityRepository } from '../repositories/authIdentity.repository';
 import { AuthTransactionRepository } from '../repositories/authTransaction.repository';
 import { AuthRateLimiter } from '../security/authRateLimiter';
@@ -17,6 +19,7 @@ export interface LoginResult {
   tokenType: 'Bearer';
   expiresAt: Date;
   idleTimeoutSeconds?: number;
+  session: SessionProfileDto;
 }
 
 export interface LoginInput {
@@ -113,12 +116,27 @@ export class LoginUseCase {
       });
     }
 
+    // So depois do sucesso: a falha acima nao gasta esta leitura nem revela
+    // nada da conta (BE-27).
+    const session = await this.identities.findSessionProfile(
+      identity.userId,
+      identity.organizationId,
+    );
+
+    if (!session) {
+      throw new Error('Usuario autenticado sem cadastro legivel no login.');
+    }
+
     return {
       state: type === 'normal' ? 'authenticated' : 'password_change_required',
       accessToken: token.raw,
       tokenType: 'Bearer',
       expiresAt,
       ...(type === 'normal' ? { idleTimeoutSeconds } : {}),
+      session: toSessionProfileResponse(session, {
+        cpf: 'masked',
+        restricted: type !== 'normal',
+      }),
     };
   }
 

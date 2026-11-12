@@ -141,6 +141,12 @@ describeWithInfrastructure('homologacao funcional dos 14 casos de uso', () => {
     expect(dataOf<{ state: string }>(restricted).state).toBe(
       'password_change_required',
     );
+    // BE-27: a sessao restrita identifica o usuario, sem nenhuma permissao.
+    expect(
+      dataOf<{
+        session: { user: { email: string }; permissions: string[] };
+      }>(restricted).session,
+    ).toMatchObject({ user: { email }, permissions: [] });
 
     const restrictedToken = dataOf<{ accessToken: string }>(
       restricted,
@@ -159,6 +165,20 @@ describeWithInfrastructure('homologacao funcional dos 14 casos de uso', () => {
 
     expect(dataOf<{ state: string }>(session).state).toBe('authenticated');
 
+    // BE-27: o login devolve a sessao que o frontend usa como cache.
+    const block = dataOf<{
+      session: {
+        user: { email: string; cpf: string };
+        permissions: string[];
+        organization: { code: string };
+      };
+    }>(session).session;
+
+    expect(block.user.email).toBe(email);
+    expect(block.user.cpf).toMatch(/^\*\*\*\.\d{3}\.\d{3}-\*\*$/);
+    expect(block.permissions).toContain('profile:manage');
+    expect(block.organization.code).toBe(organizationCode);
+
     return dataOf<{ accessToken: string }>(session).accessToken;
   };
 
@@ -173,7 +193,9 @@ describeWithInfrastructure('homologacao funcional dos 14 casos de uso', () => {
   describe('implantacao', () => {
     it('aplica todas as migrations no banco vazio, como o entrypoint de producao', () => {
       expect(t.executedMigrations).toHaveLength(migrationFiles().length);
-      expect(t.executedMigrations.at(-1)).toBe('AuditEventQuery1791700000000');
+      expect(t.executedMigrations.at(-1)).toBe(
+        'AddProfileManagePermission1791800000000',
+      );
     });
 
     it('responde vivo e pronto com PostgreSQL e Redis reais', async () => {
