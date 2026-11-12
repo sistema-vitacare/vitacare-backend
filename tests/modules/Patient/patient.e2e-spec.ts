@@ -18,6 +18,7 @@ import type { AuthenticatedRequest } from '@/modules/Auth/types/authenticatedReq
 import { PatientController } from '@/modules/Patient/patient.controller';
 import { PATIENT_USE_CASES } from '@/modules/Patient/patient.module';
 import { PatientRepository } from '@/modules/Patient/repositories/patient.repository';
+import { FAMILY_NO_LINK_MESSAGE } from '@/modules/Patient/types/patient.types';
 
 import {
   PATIENT_ID,
@@ -83,6 +84,7 @@ describe('Patient HTTP (e2e)', () => {
   const patients = {
     create: jest.fn(),
     list: jest.fn(),
+    hasCareLink: jest.fn(),
     findById: jest.fn(),
     update: jest.fn(),
     deactivate: jest.fn(),
@@ -190,11 +192,16 @@ describe('Patient HTTP (e2e)', () => {
 
   it('familiar le so vinculados e nao escreve', async () => {
     patients.list.mockResolvedValue([[], 0]);
+    patients.hasCareLink.mockResolvedValue(false);
 
-    await request(server())
+    const listed = await request(server())
       .get('/api/v1/patients')
       .set('Authorization', 'Bearer family')
       .expect(200);
+
+    expect((listed.body as { meta: { message?: string } }).meta.message).toBe(
+      FAMILY_NO_LINK_MESSAGE,
+    );
 
     expect(patients.list).toHaveBeenCalledWith(
       expect.objectContaining({

@@ -13,20 +13,33 @@ import { AttachmentRepository } from '@/modules/Attachment/repositories/attachme
 import { FollowUpController } from '@/modules/FollowUp/followUp.controller';
 import { FOLLOW_UP_USE_CASES } from '@/modules/FollowUp/followUp.module';
 import { FollowUpRepository } from '@/modules/FollowUp/repositories/followUp.repository';
+import { FOLLOW_UPS_EMPTY_MESSAGE } from '@/modules/FollowUp/types/followUp.types';
 import { FormController } from '@/modules/Form/form.controller';
 import { FORM_USE_CASES } from '@/modules/Form/form.module';
 import { FormRepository } from '@/modules/Form/repositories/form.repository';
+import { OVERVIEW_NO_FOLLOW_UPS_MESSAGE } from '@/modules/History/GetPatientOverview/getPatientOverview.type';
 import { HistoryController } from '@/modules/History/history.controller';
 import {
   HISTORY_REPOSITORIES,
   HISTORY_USE_CASES,
 } from '@/modules/History/history.module';
+import { IndicatorController } from '@/modules/Indicator/indicator.controller';
+import {
+  INDICATOR_REPOSITORIES,
+  INDICATOR_USE_CASES,
+} from '@/modules/Indicator/indicator.module';
+import { EVOLUTION_EMPTY_MESSAGE } from '@/modules/Indicator/types/evolution.types';
 import { MedicationController } from '@/modules/Medication/medication.controller';
 import { MEDICATION_USE_CASES } from '@/modules/Medication/medication.module';
 import { MedicationRepository } from '@/modules/Medication/repositories/medication.repository';
 import { PatientController } from '@/modules/Patient/patient.controller';
 import { PATIENT_USE_CASES } from '@/modules/Patient/patient.module';
 import { PatientRepository } from '@/modules/Patient/repositories/patient.repository';
+import {
+  CAREGIVER_NO_LINK_MESSAGE,
+  FAMILY_NO_LINK_MESSAGE,
+  PATIENTS_EMPTY_MESSAGE,
+} from '@/modules/Patient/types/patient.types';
 import { FileStorageService } from '@/storage/fileStorage.service';
 
 import {
@@ -76,7 +89,7 @@ interface PatientBody {
 
 interface PageBody<T> {
   data: T[];
-  meta: { pagination: { total: number } };
+  meta: { pagination: { total: number }; message?: string };
 }
 
 describeWithDatabase('visao familiar somente leitura (e2e)', () => {
@@ -215,6 +228,7 @@ describeWithDatabase('visao familiar somente leitura (e2e)', () => {
         AttachmentController,
         MedicationController,
         HistoryController,
+        IndicatorController,
       ],
       providers: [
         ...PATIENT_USE_CASES,
@@ -235,6 +249,8 @@ describeWithDatabase('visao familiar somente leitura (e2e)', () => {
         MedicationRepository,
         ...HISTORY_USE_CASES,
         ...HISTORY_REPOSITORIES,
+        ...INDICATOR_USE_CASES,
+        ...INDICATOR_REPOSITORIES,
       ],
     });
   }, 180000);
@@ -574,6 +590,235 @@ describeWithDatabase('visao familiar somente leitura (e2e)', () => {
       expect(listed.status).toBe(200);
       expect((listed.body as PageBody<unknown>).data).toEqual([]);
       expect((listed.body as PageBody<unknown>).meta.pagination.total).toBe(0);
+      expect((listed.body as PageBody<unknown>).meta.message).toBe(
+        FAMILY_NO_LINK_MESSAGE,
+      );
+    });
+  });
+
+  /** BE-29 (UC14 e UC12 alternativos; decisoes de Mateus em 2026-11-12). */
+  describe('mensagens orientativas e de ausencia de dados', () => {
+    const revokeLinks = (tenant: Tenant, user: string) =>
+      t.dataSource.query(
+        `UPDATE user_patients SET deleted_at = now()
+          WHERE organization_id = $1 AND user_id = $2 AND deleted_at IS NULL`,
+        [tenant.id, user],
+      );
+    const list = async (token: string, query = '') => {
+      const response = await t.http('get', `/patients${query}`, token);
+
+      expect(response.status).toBe(200);
+
+      return response.body as PageBody<{ id: string }>;
+    };
+
+    it('familiar sem vinculo vigente: 200 vazio com a orientacao, com e sem filtros e em qualquer pagina; vinculo de outra organizacao nao conta', async () => {
+      const { A, B } = t.tenants;
+
+      await revokeLinks(A, A.users.family);
+      await t.linkedPatient(B, 'Paciente da Outra Organizacao');
+
+      for (const query of [
+        '',
+        '?search=Maria',
+        '?status=inactive&condition=Hipertensao',
+        '?page=3&limit=5',
+      ]) {
+        const page = await list(A.tokens.family, query);
+
+        expect({ query, data: page.data, message: page.meta.message }).toEqual({
+          query,
+          data: [],
+          message: FAMILY_NO_LINK_MESSAGE,
+        });
+      }
+
+      const other = await list(B.tokens.family);
+
+      expect(other.data.length).toBeGreaterThan(0);
+      expect(other.meta.message).toBeUndefined();
+    });
+
+    it('vinculo revogado recebe a orientacao na requisicao seguinte; um vinculo novo tira a mensagem', async () => {
+      const { A } = t.tenants;
+
+      await revokeLinks(A, A.users.family);
+
+      const patientId = await t.linkedPatient(A, 'Maria Vinculada');
+      const linked = await list(A.tokens.family);
+
+      expect(linked.data.map((patient) => patient.id)).toEqual([patientId]);
+      expect(linked.meta.message).toBeUndefined();
+
+      await revokeLinks(A, A.users.family);
+
+      expect((await list(A.tokens.family)).meta.message).toBe(
+        FAMILY_NO_LINK_MESSAGE,
+      );
+
+      const relinked = await t.linkedPatient(A, 'Maria Revinculada');
+      const back = await list(A.tokens.family);
+
+      expect(back.data.map((patient) => patient.id)).toEqual([relinked]);
+      expect(back.meta.message).toBeUndefined();
+    });
+
+    it('com vinculo, busca sem resultado (ou vinculo so com paciente inativo) traz o aviso generico, nao a orientacao', async () => {
+      const { A } = t.tenants;
+
+      await revokeLinks(A, A.users.family);
+
+      const patientId = await t.linkedPatient(A, 'Maria Buscada');
+
+      expect(
+        (await list(A.tokens.family, '?search=Inexistente')).meta.message,
+      ).toBe(PATIENTS_EMPTY_MESSAGE);
+
+      await t.dataSource.query(
+        `UPDATE patients SET status = 'inactive', deleted_at = now()
+          WHERE id = $1`,
+        [patientId],
+      );
+
+      const onlyInactive = await list(A.tokens.family);
+
+      expect(onlyInactive.data).toEqual([]);
+      expect(onlyInactive.meta.message).toBe(PATIENTS_EMPTY_MESSAGE);
+      expect(
+        (await list(A.tokens.family, '?status=inactive')).data.map(
+          (patient) => patient.id,
+        ),
+      ).toEqual([patientId]);
+    });
+
+    it('cuidador sem vinculo recebe a orientacao propria; admin e profissional so o aviso generico de busca vazia', async () => {
+      const { A } = t.tenants;
+      const caregiver = await list(A.tokens.caregiver2);
+
+      expect(caregiver.data).toEqual([]);
+      expect(caregiver.meta.message).toBe(CAREGIVER_NO_LINK_MESSAGE);
+
+      for (const token of [A.tokens.admin, A.tokens.professional]) {
+        const all = await list(token);
+
+        expect(all.data.length).toBeGreaterThan(0);
+        expect(all.meta.message).toBeUndefined();
+        expect((await list(token, '?search=Inexistente')).meta.message).toBe(
+          PATIENTS_EMPTY_MESSAGE,
+        );
+      }
+    });
+
+    it('registros, visao consolidada e evolucao sem dados trazem a mensagem informativa; com dados, nenhuma', async () => {
+      const { A } = t.tenants;
+
+      await revokeLinks(A, A.users.family);
+
+      const empty = await t.linkedPatient(A, 'Paciente Sem Registro');
+      const s = await scenario(A);
+      const read = async (path: string, token: string) => {
+        const response = await t.http('get', path, token);
+
+        expect({ path, status: response.status }).toEqual({
+          path,
+          status: 200,
+        });
+
+        return response.body as { data: unknown; meta: { message?: string } };
+      };
+
+      for (const token of [A.tokens.family, A.tokens.professional]) {
+        const records = await read(`/follow-ups?patientId=${empty}`, token);
+
+        expect(records.data).toEqual([]);
+        expect(records.meta.message).toBe(FOLLOW_UPS_EMPTY_MESSAGE);
+        expect(
+          (await read(`/patients/${empty}/overview`, token)).meta.message,
+        ).toBe(OVERVIEW_NO_FOLLOW_UPS_MESSAGE);
+
+        const evolution = await read(
+          `/patients/${empty}/evolution?from=2026-10-01&to=2026-10-31`,
+          token,
+        );
+
+        expect(evolution.data).toMatchObject({ series: [] });
+        expect(evolution.meta.message).toBe(EVOLUTION_EMPTY_MESSAGE);
+
+        expect(
+          (await read(`/follow-ups?patientId=${s.patientId}`, token)).meta
+            .message,
+        ).toBeUndefined();
+        expect(
+          (
+            await read(
+              `/follow-ups?patientId=${s.patientId}&from=2026-09-01&to=2026-09-30`,
+              token,
+            )
+          ).meta.message,
+        ).toBe(FOLLOW_UPS_EMPTY_MESSAGE);
+        expect(
+          (await read(`/patients/${s.patientId}/overview`, token)).meta.message,
+        ).toBeUndefined();
+        expect(
+          (
+            await read(
+              `/patients/${s.patientId}/evolution?from=2026-10-01&to=2026-10-31`,
+              token,
+            )
+          ).meta.message,
+        ).toBeUndefined();
+        expect(
+          (
+            await read(
+              `/patients/${s.patientId}/evolution?from=2026-09-01&to=2026-09-30`,
+              token,
+            )
+          ).meta.message,
+        ).toBe(EVOLUTION_EMPTY_MESSAGE);
+      }
+    });
+
+    it('detalhe fora do alcance continua 404 sem mensagem, e a escrita continua 403', async () => {
+      const { A, B } = t.tenants;
+
+      await revokeLinks(A, A.users.family);
+
+      const unlinked = await t.linkedPatient(A, 'Paciente Revogado');
+      const other = await t.linkedPatient(B, 'Paciente da Outra Organizacao');
+
+      await revokeLinks(A, A.users.family);
+
+      for (const patientId of [unlinked, other]) {
+        for (const path of [
+          `/patients/${patientId}`,
+          `/patients/${patientId}/overview`,
+          `/patients/${patientId}/evolution`,
+          `/follow-ups?patientId=${patientId}`,
+        ]) {
+          const response = await t.http('get', path, A.tokens.family);
+          const body = response.body as {
+            data?: unknown;
+            meta: { message?: string };
+          };
+
+          expect({ path, status: response.status }).toEqual({
+            path,
+            status: 404,
+          });
+          expect(codeOf(response)).toBe('PATIENT_NOT_FOUND');
+          expect(body.data).toBeUndefined();
+          expect(body.meta.message).toBeUndefined();
+        }
+      }
+
+      const write = await t.http('post', '/patients', A.tokens.family, {
+        name: 'Novo',
+        birthDate: '1950-01-01',
+        responsibleUserId: A.users.professional,
+      });
+
+      expect(write.status).toBe(403);
+      expect(codeOf(write)).toBe('AUTH_FORBIDDEN');
     });
   });
 });
