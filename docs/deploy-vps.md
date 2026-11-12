@@ -224,6 +224,46 @@ O container precisa de saída HTTPS para os serviços de push (`fcm.googleapis.c
 `*.push.services.mozilla.com`, `*.notify.windows.com`, `*.push.apple.com`) e,
 com SMTP ligado, para o servidor de e-mail.
 
+**E-mail (SMTP).** Hoje fica desligado (`SMTP_ENABLED=false`, o padrão). Ligar é só
+configuração, sem código novo nem migration:
+
+```dotenv
+SMTP_ENABLED=true
+SMTP_HOST=<servidor SMTP>
+SMTP_PORT=587
+SMTP_SECURE=false            # true na porta 465 (TLS direto)
+SMTP_USER=<usuario>          # vazio = sem autenticacao
+SMTP_PASSWORD=<senha, segredo>
+SMTP_FROM=VitaCare <no-reply@dominio>
+PASSWORD_RESET_URL=http://<IP-da-VPS>:1040/redefinir-senha
+```
+
+Os timeouts do SMTP ficam no padrão de 10 s: a stack não repassa
+`SMTP_*_TIMEOUT_MS`.
+
+Com `SMTP_ENABLED=true`, a API **não sobe** sem `SMTP_HOST`, `SMTP_FROM` e
+`PASSWORD_RESET_URL` (validação do `.env`). Ligar ativa **três envios de uma
+vez**:
+
+1. **Recuperação de senha** (UC02): o link sai por e-mail.
+2. **E-mails de alerta** do BE-17, conforme as preferências de cada usuário.
+3. **Aviso de vencimento do plano** (BE-28): enviado aos administradores
+   ativos às 08:00 de Brasília, sete dias antes, um dia antes e no vencimento.
+
+Com o SMTP desligado, os e-mails de alerta e de aviso ficam registrados no banco
+como não enviados (`skipped`/`CHANNEL_DISABLED`), sem erro no log. Ao ligar o
+SMTP, **só os gerados dali em diante saem**: os acumulados não são reenviados
+(decisão de Mateus em 2026-11-12). O aviso de vencimento continua visível na tela
+(`term.expiryWarning` em `GET /organizations/me/plan`).
+
+O link do e-mail usa `NOTIFICATION_APP_URL`. Falha temporária do servidor (4xx,
+rede) tenta de novo em 1 min, 5 min, 30 min e 2 h; recusa definitiva (5xx) fica
+`failed`. O log leva só o id e o código, nunca o endereço.
+
+Para testar sem servidor real, suba um Mailpit (`axllent/mailpit`, SMTP na porta
+1025 e interface web na 8025), aponte `SMTP_HOST`/`SMTP_PORT` para ele e confira
+as mensagens na interface.
+
 ### 5. Stack no Portainer
 
 Stacks → Add stack → **Repository**:
@@ -514,7 +554,8 @@ Decisão de Mateus em 2026-11-10: o sistema não terá domínio nem HTTPS; o ace
 - **Cópia externa** dos backups (camada 3), criptografada.
 - **Sem HTTPS** por decisão (2026-11-10): riscos e efeito no push em [Acesso por IP, sem HTTPS](#acesso-por-ip-sem-https).
 - **LGPD (P31)** e retenção clínica: ver o checklist.
-- **S3**: anexos usam o volume local (decisão de 2026-11-05). **SMTP**: o envio
-  de e-mail (BE-17) vale quando um servidor for configurado.
+- **S3**: anexos usam o volume local (decisão de 2026-11-05). **SMTP**: desligado
+  até haver servidor. Ligá-lo ativa a recuperação de senha, os e-mails de alerta
+  (BE-17) e o aviso de vencimento do plano (BE-28); ver [Variáveis](#4-variáveis-envproduction-nunca-commitado).
 - **Dependências**: `npm audit` (à mão, fora do CI) sem `high`/`critical`; restam 3 `moderate`
   (glob/minimatch via TypeORM, correção só no TypeORM 1.x, fora do semver).
