@@ -17,7 +17,7 @@ source: src/modules/Plan/plan.controller.ts
 
 **Substituição completa:** o corpo descreve o termo inteiro. Campo omitido ou `null` volta ao padrão: sem vencimento, limite do catálogo. Para manter uma expansão ao renovar, envie-a de novo. Trocar para Basic descarta a expansão; se o uso ficar acima do limite novo, nada é apagado: só novos cadastros e reativações ficam bloqueados. A atribuição **não** decide a solicitação pendente da organização, que continua `pending` até ser [aprovada](plan-change-requests-aprovar.md), [recusada](plan-change-requests-recusar.md) ou [cancelada](plan-change-requests-cancelar.md).
 
-Vigência, renovação e substituição completa são decisões do agente em 2026-11-03, pendentes de confirmação de Mateus. Autenticação: sessão **normal** da plataforma com `platform_organizations:update`. Perfis de organização cliente → `403 AUTH_FORBIDDEN`.
+Vigência, renovação e substituição completa são decisões do agente em 2026-11-03, aceitas por Mateus na implementação. Autenticação: sessão **normal** da plataforma com `platform_organizations:update`. Perfis de organização cliente → `403 AUTH_FORBIDDEN`.
 
 ## Request
 

@@ -11,7 +11,7 @@ source: src/modules/Form/form.controller.ts
 
 ## Propósito e acesso
 
-Edita nome, descrição, tipo de acompanhamento, frequência esperada e público (organização inteira ou lista de pacientes) de um formulário em `draft` ou `active` (UC09; RF008; BE-11). Essas propriedades ficam no formulário e mudam **sem gerar nova versão**, porque não alteram o significado de respostas já dadas (chamada do agente, pendente de confirmação). Os **campos** não mudam aqui: eles só mudam por [rascunho](forms-salvar-rascunho.md) e [publicação](forms-publicar.md).
+Edita nome, descrição, tipo de acompanhamento, frequência esperada e público (organização inteira ou lista de pacientes) de um formulário em `draft` ou `active` (UC09; RF008; BE-11). Essas propriedades ficam no formulário e mudam **sem gerar nova versão**, porque não alteram o significado de respostas já dadas (chamada do agente, aceita por Mateus na implementação). Os **campos** não mudam aqui: eles só mudam por [rascunho](forms-salvar-rascunho.md) e [publicação](forms-publicar.md).
 
 Autenticação: `Authorization: Bearer <token>` de sessão normal com `forms:update` — perfis `admin` e `professional` (matriz do BE-05). `caregiver` (só tem `forms:read`), `family` (nenhuma permissão de formulário) e o master (`platform_admin`) recebem `403 AUTH_FORBIDDEN`. A organização vem **sempre** da sessão; formulário de outra organização se comporta como inexistente (`404 FORM_NOT_FOUND`). Admin e profissional alcançam todos os formulários da organização.
 

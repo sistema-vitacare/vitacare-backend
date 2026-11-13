@@ -19,7 +19,7 @@ Exporta em PDF o relatório consolidado do paciente no período (RF012; UC10 pas
 - **Nova tentativa:** depois de uma falha, basta repetir o pedido.
 - **Auditoria:** cada PDF entregue grava `patient_report.exported` (`entity_type = patient`, `entity_id` = paciente, `after_values = { from, to }`), sem dado clínico. A gravação acontece depois de o PDF ficar pronto e antes do envio; se ela falhar, o PDF não sai.
 
-Escolhas do agente, aprovadas no desenho e **pendentes de confirmação**: biblioteca `pdfkit` com a fonte Helvetica padrão (caractere fora do conjunto da fonte, como emoji ou ideograma, sai como `?` no PDF, e o JSON fica intacto); nome do arquivo sem o nome do paciente; período vazio gera PDF com o aviso "Nenhum registro válido no período." e também é auditado.
+Escolhas do agente, aprovadas no desenho e **aceitas por Mateus na implementação**: biblioteca `pdfkit` com a fonte Helvetica padrão (caractere fora do conjunto da fonte, como emoji ou ideograma, sai como `?` no PDF, e o JSON fica intacto); nome do arquivo sem o nome do paciente; período vazio gera PDF com o aviso "Nenhum registro válido no período." e também é auditado.
 
 Autenticação e alcance: os mesmos do [relatório em JSON](patients-relatorio.md) — `reports:generate` (`admin` e `professional`); cuidador, familiar e master recebem `403`; paciente inexistente ou de outra organização, `404`; paciente inativo é exportável.
 

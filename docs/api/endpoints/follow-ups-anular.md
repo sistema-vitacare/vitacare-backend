@@ -19,7 +19,7 @@ Autenticação: `Authorization: Bearer <token>` de sessão normal com `follow_up
 - `caregiver` (`follow_ups:create`): só registros **de que é autor**, de paciente com vínculo de cuidador **vigente**; registro de outro autor → `403 FOLLOW_UP_NOT_AUTHOR`; paciente fora do alcance → `404`;
 - `family` e o master: `403 AUTH_FORBIDDEN`.
 
-Registro inexistente ou de outra organização → `404 FOLLOW_UP_NOT_FOUND`. Paciente inativo **não** impede anular (chamada do agente, pendente de confirmação).
+Registro inexistente ou de outra organização → `404 FOLLOW_UP_NOT_FOUND`. Paciente inativo **não** impede anular (chamada do agente, aceita por Mateus na implementação).
 
 ## Request
 

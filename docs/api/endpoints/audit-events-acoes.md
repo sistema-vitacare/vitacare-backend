@@ -13,7 +13,7 @@ source: src/modules/Audit/audit.controller.ts
 
 Opções do filtro "Ação" da Figura 45 (UC06 passo 2; BE-23): todas as ações que o backend grava, com rótulo em português e gravidade. Catálogo fixo no código (`src/modules/Audit/policies/auditCatalog.policy.ts`), decidido por Mateus em 2026-11-09; um teste falha se o código gravar ação fora dele.
 
-Gravidade (chamada do agente aprovada no desenho, pendente de confirmação): `warning` para tentativa de acesso recusada, senha temporária emitida, inativações (usuário, organização, paciente, formulário, medicamento, regra), troca de perfil, revogação de vínculo, anulação de registro, remoção de anexo, atribuição de plano, aprovação/recusa de solicitação de plano e exportações (relatório PDF e auditoria); `info` para criação da plataforma, preferências de notificação e inscrição push; `alert.generated` usa a severidade do alerta (`severity: null` aqui); o resto `normal`. Nenhuma ação é `critical` fixa.
+Gravidade (chamada do agente aprovada no desenho, aceita por Mateus na implementação): `warning` para tentativa de acesso recusada, senha temporária emitida, inativações (usuário, organização, paciente, formulário, medicamento, regra), troca de perfil, revogação de vínculo, anulação de registro, remoção de anexo, atribuição de plano, aprovação/recusa de solicitação de plano e exportações (relatório PDF e auditoria); `info` para criação da plataforma, preferências de notificação e inscrição push; `alert.generated` usa a severidade do alerta (`severity: null` aqui); o resto `normal`. Nenhuma ação é `critical` fixa.
 
 Acesso: `Bearer` com `audit_events:read` (`admin`, `platform_admin`).
 

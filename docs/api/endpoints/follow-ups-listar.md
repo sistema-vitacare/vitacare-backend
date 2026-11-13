@@ -95,7 +95,7 @@ As propriedades de cada item estão descritas em [follow-ups-consultar.md](follo
 
 - Os filtros são opcionais e se **combinam com E**; `total` conta só o que passa em todos.
 - **Período:** `from` e `to` são dias do calendário de Brasília, inclusivos nas duas pontas, aplicados à data da **visita** (`visitedAt`), não ao envio. Uma visita em `2026-10-01T02:30:00Z` (30/09 às 23:30 em Brasília) entra em `to=2026-09-30`. Pode-se informar só uma das pontas.
-- **Parâmetro e categoria:** `fieldKey` e `section` selecionam registros que têm **alguma** resposta no campo ou na seção; o registro sai **completo**, com todas as respostas (chamada do agente, pendente de confirmação: o registro é a unidade auditável). Campo desabilitado ou de versão antiga conta pela resposta gravada.
+- **Parâmetro e categoria:** `fieldKey` e `section` selecionam registros que têm **alguma** resposta no campo ou na seção; o registro sai **completo**, com todas as respostas (chamada do agente, aceita por Mateus na implementação: o registro é a unidade auditável). Campo desabilitado ou de versão antiga conta pela resposta gravada.
 - **Período ou filtro sem registro (UC12 e UC14, alternativos; BE-29):** `200` com `data: []`, `total: 0` e `meta.message` `Nenhum registro de acompanhamento no período e nos filtros selecionados.`, para todos os perfis. Página além da última, com `total` maior que zero, não traz mensagem. Paciente fora do alcance continua `404 PATIENT_NOT_FOUND`, sem mensagem.
 
 ```json

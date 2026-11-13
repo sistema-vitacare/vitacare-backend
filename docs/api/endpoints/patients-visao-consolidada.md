@@ -20,7 +20,7 @@ Autenticação: `Authorization: Bearer <token>` de sessão normal com `patient_h
 
 Paciente inexistente, de outra organização, sem vínculo ou com vínculo revogado → `404 PATIENT_NOT_FOUND`, **antes** de qualquer contagem: nenhum número, total ou conteúdo sai. O master (`platform_admin`) recebe `403`. Paciente **inativo** continua com a visão legível.
 
-Cada bloco respeita a permissão de leitura do perfil (chamada do agente, pendente de confirmação): sem `medications:read`, `activeMedications` e `counts.activeMedications` saem `null`; sem `alerts:read`, `recentAlerts` e `counts.openAlerts` saem `null`. Hoje os quatro perfis de organização têm as duas permissões.
+Cada bloco respeita a permissão de leitura do perfil (chamada do agente, aceita por Mateus na implementação): sem `medications:read`, `activeMedications` e `counts.activeMedications` saem `null`; sem `alerts:read`, `recentAlerts` e `counts.openAlerts` saem `null`. Hoje os quatro perfis de organização têm as duas permissões.
 
 ## Request
 

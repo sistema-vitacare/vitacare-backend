@@ -11,7 +11,7 @@ source: src/modules/Alert/alert.controller.ts
 
 ## Propósito e acesso
 
-Apoio ao UC09 (passo 5) e RF013: o profissional consulta as regras configuradas, por formulário ou por paciente. Leitura das regras é restrita a quem as configura (chamada do agente pendente de confirmação).
+Apoio ao UC09 (passo 5) e RF013: o profissional consulta as regras configuradas, por formulário ou por paciente. Leitura das regras é restrita a quem as configura (chamada do agente aceita por Mateus na implementação).
 
 Autenticação: `Authorization: Bearer <token>` de sessão normal com `alert_rules:manage` (rótulo "Configurar regras de alerta") — `professional` e `admin` (herança da Figura 28). `caregiver`, `family` e o master (`platform_admin`) recebem `403 AUTH_FORBIDDEN`. A organização vem **sempre** da sessão; regra, formulário ou paciente de outra organização responde `404`, igual a um inexistente.
 
