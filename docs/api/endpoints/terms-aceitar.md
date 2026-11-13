@@ -11,7 +11,7 @@ source: src/modules/Terms/terms.controller.ts
 
 ## Propósito e acesso
 
-Registra que o usuário da sessão **leu e aceitou** a versão vigente do termo de uso e privacidade (BE-32; R08 e RNF006, decisão de Mateus em 2026-11-12: escopo acadêmico, aceite obrigatório no primeiro login de todos os perfis, inclusive o master). Enquanto não houver aceite da vigente, o [login](auth-login.md) responde `state: "terms_acceptance_required"` e toda rota protegida responde `403 TERMS_ACCEPTANCE_REQUIRED`, exceto esta, [meus aceites](terms-meus-aceites.md), [GET /profile](profile-consultar.md) e [logout](auth-logout.md). Depois do aceite, a **mesma sessão** passa a valer normalmente na requisição seguinte; não é preciso novo login.
+Registra que o usuário da sessão **leu e aceitou** a versão vigente do termo de uso e privacidade (BE-32; R08 e RNF006, decisão de Mateus em 2026-11-12: escopo acadêmico, aceite obrigatório no primeiro login de todos os perfis, inclusive o master). Enquanto não houver aceite da vigente, o [login](auth-login.md) responde `state: "terms_acceptance_required"` e toda rota protegida responde `403 TERMS_ACCEPTANCE_REQUIRED`, exceto esta, [meus aceites](terms-meus-aceites.md), [GET /profile](profile-consultar.md), [revogar o push](notifications-push-revogar.md) e [logout](auth-logout.md). Depois do aceite, a **mesma sessão** passa a valer normalmente na requisição seguinte; não é preciso novo login.
 
 Autenticação: `Authorization: Bearer <token>` de sessão **normal** (com ou sem aceite pendente). A sessão restrita de primeiro acesso recebe `401`: o aceite vem depois da troca da senha provisória e do novo login (decisão de Mateus em 2026-11-13). Sem permissão nomeada; o alvo é sempre o próprio usuário da sessão.
 

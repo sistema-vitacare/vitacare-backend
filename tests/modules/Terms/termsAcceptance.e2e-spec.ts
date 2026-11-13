@@ -340,6 +340,18 @@ describeWithInfrastructure(
         };
       }
 
+      // Quem recusa o termo ainda para o push deste navegador antes de sair
+      // (BE-17): a rota chega ao caso de uso, que nao acha a inscricao.
+      const revoke = await http(
+        'post',
+        '/notifications/push-subscriptions/revoke',
+        orgs.A.adminToken,
+        { endpoint: 'https://fcm.googleapis.com/fcm/send/termo-pendente' },
+      );
+
+      expect(revoke.status).toBe(404);
+      expect(codeOf(revoke)).toBe('NOTIFICATION_PUSH_SUBSCRIPTION_NOT_FOUND');
+
       const before = await acceptedEvents();
       const both = await Promise.all([
         accept(orgs.A.adminToken, 1),

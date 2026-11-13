@@ -588,6 +588,12 @@ Sem SLA ou SLO de disponibilidade: não declarar.
   aceite é prova e não pode perder o texto.
 - **Smoke e carga:** o modo `read` não faz login; `full`, `verify` e
   `load.mjs` aceitam o termo com as contas sintéticas que criam.
+- **Ordem de publicação:** o merge na `main` dispara o deploy, e o entrypoint
+  publica a versão 1 na subida. A partir da requisição seguinte, **todo**
+  usuário recebe `terms_acceptance_required` no login e `403
+  TERMS_ACCEPTANCE_REQUIRED` nas demais rotas. Publique o frontend com a tela
+  do termo e o tratamento do `403` **antes ou junto** deste merge; sem isso,
+  ninguém consegue usar o sistema, nem em demonstração.
 
 ## Acesso por IP, sem HTTPS
 

@@ -131,7 +131,7 @@ export const setupApp = (
             type: 'http',
             scheme: 'bearer',
             description:
-              'Token opaco de sessao emitido por POST /auth/login. Enviar como `Authorization: Bearer <token>`. Enquanto o usuario nao aceitar a versao vigente do termo de uso (BE-32), toda rota protegida responde `403 TERMS_ACCEPTANCE_REQUIRED`, exceto ler a propria sessao (`GET /profile`), aceitar o termo (`POST /terms/acceptances`), listar os proprios aceites (`GET /terms/acceptances/me`) e sair (`POST /auth/logout`).',
+              'Token opaco de sessao emitido por POST /auth/login. Enviar como `Authorization: Bearer <token>`. Enquanto o usuario nao aceitar a versao vigente do termo de uso (BE-32), toda rota protegida responde `403 TERMS_ACCEPTANCE_REQUIRED`, exceto ler a propria sessao (`GET /profile`), aceitar o termo (`POST /terms/acceptances`), listar os proprios aceites (`GET /terms/acceptances/me`), parar o push deste navegador (`POST /notifications/push-subscriptions/revoke`) e sair (`POST /auth/logout`).',
           },
           BEARER_SECURITY_SCHEME,
         )
