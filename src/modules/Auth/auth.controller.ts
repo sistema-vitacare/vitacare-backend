@@ -21,6 +21,11 @@ import { BEARER_SECURITY_SCHEME } from '@/common/http/bearerAuth';
 import type { EnvelopePayload } from '@/common/http/envelope';
 import { UuidParam } from '@/common/http/uuidParam.pipe';
 
+import {
+  AcceptedInvitationDto,
+  AcceptInvitationDto,
+} from './AcceptInvitation/acceptInvitation.dto';
+import { AcceptInvitationUseCase } from './AcceptInvitation/acceptInvitation.useCase';
 import { ChangePasswordDto } from './ChangePassword/changePassword.dto';
 import { ChangePasswordUseCase } from './ChangePassword/changePassword.useCase';
 import { CompleteFirstAccessDto } from './CompleteFirstAccess/completeFirstAccess.dto';
@@ -28,6 +33,11 @@ import { CompleteFirstAccessUseCase } from './CompleteFirstAccess/completeFirstA
 import { CurrentSessionId } from './guards/currentSessionId.decorator';
 import { AllowSessionTypes, Public } from './guards/public.decorator';
 import { RequirePermissions } from './guards/requiredPermissions.decorator';
+import {
+  InspectInvitationDto,
+  InvitationPreviewDto,
+} from './InspectInvitation/inspectInvitation.dto';
+import { InspectInvitationUseCase } from './InspectInvitation/inspectInvitation.useCase';
 import { LoginDto, LoginResponseDto } from './Login/login.dto';
 import { LoginUseCase } from './Login/login.useCase';
 import { LogoutUseCase } from './Logout/logout.useCase';
@@ -56,6 +66,8 @@ export class AuthController {
     private readonly requestPasswordRecoveryUseCase: RequestPasswordRecoveryUseCase,
     private readonly resetPasswordUseCase: ResetPasswordUseCase,
     private readonly resetUserPasswordAsAdminUseCase: ResetUserPasswordAsAdminUseCase,
+    private readonly inspectInvitationUseCase: InspectInvitationUseCase,
+    private readonly acceptInvitationUseCase: AcceptInvitationUseCase,
   ) {}
 
   @Post('login')
@@ -182,6 +194,63 @@ export class AuthController {
   })
   async resetPassword(@Body() body: ResetPasswordDto): Promise<null> {
     return this.resetPasswordUseCase.execute(body);
+  }
+
+  @Post('invitations/inspect')
+  @Public()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary:
+      'Le o convite por link sem consumi-lo: usuario, organizacao, perfil e validade.',
+  })
+  @ApiEnvelope(InvitationPreviewDto)
+  @ApiErrors(
+    {
+      status: 422,
+      codes: ['VALIDATION_FAILED', 'AUTH_INVITATION_INVALID_OR_EXPIRED'],
+    },
+    { status: 429, codes: ['AUTH_TEMPORARILY_BLOCKED'] },
+    { status: 503, codes: ['AUTH_DEPENDENCY_UNAVAILABLE'] },
+  )
+  async inspectInvitation(
+    @Body() body: InspectInvitationDto,
+    @Req() request: Request,
+    @Res({ passthrough: true }) response: Response,
+  ): Promise<InvitationPreviewDto> {
+    response.setHeader('Cache-Control', 'no-store');
+
+    return this.inspectInvitationUseCase.execute(body, {
+      ip: clientIp(request),
+    });
+  }
+
+  @Post('invitations/accept')
+  @Public()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary:
+      'Aceita o convite por link: grava a senha escolhida e ativa o usuario, sem abrir sessao.',
+  })
+  @ApiEnvelope(AcceptedInvitationDto)
+  @ApiErrors(
+    {
+      status: 422,
+      codes: ['VALIDATION_FAILED', 'AUTH_INVITATION_INVALID_OR_EXPIRED'],
+    },
+    { status: 429, codes: ['AUTH_TEMPORARILY_BLOCKED'] },
+    { status: 503, codes: ['AUTH_DEPENDENCY_UNAVAILABLE'] },
+  )
+  async acceptInvitation(
+    @Body() body: AcceptInvitationDto,
+    @Req() request: Request,
+    @Res({ passthrough: true }) response: Response,
+  ): Promise<EnvelopePayload<AcceptedInvitationDto>> {
+    response.setHeader('Cache-Control', 'no-store');
+
+    return this.acceptInvitationUseCase.execute(body, {
+      ip: clientIp(request),
+      requestId: requestIdOf(request),
+    });
   }
 
   @Post('users/:userId/temporary-password')

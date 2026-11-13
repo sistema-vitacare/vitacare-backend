@@ -4,6 +4,8 @@ import type {
   EmailSender,
 } from '@/modules/Notification/channels/emailSender';
 
+import Redis from 'ioredis';
+
 import { bootFullApp, type FullApp } from '../../app/fullApp.fixtures';
 
 /**
@@ -500,6 +502,238 @@ describeWithInfrastructure(
           { sent: true, consumed: false, revokedReason: 'reissued' },
           { sent: false, consumed: false, revokedReason: 'send_failed' },
         ]);
+      });
+    });
+
+    describe('consulta e aceite do link', () => {
+      /** O limite real por IP (30/h) vale para o teste inteiro; zera a cada caso. */
+      const resetInvitationLimit = async () => {
+        const client = new Redis(redisUrl!, { lazyConnect: true });
+
+        await client.connect();
+        const keys = await client.keys('*auth:invitation-ip:*');
+
+        if (keys.length > 0) await client.del(...keys);
+        await client.quit();
+      };
+
+      const inspect = (token: string) =>
+        http('post', '/auth/invitations/inspect', null, { token });
+      const accept = (token: string, newPassword = PASSWORD) =>
+        http('post', '/auth/invitations/accept', null, { token, newPassword });
+
+      beforeEach(resetInvitationLimit);
+
+      it('inspect mostra usuario, organizacao, perfil e validade sem consumir', async () => {
+        const { email, response } = await invite(tenants.A);
+        const token = sender.tokenFor(email);
+
+        for (let round = 0; round < 2; round += 1) {
+          const preview = await inspect(token);
+
+          expect(preview.status).toBe(200);
+          expect(preview.headers['cache-control']).toBe('no-store');
+          expect(dataOf<object>(preview)).toEqual({
+            user: { name: 'Ana Convidada', email },
+            organization: { code: tenants.A.code, name: 'Organizacao A' },
+            profile: { code: 'caregiver', name: expect.any(String) as string },
+            expiresAt: dataOf<{ expiresAt: string }>(response).expiresAt,
+          });
+        }
+      });
+
+      it('o aceite ativa o usuario, nao abre sessao e o login entra com a senha escolhida', async () => {
+        const { email, id } = await invite(tenants.A);
+        const token = sender.tokenFor(email);
+
+        const accepted = await accept(token, 'senha escolhida no convite');
+
+        expect(accepted.status).toBe(200);
+        expect(dataOf<object>(accepted)).toEqual({
+          organizationCode: tenants.A.code,
+          email,
+        });
+        expect(messageOf(accepted)).toBe(
+          'Senha cadastrada. Entre com seu e-mail e a nova senha.',
+        );
+        expect(JSON.stringify(accepted.body)).not.toContain('accessToken');
+
+        const session = await login(
+          tenants.A.code,
+          email,
+          'senha escolhida no convite',
+        );
+        expect(session.status).toBe(200);
+        expect(dataOf<{ state: string }>(session).state).toBe('authenticated');
+
+        const user = await invitationOf(tenants.A, id);
+        expect(user.status).toBe('active');
+        expect(user.invitation).toBeNull();
+        expect(await invitationRows(id)).toEqual([
+          { sent: true, consumed: true, revokedReason: null },
+        ]);
+
+        const [acceptedEvent] = await t.dataSource.query<
+          Array<{ actor: string; profile: string; ip: string | null }>
+        >(
+          `SELECT actor_user_id AS actor, actor_profile_code AS profile,
+                  host(ip_address) AS ip
+             FROM audit_events
+            WHERE action = 'user.invitation_accepted' AND entity_id = $1`,
+          [id],
+        );
+        expect(acceptedEvent).toMatchObject({
+          actor: id,
+          profile: 'caregiver',
+        });
+        expect(acceptedEvent.ip).not.toBeNull();
+      });
+
+      it('segundo aceite, inspect depois do aceite e token inventado respondem o mesmo 422', async () => {
+        const { email } = await invite(tenants.A);
+        const token = sender.tokenFor(email);
+
+        expect((await accept(token)).status).toBe(200);
+
+        for (const response of [
+          await accept(token, 'outra senha qualquer'),
+          await inspect(token),
+          await inspect('token-que-nao-existe'),
+          await accept('token-que-nao-existe'),
+        ]) {
+          expect(response.status).toBe(422);
+          expect(codeOf(response)).toBe('AUTH_INVITATION_INVALID_OR_EXPIRED');
+        }
+
+        expect((await login(tenants.A.code, email, PASSWORD)).status).toBe(200);
+      });
+
+      it('link vencido responde 422 e o admin ve expired', async () => {
+        const { email, id } = await invite(tenants.A);
+        const token = sender.tokenFor(email);
+
+        await t.dataSource.query(
+          `UPDATE user_invitations SET expires_at = now() - interval '1 second'
+            WHERE user_id = $1`,
+          [id],
+        );
+
+        expect(codeOf(await inspect(token))).toBe(
+          'AUTH_INVITATION_INVALID_OR_EXPIRED',
+        );
+        expect(codeOf(await accept(token))).toBe(
+          'AUTH_INVITATION_INVALID_OR_EXPIRED',
+        );
+        expect((await invitationOf(tenants.A, id)).invitation).toMatchObject({
+          channel: 'email',
+          status: 'expired',
+        });
+        expect(
+          await scalar('SELECT status AS value FROM users WHERE id = $1', [id]),
+        ).toBe('pending');
+      });
+
+      it('o link anterior a uma reemissao responde 422 e o novo funciona', async () => {
+        const { email, id } = await invite(tenants.A);
+        const first = sender.tokenFor(email);
+
+        await reissue(tenants.A, id);
+        const second = sender.tokenFor(email);
+
+        expect(second).not.toBe(first);
+        expect(codeOf(await accept(first))).toBe(
+          'AUTH_INVITATION_INVALID_OR_EXPIRED',
+        );
+        expect((await accept(second)).status).toBe(200);
+      });
+
+      it('o token de envio que falhou nunca vale', async () => {
+        sender.results.push({ kind: 'failed', code: 'SMTP_REJECTED' });
+        sender.results.push({ kind: 'sent' });
+
+        const { email, id } = await invite(tenants.A);
+        // O e-mail nao foi capturado: o token so existe no banco, revogado.
+        expect(() => sender.tokenFor(email)).toThrow();
+        expect((await invitationOf(tenants.A, id)).invitation?.status).toBe(
+          'invalidated',
+        );
+
+        await reissue(tenants.A, id);
+        expect((await accept(sender.tokenFor(email))).status).toBe(200);
+      });
+
+      it('dois aceites simultaneos do mesmo link: um 200 e um 422, em 5 rodadas', async () => {
+        for (let round = 0; round < 5; round += 1) {
+          const { email } = await invite(tenants.A);
+          const token = sender.tokenFor(email);
+
+          const statuses = (
+            await Promise.all([accept(token), accept(token)])
+          ).map((response) => response.status);
+
+          expect(statuses.sort()).toEqual([200, 422]);
+        }
+      });
+
+      it('aceite simultaneo a reemissao nunca responde 500 nem vence duas vezes', async () => {
+        for (let round = 0; round < 5; round += 1) {
+          const { email, id } = await invite(tenants.A);
+
+          const [accepted, reissued] = await Promise.all([
+            accept(sender.tokenFor(email)),
+
+            reissue(tenants.A, id),
+          ]);
+
+          // Aceite primeiro: reemissao 409. Reemissao primeiro: aceite 422.
+
+          expect(
+            [accepted.status, reissued.status].sort((a, b) => a - b),
+          ).toEqual(accepted.status === 200 ? [200, 409] : [201, 422]);
+        }
+      });
+
+      it('mesmo e-mail em A e B: cada token ativa so a propria conta', async () => {
+        const email = nextEmail();
+
+        const inA = await createUser(tenants.A, {}, email);
+        const tokenA = sender.tokenFor(email);
+        const inB = await createUser(tenants.B, {}, email);
+        const tokenB = sender.tokenFor(email);
+
+        expect(tokenA).not.toBe(tokenB);
+
+        const acceptedA = await accept(tokenA, 'senha da conta em A');
+        expect(dataOf<{ organizationCode: string }>(acceptedA)).toEqual({
+          organizationCode: tenants.A.code,
+          email,
+        });
+
+        const idB = dataOf<{ user: { id: string } }>(inB).user.id;
+        expect((await invitationOf(tenants.B, idB)).status).toBe('pending');
+        expect(
+          (await login(tenants.B.code, email, 'senha da conta em A')).status,
+        ).toBe(401);
+
+        expect((await accept(tokenB, 'senha da conta em B')).status).toBe(200);
+        expect(
+          (await login(tenants.A.code, email, 'senha da conta em A')).status,
+        ).toBe(200);
+        expect(
+          (await login(tenants.B.code, email, 'senha da conta em B')).status,
+        ).toBe(200);
+        expect(dataOf<{ user: { id: string } }>(inA).user.id).not.toBe(idB);
+      });
+
+      it('o limite por IP responde 429 depois de 30 tentativas na hora', async () => {
+        const codes: number[] = [];
+
+        for (let attempt = 0; attempt < 31; attempt += 1) {
+          codes.push((await inspect(`token-falso-${attempt}`)).status);
+        }
+
+        expect(codes.slice(0, 30).every((status) => status === 422)).toBe(true);
+        expect(codes[30]).toBe(429);
       });
     });
 

@@ -9,6 +9,8 @@ const limits: Record<string, number> = {
   'auth.recoveryWindowSeconds': 3600,
   'auth.recoveryMaxPerAccount': 3,
   'auth.recoveryMaxPerIp': 10,
+  'auth.invitationWindowSeconds': 3600,
+  'auth.invitationMaxPerIp': 30,
 };
 
 const config = { getOrThrow: jest.fn((key: string) => limits[key]) };
@@ -120,6 +122,29 @@ describe('AuthRateLimiter', () => {
       limiter.assertLoginAllowed('clinica-a', 'user@example.test', '127.0.0.1'),
     ).rejects.toMatchObject<Partial<DomainException>>({
       code: 'AUTH_DEPENDENCY_UNAVAILABLE',
+    });
+  });
+
+  it('conta consulta e aceite do convite por IP, sem identidade, e bloqueia no teto', async () => {
+    const redis = {
+      getNumber: jest.fn().mockResolvedValue(29),
+      incrementWithTtl: jest.fn().mockResolvedValue(30),
+    };
+    const limiter = build(redis);
+
+    await limiter.assertInvitationAllowed('10.0.0.7');
+
+    expect(redis.incrementWithTtl).toHaveBeenCalledWith(
+      expect.stringMatching(/^auth:invitation-ip:[0-9a-f]{64}$/),
+      3600,
+    );
+
+    redis.getNumber.mockResolvedValue(30);
+
+    await expect(
+      limiter.assertInvitationAllowed('10.0.0.7'),
+    ).rejects.toMatchObject<Partial<DomainException>>({
+      code: 'AUTH_TEMPORARILY_BLOCKED',
     });
   });
 });

@@ -43,6 +43,8 @@ import { PasswordResetRepository } from '@/modules/Auth/repositories/passwordRes
 import { RequestPasswordRecoveryUseCase } from '@/modules/Auth/RequestPasswordRecovery/requestPasswordRecovery.useCase';
 import { ResetPasswordUseCase } from '@/modules/Auth/ResetPassword/resetPassword.useCase';
 import { ResetUserPasswordAsAdminUseCase } from '@/modules/Auth/ResetUserPasswordAsAdmin/resetUserPasswordAsAdmin.useCase';
+import { AcceptInvitationUseCase } from '@/modules/Auth/AcceptInvitation/acceptInvitation.useCase';
+import { InspectInvitationUseCase } from '@/modules/Auth/InspectInvitation/inspectInvitation.useCase';
 import { AuthRateLimiter } from '@/modules/Auth/security/authRateLimiter';
 import { PasswordHasher } from '@/modules/Auth/security/passwordHasher';
 import { TokenService } from '@/modules/Auth/security/token.service';
@@ -354,6 +356,8 @@ describeWithDatabase('gestao de usuarios em PostgreSQL (e2e)', () => {
         RequestPasswordRecoveryUseCase,
         ResetPasswordUseCase,
         ResetUserPasswordAsAdminUseCase,
+        InspectInvitationUseCase,
+        AcceptInvitationUseCase,
         AuthIdentityRepository,
         AuthSessionRepository,
         AuthTransactionRepository,
