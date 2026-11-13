@@ -72,6 +72,7 @@ export const AUDIT_ACTIONS: Readonly<Record<string, AuditActionEntry>> = {
   'user.reactivated': entry('Reativou usuário'),
   'profile.updated': entry('Editou o próprio cadastro', 'info'),
   'profile.email_changed': entry('Trocou o próprio e-mail', 'warning'),
+  'terms.accepted': entry('Aceitou o termo de uso'),
   'patient.created': entry('Cadastrou paciente'),
   'patient.updated': entry('Editou paciente'),
   'patient.responsible_changed': entry('Trocou o profissional responsável'),

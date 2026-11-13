@@ -90,6 +90,8 @@ export const setupApp = (
     exclude: [
       { path: 'health/live', method: RequestMethod.GET },
       { path: 'health/ready', method: RequestMethod.GET },
+      // Pagina publica do termo de uso (BE-32), linkada no rodape e no e-mail.
+      { path: 'termos', method: RequestMethod.GET },
     ],
   });
 
@@ -98,9 +100,9 @@ export const setupApp = (
     defaultVersion: options.apiVersion,
   });
 
-  // Health mantem o relatorio do Terminus e a documentacao mantem HTML/OpenAPI
-  // puros: as duas ficam fora do envelope e do novo formato de erro.
-  const excludedPaths = ['/health', docsPath];
+  // Health mantem o relatorio do Terminus, a documentacao mantem HTML/OpenAPI
+  // puros e a pagina do termo e HTML: ficam fora do envelope e do formato de erro.
+  const excludedPaths = ['/health', docsPath, '/termos'];
 
   app.useGlobalPipes(
     new ValidationPipe({
@@ -129,7 +131,7 @@ export const setupApp = (
             type: 'http',
             scheme: 'bearer',
             description:
-              'Token opaco de sessao emitido por POST /auth/login. Enviar como `Authorization: Bearer <token>`.',
+              'Token opaco de sessao emitido por POST /auth/login. Enviar como `Authorization: Bearer <token>`. Enquanto o usuario nao aceitar a versao vigente do termo de uso (BE-32), toda rota protegida responde `403 TERMS_ACCEPTANCE_REQUIRED`, exceto ler a propria sessao (`GET /profile`), aceitar o termo (`POST /terms/acceptances`), listar os proprios aceites (`GET /terms/acceptances/me`) e sair (`POST /auth/logout`).',
           },
           BEARER_SECURITY_SCHEME,
         )

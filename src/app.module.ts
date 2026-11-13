@@ -37,6 +37,7 @@ import { PlanExpiryNoticeModule } from './modules/PlanExpiryNotice/planExpiryNot
 import { OrganizationModule } from './modules/Organization/organization.module';
 import { PlanModule } from './modules/Plan/plan.module';
 import { ProfileModule } from './modules/Profile/profile.module';
+import { TermsModule } from './modules/Terms/terms.module';
 import { PatientModule } from './modules/Patient/patient.module';
 import { PatientAccessModule } from './modules/PatientAccess/patientAccess.module';
 import { ReportModule } from './modules/Report/report.module';
@@ -98,6 +99,7 @@ import { StorageModule } from './storage/storage.module';
     AccessModule,
     UserModule,
     ProfileModule,
+    TermsModule,
     PatientModule,
     PatientAccessModule,
     FormModule,

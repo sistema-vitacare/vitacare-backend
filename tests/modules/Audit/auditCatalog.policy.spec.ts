@@ -88,6 +88,13 @@ describe('catalogo de acoes da auditoria (BE-23)', () => {
     expect(AUDIT_ACTIONS['auth.bootstrap_completed']).toBeDefined();
   });
 
+  it('inclui o aceite do termo de uso como acao normal (BE-32)', () => {
+    expect(AUDIT_ACTIONS['terms.accepted']).toEqual({
+      label: 'Aceitou o termo de uso',
+      severity: 'normal',
+    });
+  });
+
   it('rotula em portugues e devolve o codigo para acao desconhecida', () => {
     expect(auditActionLabel('follow_up.created')).toBe(
       'Registrou acompanhamento',

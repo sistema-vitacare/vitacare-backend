@@ -51,9 +51,9 @@ describe('renderTermsMarkdown (BE-32)', () => {
   it('renderiza o termo v1 inteiro sem sobra de marcacao', () => {
     const html = renderTermsMarkdown(readFileSync(TERMS_FILE, 'utf8'));
 
-    expect(html.startsWith('<h1>Termo de Uso e Privacidade do VitaCare</h1>')).toBe(
-      true,
-    );
+    expect(
+      html.startsWith('<h1>Termo de Uso e Privacidade do VitaCare</h1>'),
+    ).toBe(true);
     expect(html).not.toContain('**');
     expect(html).not.toMatch(/^[-#]/m);
     expect(html).not.toContain('<script');
