@@ -15,7 +15,7 @@ Lista da configuração de formulários (Figura 39; UC09 passo 1; RF008; BE-11) 
 
 Autenticação: `Authorization: Bearer <token>` de sessão normal com `forms:read` — perfis `admin`, `professional` e `caregiver`. `family` (sem permissão de formulário) e o master (`platform_admin`) recebem `403 AUTH_FORBIDDEN`. A organização vem **sempre** da sessão.
 
-**Alcance:** `admin` e `professional` veem todos os formulários da organização, em qualquer status. O `caregiver` vê só formulários **`active`** que valem para a organização inteira ou cuja lista inclui um paciente a que ele tem vínculo de cuidado vigente (papel `caregiver`, o mesmo alcance de [GET /patients](patients-listar.md)); não vê rascunhos nem desativados, recebe `hasDraft = false` e, em `patientIds`, só os pacientes do seu alcance. Formulários da organização inteira aparecem para o cuidador mesmo que ele não tenha nenhum paciente vinculado (chamada do agente, pendente de confirmação). A [revogação](patient-links-revogar.md) do vínculo vale na requisição seguinte.
+**Alcance:** `admin` e `professional` veem todos os formulários da organização, em qualquer status. O `caregiver` vê só formulários **`active`** que valem para a organização inteira ou cuja lista inclui um paciente a que ele tem vínculo de cuidado vigente (papel `caregiver`, o mesmo alcance de [GET /patients](patients-listar.md)); não vê rascunhos nem desativados, recebe `hasDraft = false` e, em `patientIds`, só os pacientes do seu alcance. Formulários da organização inteira aparecem para o cuidador mesmo que ele não tenha nenhum paciente vinculado (chamada do agente, aceita por Mateus na implementação). A [revogação](patient-links-revogar.md) do vínculo vale na requisição seguinte.
 
 ## Request
 

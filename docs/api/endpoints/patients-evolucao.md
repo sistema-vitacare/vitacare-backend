@@ -20,7 +20,7 @@ Séries de evolução por parâmetro numérico de um paciente num período, com 
 - **Familiar:** recebe a mesma resposta do profissional.
 - **Série e período:** um ponto por medição; sem datas, os últimos 30 dias até hoje, com no máximo 366 dias.
 
-As escolhas marcadas como "chamada do agente" abaixo foram aprovadas no desenho e continuam pendentes de confirmação.
+As escolhas marcadas como "chamada do agente" abaixo foram aprovadas no desenho e foram aceitas por Mateus na implementação.
 
 Autenticação: `Authorization: Bearer <token>` de sessão normal com `patient_evolution:read` (`admin`, `professional` e `family`). O **cuidador** não tem a permissão na matriz do BE-05 e recebe `403`; o master também. A organização vem **sempre** da sessão. Alcance pelo paciente, o mesmo das demais leituras clínicas:
 

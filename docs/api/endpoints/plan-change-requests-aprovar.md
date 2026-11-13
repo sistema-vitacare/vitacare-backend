@@ -13,7 +13,7 @@ source: src/modules/Plan/plan.controller.ts
 
 O administrador master aprova a solicitação `pending` (UC04 passo 5, "atualização administrativa"). Na mesma transação, sob a trava da organização: encerra o termo corrente, abre um termo com `origin = "change_request"` ligado à solicitação, com o plano pedido e, se enviados, `endsAt` e limites personalizados; atualiza `organizations.usage_plan_id` e marca a solicitação `approved`. O novo limite e a nova vigência valem na requisição seguinte da organização.
 
-O corpo segue a mesma regra de [atribuição](plans-atribuir.md): ausente/`null` = sem vencimento e limite do catálogo; limite personalizado só para plano expansível (Enterprise) e só igual ou acima do catálogo (Quadro 2 do TCC, decisão de Mateus em 2026-11-04). Limite recusado → `422` e a solicitação continua `pending`, sem termo novo. Vigência e fluxo de decisão: decisões do agente em 2026-11-03, pendentes de confirmação de Mateus.
+O corpo segue a mesma regra de [atribuição](plans-atribuir.md): ausente/`null` = sem vencimento e limite do catálogo; limite personalizado só para plano expansível (Enterprise) e só igual ou acima do catálogo (Quadro 2 do TCC, decisão de Mateus em 2026-11-04). Limite recusado → `422` e a solicitação continua `pending`, sem termo novo. Vigência e fluxo de decisão: decisões do agente em 2026-11-03, aceitas por Mateus na implementação.
 
 Autenticação: sessão **normal** da plataforma com `platform_organizations:update`. Perfis de organização cliente → `403 AUTH_FORBIDDEN`.
 

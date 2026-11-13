@@ -13,7 +13,7 @@ source: src/modules/Plan/plan.controller.ts
 
 UC04 passos 4–5 (RF018): o administrador pede outro plano. O pedido fica `pending` para análise do administrador master; **o plano, os limites e a vigência não mudam até a [aprovação](plan-change-requests-aprovar.md)**. Solicitar não equivale a pagar: não há cobrança nem gateway.
 
-Regras (decisões do agente em 2026-11-03, pendentes de confirmação de Mateus):
+Regras (decisões do agente em 2026-11-03, aceitas por Mateus na implementação):
 
 - No máximo **uma** solicitação `pending` por organização; a repetida responde `409`, também sob concorrência (índice único parcial no banco).
 - O plano pedido deve estar ativo no [catálogo](plans-listar.md) e ser **diferente** do corrente. Exceção: com a vigência vencida (`term.status = "expired"`), o mesmo plano é aceito como **pedido de renovação**.

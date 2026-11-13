@@ -11,7 +11,7 @@ source: src/modules/Form/form.controller.ts
 
 ## Propósito e acesso
 
-Desfaz a [desativação](forms-desativar.md) (UC09; RF008; BE-11). O UC09 só fala em desativar; a reativação segue o padrão de pacientes e usuários (chamada do agente, pendente de confirmação). O formulário volta a **`active`** se tiver versão publicada, ou a **`draft`** se nunca foi publicado; versões, campos, rascunho e lista de pacientes voltam como estavam. Formulários não contam em limite de plano.
+Desfaz a [desativação](forms-desativar.md) (UC09; RF008; BE-11). O UC09 só fala em desativar; a reativação segue o padrão de pacientes e usuários (chamada do agente, aceita por Mateus na implementação). O formulário volta a **`active`** se tiver versão publicada, ou a **`draft`** se nunca foi publicado; versões, campos, rascunho e lista de pacientes voltam como estavam. Formulários não contam em limite de plano.
 
 Autenticação: `Authorization: Bearer <token>` de sessão normal com `forms:deactivate` — perfis `admin` e `professional` (matriz do BE-05). `caregiver` (só tem `forms:read`), `family` (nenhuma permissão de formulário) e o master (`platform_admin`) recebem `403 AUTH_FORBIDDEN`. A organização vem **sempre** da sessão; formulário de outra organização se comporta como inexistente (`404 FORM_NOT_FOUND`).
 

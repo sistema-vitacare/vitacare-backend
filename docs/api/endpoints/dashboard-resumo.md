@@ -22,7 +22,7 @@ Resumo do painel operacional da organização da sessão (RF015; UC05 passos 1�
 - **Listas de 5 itens:** alertas prioritários (abertos, `critical` > `warning` > `info`, depois os mais recentes) e últimos registros válidos do período, sem as respostas.
 - **Usuário ativo = `status = active`** (já fez o primeiro acesso); pacientes e usuários ativos são a foto de agora.
 
-As escolhas marcadas como "chamada do agente" abaixo foram aprovadas no desenho e continuam pendentes de confirmação.
+As escolhas marcadas como "chamada do agente" abaixo foram aprovadas no desenho e foram aceitas por Mateus na implementação.
 
 Autenticação: `Authorization: Bearer <token>` de sessão normal com `dashboard:read`, que a matriz do BE-05 dá só ao `admin`. Profissional, cuidador, familiar e master recebem `403 AUTH_FORBIDDEN`. A organização vem **sempre** da sessão: toda contagem é filtrada por ela, e nenhum número de outra organização entra. Ordem das checagens: sessão (`401`), permissão (`403 AUTH_FORBIDDEN`), período (`422`), plano (`403 DASHBOARD_PLAN_FEATURE_UNAVAILABLE`); nenhuma contagem é lida antes do plano. **Vigência vencida não tira o painel** (chamada do agente, pela política do BE-07: o vencimento só bloqueia crescimento). Leitura sem auditoria, sem cache.
 

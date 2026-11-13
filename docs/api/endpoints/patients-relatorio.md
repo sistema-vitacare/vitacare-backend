@@ -25,7 +25,7 @@ O conteúdo confere com as demais rotas no mesmo período:
 - **Conteúdo:** identificação, período, resumo dos registros, gráficos e indicadores por parâmetro, a **tabela de registros** com todas as respostas e os **medicamentos ativos**. Alertas do período não entram.
 - **Auditoria:** só a exportação em PDF.
 
-Escolhas do agente, aprovadas no desenho e **pendentes de confirmação**: rotas JSON e PDF com `reports:generate`; identificação sem CPF, telefone, e-mail, endereço, plano de saúde e observações do cadastro; período igual ao do BE-20; limite de 1.000 registros; medicamentos ativos no momento da geração; período vazio responde `200`.
+Escolhas do agente, aprovadas no desenho e **aceitas por Mateus na implementação**: rotas JSON e PDF com `reports:generate`; identificação sem CPF, telefone, e-mail, endereço, plano de saúde e observações do cadastro; período igual ao do BE-20; limite de 1.000 registros; medicamentos ativos no momento da geração; período vazio responde `200`.
 
 Autenticação: `Authorization: Bearer <token>` de sessão normal com `reports:generate` (`admin` e `professional`, matriz do BE-05). **Cuidador e familiar** não têm a permissão e recebem `403`; o master também. A organização vem **sempre** da sessão; admin e profissional alcançam qualquer paciente da organização. Paciente inexistente ou de outra organização → `404 PATIENT_NOT_FOUND`, **antes** de ler qualquer registro. Paciente **inativo** continua com relatório.
 

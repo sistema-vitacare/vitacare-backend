@@ -19,7 +19,7 @@ Autenticação: `Authorization: Bearer <token>` com `follow_ups:annul` **ou** `f
 - `caregiver` (`follow_ups:create`): só anexos **que ele enviou**, de paciente com vínculo de cuidador vigente; anexo de outro → `403 ATTACHMENT_NOT_AUTHOR`; paciente fora do alcance → `404`;
 - `family` e master: `403 AUTH_FORBIDDEN`.
 
-Registro **anulado** ou paciente **inativo** não impedem a remoção: corrigir a exposição de um dado não depende do cadastro (chamada do agente, pendente de confirmação).
+Registro **anulado** ou paciente **inativo** não impedem a remoção: corrigir a exposição de um dado não depende do cadastro (chamada do agente, aceita por Mateus na implementação).
 
 ## Request
 

@@ -11,7 +11,7 @@ source: src/modules/Alert/alert.controller.ts
 
 ## Propósito e acesso
 
-UC09 (manutenção das regras) e RF013. Grava `status = inactive` e `deleted_at` juntos. A regra deixa de avaliar os registros avaliados a partir de agora; os alertas já gerados por ela são **preservados** e continuam consultáveis. Nada é apagado. **Caminho adiado:** um registro cuja avaliação logo após o envio falhou é avaliado depois pela varredura com o estado da regra **naquele momento** (ativa, inativa, operador e referência atuais); só a guarda "regra criada até o envio" olha o passado. Limitação aceita (chamada do agente, pendente de confirmação).
+UC09 (manutenção das regras) e RF013. Grava `status = inactive` e `deleted_at` juntos. A regra deixa de avaliar os registros avaliados a partir de agora; os alertas já gerados por ela são **preservados** e continuam consultáveis. Nada é apagado. **Caminho adiado:** um registro cuja avaliação logo após o envio falhou é avaliado depois pela varredura com o estado da regra **naquele momento** (ativa, inativa, operador e referência atuais); só a guarda "regra criada até o envio" olha o passado. Limitação aceita (chamada do agente, aceita por Mateus na implementação).
 
 Autenticação: `Authorization: Bearer <token>` de sessão normal com `alert_rules:manage` (rótulo "Configurar regras de alerta") — `professional` e `admin` (herança da Figura 28). `caregiver`, `family` e o master (`platform_admin`) recebem `403 AUTH_FORBIDDEN`. A organização vem **sempre** da sessão; regra, formulário ou paciente de outra organização responde `404`, igual a um inexistente.
 
