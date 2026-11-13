@@ -63,6 +63,8 @@ import { UserRepository } from '@/modules/User/repositories/user.repository';
 import { UserController } from '@/modules/User/user.controller';
 import { USER_USE_CASES } from '@/modules/User/user.module';
 
+import { userInvitationTestProviders } from '../User/userInvitation.testProviders';
+
 /**
  * BE-05 de ponta a ponta: `AuthGuard` e `PermissionsGuard` reais resolvendo a
  * sessao no PostgreSQL descartavel a cada requisicao, duas organizacoes com um
@@ -349,6 +351,7 @@ describeWithDatabase('autorizacao por perfil em PostgreSQL (e2e)', () => {
         AccessProfileRepository,
 
         ...USER_USE_CASES,
+        ...userInvitationTestProviders(),
         UserRepository,
 
         { provide: APP_GUARD, useClass: AuthGuard },

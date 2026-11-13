@@ -30,6 +30,11 @@ import { UserRepository } from '@/modules/User/repositories/user.repository';
 import { UserController } from '@/modules/User/user.controller';
 import { USER_USE_CASES } from '@/modules/User/user.module';
 
+import { UserInvitationRepository } from '@/modules/Auth/repositories/userInvitation.repository';
+import { TokenService } from '@/modules/Auth/security/token.service';
+
+import { userInvitationTestProviders } from './userInvitation.testProviders';
+
 const TENANT_A_ID = '0000000a-0000-4000-8000-00000000000a';
 const PLATFORM_ORG_ID = '00000000-0000-4000-8000-000000000001';
 const ADMIN_ID = '1111111a-0000-4000-8000-00000000000a';
@@ -154,6 +159,9 @@ describe('User HTTP (e2e)', () => {
       controllers: [UserController],
       providers: [
         ...USER_USE_CASES,
+        ...userInvitationTestProviders(),
+        { provide: UserInvitationRepository, useValue: {} },
+        { provide: TokenService, useValue: { issue: jest.fn() } },
         { provide: UserRepository, useValue: users },
         { provide: PasswordHasher, useValue: passwords },
         { provide: ConfigService, useValue: config },

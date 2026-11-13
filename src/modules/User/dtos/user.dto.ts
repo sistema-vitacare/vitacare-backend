@@ -1,6 +1,11 @@
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 import { TENANT_PROFILE_CODES } from '@/modules/Access/access.permissions';
+
+import {
+  INVITATION_CHANNELS,
+  type InvitationChannel,
+} from '../types/user.types';
 
 export const USER_STATUSES = ['pending', 'active', 'inactive'] as const;
 
@@ -19,20 +24,46 @@ export class UserProfileRefDto {
   name!: string;
 }
 
+export const INVITATION_STATUSES = [
+  'pending',
+  'expired',
+  'invalidated',
+] as const;
+
+export type InvitationStatus = (typeof INVITATION_STATUSES)[number];
+
 export class UserInvitationDto {
   @ApiProperty({
-    enum: ['pending', 'expired'],
+    enum: [...INVITATION_CHANNELS],
+    example: 'email',
+    description:
+      '`email`: link enviado ao usuario para ele cadastrar a senha; `temporary_password`: senha provisoria entregue pelo administrador.',
+  })
+  channel!: InvitationChannel;
+
+  @ApiProperty({
+    enum: [...INVITATION_STATUSES],
     example: 'pending',
     description:
-      '`pending` enquanto a senha provisoria vale; `expired` depois do prazo (reemitir o convite).',
+      '`pending` enquanto o convite vale; `expired` depois do prazo; `invalidated` (so `email`) quando o link foi revogado: envio falhou ou o e-mail do usuario mudou. Em `expired` e `invalidated`, reemitir o convite.',
   })
-  status!: 'pending' | 'expired';
+  status!: InvitationStatus;
 
   @ApiProperty({
     format: 'date-time',
-    description: 'Fim da validade da senha provisoria do convite.',
+    description:
+      'Fim da validade do convite: da senha provisoria (24 h) ou do link (padrao 72 h).',
   })
   expiresAt!: string;
+
+  @ApiProperty({
+    format: 'date-time',
+    nullable: true,
+    type: String,
+    description:
+      'Quando o servidor SMTP aceitou o e-mail do convite; `null` no canal `temporary_password` ou se o envio nao saiu. Aceito pelo SMTP nao quer dizer entregue na caixa.',
+  })
+  sentAt!: string | null;
 }
 
 export class UserDto {
@@ -94,17 +125,41 @@ export class UserDto {
   deletedAt!: string | null;
 }
 
+export class InvitationDeliveryDto {
+  @ApiProperty({
+    enum: ['sent', 'failed'],
+    example: 'sent',
+    description:
+      '`sent`: o servidor SMTP aceitou o e-mail; `failed`: o envio falhou e o link ja foi revogado (reemitir o convite ou usar a senha provisoria).',
+  })
+  status!: 'sent' | 'failed';
+}
+
 export class UserInvitationResponseDto {
   @ApiProperty({
+    enum: [...INVITATION_CHANNELS],
+    example: 'temporary_password',
+    description: 'Canal usado neste convite.',
+  })
+  channel!: InvitationChannel;
+
+  @ApiPropertyOptional({
     example: 'Kq7mTz3pW9xYb2nHc4Rd',
     description:
-      'Senha provisoria do convite, exibida uma unica vez. Entregar ao usuario fora da API.',
+      'So no canal `temporary_password`: senha provisoria, exibida uma unica vez. Entregar ao usuario fora da API. Nunca aparece no canal `email`.',
   })
-  temporaryPassword!: string;
+  temporaryPassword?: string;
 
   @ApiProperty({
     format: 'date-time',
-    description: 'Fim da validade da senha provisoria (emissao + 24 h).',
+    description:
+      'Fim da validade do convite: senha provisoria (emissao + 24 h) ou link (emissao + `INVITATION_TTL_HOURS`, padrao 72 h).',
   })
   expiresAt!: string;
+
+  @ApiPropertyOptional({
+    type: InvitationDeliveryDto,
+    description: 'So no canal `email`: resultado do envio.',
+  })
+  delivery?: InvitationDeliveryDto;
 }

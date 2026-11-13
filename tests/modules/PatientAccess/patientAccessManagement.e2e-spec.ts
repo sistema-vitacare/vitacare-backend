@@ -24,6 +24,7 @@ import { ApplyPlanCatalogRules1790600000000 } from '@/database/migrations/179060
 import { CreatePatients1790700000000 } from '@/database/migrations/1790700000000-CreatePatients';
 import { AddPatientCareLinks1790800000000 } from '@/database/migrations/1790800000000-AddPatientCareLinks';
 import { AuditEventQuery1791700000000 } from '@/database/migrations/1791700000000-AuditEventQuery';
+import { CreateUserInvitations1792100000000 } from '@/database/migrations/1792100000000-CreateUserInvitations';
 import { runPlatformSeed } from '@/database/seeds/platformSeed';
 import { SnakeNamingStrategy } from '@/database/snakeNaming.strategy';
 import type { TenantProfileCode } from '@/modules/Access/access.permissions';
@@ -48,6 +49,8 @@ import { UserRepository } from '@/modules/User/repositories/user.repository';
 import { UserController } from '@/modules/User/user.controller';
 import { USER_USE_CASES } from '@/modules/User/user.module';
 
+import { userInvitationTestProviders } from '../User/userInvitation.testProviders';
+
 /**
  * BE-10 de ponta a ponta com guards reais. A e B tem um usuario de cada
  * perfil; A tem ainda cuidadores extras (pendente, inativo) e um segundo
@@ -68,10 +71,11 @@ const MIGRATIONS = [
   CreatePatients1790700000000,
   AddPatientCareLinks1790800000000,
   AuditEventQuery1791700000000,
+  CreateUserInvitations1792100000000,
 ];
 
 const TRUNCATE_ALL =
-  'TRUNCATE user_patients, patients, organization_plan_terms, plan_change_requests, audit_events, auth_sessions, password_reset_tokens, users, profile_permissions, permissions, access_profiles, organizations, usage_plans';
+  'TRUNCATE user_invitations, user_patients, patients, organization_plan_terms, plan_change_requests, audit_events, auth_sessions, password_reset_tokens, users, profile_permissions, permissions, access_profiles, organizations, usage_plans';
 
 const SETTINGS: Record<string, number> = {
   'auth.sessionIdleSeconds': 1800,
@@ -363,6 +367,7 @@ describeWithDatabase('vinculos de cuidado em PostgreSQL (e2e)', () => {
         ...PATIENT_ACCESS_USE_CASES,
         PatientLinkRepository,
         ...USER_USE_CASES,
+        ...userInvitationTestProviders(),
         UserRepository,
 
         { provide: APP_GUARD, useClass: AuthGuard },

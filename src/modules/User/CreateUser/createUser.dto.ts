@@ -21,6 +21,10 @@ import {
 
 import { UserDto, UserInvitationResponseDto } from '../dtos/user.dto';
 import { LowerTrim, OnlyDigits } from '../dtos/userFields';
+import {
+  INVITATION_CHANNELS,
+  type InvitationChannel,
+} from '../types/user.types';
 
 export class CreateUserDto {
   @ApiProperty({ example: 'Ana Exemplo', maxLength: 180 })
@@ -65,13 +69,25 @@ export class CreateUserDto {
     message: 'O perfil deve ser admin, professional, caregiver ou family.',
   })
   profileCode!: TenantProfileCode;
+
+  @ApiPropertyOptional({
+    enum: [...INVITATION_CHANNELS],
+    example: 'email',
+    description:
+      'Canal do convite (BE-31). Sem o campo: `email` com o SMTP ligado, `temporary_password` com ele desligado. `email` com o SMTP desligado responde 422 `USER_INVITATION_EMAIL_UNAVAILABLE`.',
+  })
+  @IsOptional()
+  @IsIn(INVITATION_CHANNELS, {
+    message: 'O canal deve ser email ou temporary_password.',
+  })
+  channel?: InvitationChannel;
 }
 
 export class CreateUserResponseDto extends UserInvitationResponseDto {
   @ApiProperty({
     type: UserDto,
     description:
-      'Usuario cadastrado, com status `pending` ate o primeiro acesso.',
+      'Usuario cadastrado, com status `pending` ate o primeiro acesso ou o aceite do link.',
   })
   user!: UserDto;
 }

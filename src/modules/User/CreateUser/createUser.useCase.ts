@@ -1,51 +1,49 @@
 import { Injectable } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 
 import type { RequestContext } from '@/common/context/requestContext.type';
 import { DomainException } from '@/common/errors/domain.exception';
+import { type EnvelopePayload, withMeta } from '@/common/http/envelope';
 import { AuthErrors } from '@/modules/Auth/auth.errors';
-import { PasswordHasher } from '@/modules/Auth/security/passwordHasher';
-import { generateTemporaryPassword } from '@/modules/Auth/security/temporaryPassword';
 
 import { toUserResponse } from '../parsers/user.parser';
 import { UserRepository } from '../repositories/user.repository';
+import { InvitationIssuer } from '../services/invitationIssuer.service';
 import { UserErrors } from '../user.errors';
 import type { CreateUserDto, CreateUserResponseDto } from './createUser.dto';
 
 /**
- * Cadastro do UC03 (passo 3) com o convite do passo 6 traduzido para senha
- * provisoria: sem SMTP, o administrador a recebe uma unica vez e a entrega ao
- * usuario fora da API. O usuario fica `pending` ate o primeiro acesso.
+ * Cadastro do UC03 (passo 3) com o convite do passo 6 (BE-31). Com o canal
+ * `email`, o usuario nasce `pending` sem senha e recebe o link depois do
+ * commit; com `temporary_password` (SMTP desligado, ou pedido pelo admin), a
+ * senha provisoria volta uma unica vez ao administrador. Limite e vigencia do
+ * plano bloqueiam antes de qualquer token ou envio.
  */
 @Injectable()
 export class CreateUserUseCase {
   constructor(
     private readonly users: UserRepository,
-    private readonly passwords: PasswordHasher,
-    private readonly config: ConfigService,
+    private readonly issuer: InvitationIssuer,
   ) {}
 
   async execute(
     input: CreateUserDto,
     ctx: RequestContext,
-  ): Promise<CreateUserResponseDto> {
-    const temporaryPassword = generateTemporaryPassword();
-    const expiresAt = new Date(
-      Date.now() +
-        this.config.getOrThrow<number>('auth.temporaryPasswordSeconds') * 1000,
-    );
-
-    const outcome = await this.users.create({
+  ): Promise<EnvelopePayload<CreateUserResponseDto>> {
+    const issued = await this.issuer.issue(input.channel);
+    const actor = {
       organizationId: ctx.organizationId,
       actorUserId: ctx.userId,
       requestId: ctx.requestId,
+    };
+
+    const outcome = await this.users.create({
+      ...actor,
       name: input.name,
       email: input.email,
       cpf: input.cpf,
       phone: input.phone ?? null,
       profileCode: input.profileCode,
-      passwordHash: await this.passwords.hash(temporaryPassword),
-      expiresAt,
+      invitation: issued.invitation,
     });
 
     switch (outcome.kind) {
@@ -67,12 +65,26 @@ export class CreateUserUseCase {
           detail: 'O ator deixou de ser administrador ativo antes do cadastro.',
         });
 
-      default:
-        return {
-          user: toUserResponse(outcome.user, ctx),
-          temporaryPassword,
-          expiresAt: expiresAt.toISOString(),
-        };
+      default: {
+        const { response, message } = await this.issuer.complete(
+          issued,
+          outcome.mail,
+          actor,
+        );
+        // Releitura depois do envio: `invitation` sai com `sentAt` ou `invalidated`.
+        const user =
+          outcome.mail === null
+            ? outcome.user
+            : ((await this.users.findById(
+                ctx.organizationId,
+                outcome.user.id,
+              )) ?? outcome.user);
+
+        return withMeta(
+          { user: toUserResponse(user, ctx), ...response },
+          message ? { message } : {},
+        );
+      }
     }
   }
 }

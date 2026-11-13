@@ -24,6 +24,7 @@ import { AddPlanTermsAndChangeRequests1790500000000 } from '@/database/migration
 import { ApplyPlanCatalogRules1790600000000 } from '@/database/migrations/1790600000000-ApplyPlanCatalogRules';
 import { CreatePatients1790700000000 } from '@/database/migrations/1790700000000-CreatePatients';
 import { AuditEventQuery1791700000000 } from '@/database/migrations/1791700000000-AuditEventQuery';
+import { CreateUserInvitations1792100000000 } from '@/database/migrations/1792100000000-CreateUserInvitations';
 import { runPlatformSeed } from '@/database/seeds/platformSeed';
 import { SnakeNamingStrategy } from '@/database/snakeNaming.strategy';
 import type { TenantProfileCode } from '@/modules/Access/access.permissions';
@@ -51,6 +52,8 @@ import { UserRepository } from '@/modules/User/repositories/user.repository';
 import { UserController } from '@/modules/User/user.controller';
 import { USER_USE_CASES } from '@/modules/User/user.module';
 
+import { userInvitationTestProviders } from './userInvitation.testProviders';
+
 /**
  * BE-06 de ponta a ponta: guards reais resolvendo a sessao no PostgreSQL
  * descartavel, duas organizacoes com um usuario de cada perfil, uma terceira
@@ -70,10 +73,11 @@ const MIGRATIONS = [
   ApplyPlanCatalogRules1790600000000,
   CreatePatients1790700000000,
   AuditEventQuery1791700000000,
+  CreateUserInvitations1792100000000,
 ];
 
 const TRUNCATE_ALL =
-  'TRUNCATE user_patients, patients, organization_plan_terms, plan_change_requests, audit_events, auth_sessions, password_reset_tokens, users, profile_permissions, permissions, access_profiles, organizations, usage_plans';
+  'TRUNCATE user_invitations, user_patients, patients, organization_plan_terms, plan_change_requests, audit_events, auth_sessions, password_reset_tokens, users, profile_permissions, permissions, access_profiles, organizations, usage_plans';
 
 const SETTINGS: Record<string, number> = {
   'auth.sessionIdleSeconds': 1800,
@@ -361,6 +365,7 @@ describeWithDatabase('gestao de usuarios em PostgreSQL (e2e)', () => {
         OrganizationRepository,
 
         ...USER_USE_CASES,
+        ...userInvitationTestProviders(),
         UserRepository,
 
         { provide: APP_GUARD, useClass: AuthGuard },
@@ -542,7 +547,49 @@ describeWithDatabase('gestao de usuarios em PostgreSQL (e2e)', () => {
           WHERE action = 'user.created' AND entity_id = $1`,
         [data.user.id],
       );
-      expect(JSON.parse(audit!)).toEqual({ profile: 'caregiver' });
+      expect(JSON.parse(audit!)).toEqual({
+        profile: 'caregiver',
+        channel: 'temporary_password',
+      });
+    });
+
+    it('SMTP desligado: o convite e a senha provisoria de hoje, so com o canal a mais (BE-31)', async () => {
+      const response = await createUser(tenants.A);
+      const body = response.body as {
+        data: Record<string, unknown> & { user: UserBody };
+        meta: Record<string, unknown>;
+      };
+
+      expect(response.status).toBe(201);
+      expect(Object.keys(body.data).sort()).toEqual(
+        ['channel', 'expiresAt', 'temporaryPassword', 'user'].sort(),
+      );
+      expect(body.data.channel).toBe('temporary_password');
+      expect(body.meta).not.toHaveProperty('message');
+      expect(body.data.user.invitation).toMatchObject({
+        channel: 'temporary_password',
+        status: 'pending',
+        sentAt: null,
+      });
+
+      const reissued = await userAction(
+        tenants.A,
+        body.data.user.id,
+        'invitation',
+      );
+      expect(
+        Object.keys((reissued.body as { data: object }).data).sort(),
+      ).toEqual(['channel', 'expiresAt', 'temporaryPassword'].sort());
+
+      const refused = await createUser(tenants.A, { channel: 'email' });
+      expect(refused.status).toBe(422);
+      expect((refused.body as ErrorBody).error).toMatchObject({
+        code: 'USER_INVITATION_EMAIL_UNAVAILABLE',
+        fields: [{ field: 'channel' }],
+      });
+      expect(
+        await scalar('SELECT count(*)::text AS value FROM user_invitations'),
+      ).toBe('0');
     });
 
     it('trata % e _ da busca como texto', async () => {

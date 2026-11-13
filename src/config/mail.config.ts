@@ -9,6 +9,7 @@ export default registerAs('mail', () => ({
   password: process.env.SMTP_PASSWORD || undefined,
   from: process.env.SMTP_FROM,
   passwordResetUrl: process.env.PASSWORD_RESET_URL,
+  invitationAcceptUrl: process.env.INVITATION_ACCEPT_URL,
   connectionTimeoutMs: Number(process.env.SMTP_CONNECTION_TIMEOUT_MS ?? 10000),
   greetingTimeoutMs: Number(process.env.SMTP_GREETING_TIMEOUT_MS ?? 10000),
   socketTimeoutMs: Number(process.env.SMTP_SOCKET_TIMEOUT_MS ?? 10000),

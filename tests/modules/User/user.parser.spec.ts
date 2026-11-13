@@ -35,26 +35,60 @@ describe('user.parser', () => {
     );
   });
 
-  it('descreve o convite pendente dentro do prazo', () => {
-    const expiresAt = new Date(Date.now() + 60_000);
+  it.each([
+    ['pendente dentro do prazo', 60_000, 'pending'],
+    ['vencido', -60_000, 'expired'],
+  ] as const)('descreve a senha provisoria %s', (_label, offset, status) => {
+    const expiresAt = new Date(Date.now() + offset);
 
     expect(
       toUserResponse(
         userRow({ status: 'pending', temporaryPasswordExpiresAt: expiresAt }),
         adminCtx,
       ).invitation,
-    ).toEqual({ status: 'pending', expiresAt: expiresAt.toISOString() });
+    ).toEqual({
+      channel: 'temporary_password',
+      status,
+      expiresAt: expiresAt.toISOString(),
+      sentAt: null,
+    });
   });
 
-  it('descreve o convite vencido', () => {
-    const expiresAt = new Date(Date.now() - 60_000);
+  it.each([
+    ['pendente e enviado', 60_000, true, null, 'pending'],
+    ['pendente sem envio registrado', 60_000, false, null, 'pending'],
+    ['vencido', -60_000, true, null, 'expired'],
+    ['revogado', 60_000, false, new Date(), 'invalidated'],
+    ['revogado e vencido', -60_000, false, new Date(), 'invalidated'],
+  ] as const)(
+    'descreve o link %s',
+    (_label, offset, sent, revokedAt, status) => {
+      const expiresAt = new Date(Date.now() + offset);
+      const sentAt = sent ? new Date('2026-11-13T10:00:00.000Z') : null;
 
+      expect(
+        toUserResponse(
+          userRow({
+            status: 'pending',
+            invitationExpiresAt: expiresAt,
+            invitationSentAt: sentAt,
+            invitationRevokedAt: revokedAt,
+          }),
+          adminCtx,
+        ).invitation,
+      ).toEqual({
+        channel: 'email',
+        status,
+        expiresAt: expiresAt.toISOString(),
+        sentAt: sentAt?.toISOString() ?? null,
+      });
+    },
+  );
+
+  it('pendente por link sem convite gravado aparece como convite a reemitir', () => {
     expect(
-      toUserResponse(
-        userRow({ status: 'pending', temporaryPasswordExpiresAt: expiresAt }),
-        adminCtx,
-      ).invitation,
-    ).toEqual({ status: 'expired', expiresAt: expiresAt.toISOString() });
+      toUserResponse(userRow({ status: 'pending' }), adminCtx).invitation,
+    ).toMatchObject({ channel: 'email', status: 'invalidated', sentAt: null });
   });
 
   it('nao descreve convite de usuario ativo com senha temporaria administrativa', () => {

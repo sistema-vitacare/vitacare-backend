@@ -24,4 +24,9 @@ export default registerAs('auth', () => ({
   recoveryWindowSeconds: 3600,
   recoveryMaxPerAccount: 3,
   recoveryMaxPerIp: 10,
+  /** Convite por link (BE-31): `INVITATION_TTL_HOURS`, padrao 72 h. */
+  invitationSeconds: Number(process.env.INVITATION_TTL_HOURS ?? 72) * 3600,
+  /** Consulta e aceite do convite: 30 por IP em uma hora, somados. */
+  invitationWindowSeconds: 3600,
+  invitationMaxPerIp: 30,
 }));
