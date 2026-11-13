@@ -41,6 +41,11 @@ export interface AuthenticatedPrincipal {
   profile: ProfileCode;
   permissions: ReadonlySet<string>;
   absoluteExpiresAt: Date;
+  /**
+   * Aceitou a versao vigente do termo de uso, ou nao ha versao publicada
+   * (BE-32). Sem aceite, a sessao normal so alcanca as rotas liberadas.
+   */
+  termsAccepted: boolean;
 }
 
 /**
@@ -68,4 +73,6 @@ export interface SessionProfileRow {
     status: 'active' | 'inactive';
     plan: PlanSummary | null;
   };
+  /** Vigente = maior versao publicada; aceita = maior versao aceita (BE-32). */
+  terms: { currentVersion: number | null; acceptedVersion: number | null };
 }

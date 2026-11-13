@@ -46,6 +46,7 @@ const sessionRow: SessionProfileRow = {
       termStatus: 'active',
     },
   },
+  terms: { currentVersion: null, acceptedVersion: null },
 };
 
 const credentials = {
@@ -180,6 +181,62 @@ describe('LoginUseCase', () => {
           termStatus: 'active',
         },
       },
+      terms: { required: false, currentVersion: null, acceptedVersion: null },
+    });
+  });
+
+  describe('termo de uso (BE-32)', () => {
+    const withTerms = (
+      currentVersion: number | null,
+      acceptedVersion: number | null,
+    ): SessionProfileRow => ({
+      ...sessionRow,
+      terms: { currentVersion, acceptedVersion },
+    });
+
+    it('sem aceite da vigente: sessao normal, estado terms_acceptance_required e nenhuma permissao', async () => {
+      const { useCase, transactions } = build({ session: withTerms(2, 1) });
+
+      const result = await useCase.execute(credentials, { ip: '127.0.0.1' });
+
+      expect(result.state).toBe('terms_acceptance_required');
+      expect(result.idleTimeoutSeconds).toBe(1800);
+      expect(result.session.permissions).toEqual([]);
+      expect(result.session.terms).toEqual({
+        required: true,
+        currentVersion: 2,
+        acceptedVersion: 1,
+      });
+      expect(transactions.createLoginSession).toHaveBeenCalledWith(
+        expect.objectContaining({ type: 'normal' }),
+      );
+    });
+
+    it('com a vigente aceita: authenticated com as permissoes', async () => {
+      const { useCase } = build({ session: withTerms(2, 2) });
+
+      const result = await useCase.execute(credentials, { ip: '127.0.0.1' });
+
+      expect(result.state).toBe('authenticated');
+      expect(result.session.permissions).toEqual([
+        'alerts:read',
+        'profile:manage',
+        'users:read',
+      ]);
+      expect(result.session.terms.required).toBe(false);
+    });
+
+    it('a troca obrigatoria de senha vem antes do termo', async () => {
+      const { useCase } = build({
+        identity: { ...activeIdentity, mustChangePassword: true },
+        session: withTerms(1, null),
+      });
+
+      const result = await useCase.execute(credentials, { ip: '127.0.0.1' });
+
+      expect(result.state).toBe('password_change_required');
+      expect(result.idleTimeoutSeconds).toBeUndefined();
+      expect(result.session.permissions).toEqual([]);
     });
   });
 

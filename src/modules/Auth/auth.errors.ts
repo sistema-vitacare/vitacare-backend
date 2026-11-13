@@ -16,6 +16,12 @@ export const AuthErrors = {
     status: HttpStatus.FORBIDDEN,
     message: 'Você não tem permissão para esta operação.',
   },
+  /** Lancado pelo guard (BE-32); o codigo e do dominio do termo de uso. */
+  TERMS_ACCEPTANCE_REQUIRED: {
+    code: 'TERMS_ACCEPTANCE_REQUIRED',
+    status: HttpStatus.FORBIDDEN,
+    message: 'Aceite o termo de uso para continuar.',
+  },
   USER_NOT_FOUND: {
     code: 'AUTH_USER_NOT_FOUND',
     status: HttpStatus.NOT_FOUND,

@@ -38,6 +38,7 @@ const sessionRow: SessionProfileRow = {
     status: 'active',
     plan: null,
   },
+  terms: { currentVersion: null, acceptedVersion: null },
 };
 
 const build = (

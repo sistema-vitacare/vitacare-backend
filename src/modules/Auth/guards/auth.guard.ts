@@ -9,7 +9,11 @@ import { AuthErrors } from '../auth.errors';
 import { AuthSessionRepository } from '../repositories/authSession.repository';
 import type { AuthSessionType } from '../entities/authSession.entity';
 import type { AuthenticatedRequest } from '../types/authenticatedRequest.type';
-import { ALLOWED_SESSION_TYPES_KEY, IS_PUBLIC_KEY } from './public.decorator';
+import {
+  ALLOW_PENDING_TERMS_KEY,
+  ALLOWED_SESSION_TYPES_KEY,
+  IS_PUBLIC_KEY,
+} from './public.decorator';
 
 /** Token opaco em base64url; nada mais e aceito no header. */
 const BEARER_PATTERN = /^Bearer ([A-Za-z0-9_-]+)$/;
@@ -51,6 +55,19 @@ export class AuthGuard implements CanActivate {
       throw this.unauthenticated('Tipo de sessão incompatível com a operação.');
     }
 
+    // Termo de uso (BE-32): sessao normal sem o aceite da vigente so le a
+    // propria sessao, aceita e sai. Na duvida (valor ausente), fecha.
+    if (
+      principal.sessionType === 'normal' &&
+      principal.termsAccepted !== true &&
+      !this.allowsPendingTerms(context)
+    ) {
+      throw new DomainException({
+        ...AuthErrors.TERMS_ACCEPTANCE_REQUIRED,
+        detail: 'O usuário ainda não aceitou a versão vigente do termo de uso.',
+      });
+    }
+
     request.authSessionId = principal.sessionId;
     request.context = {
       // Mesmo id que sai em `meta.requestId` e no log, para a auditoria
@@ -69,6 +86,15 @@ export class AuthGuard implements CanActivate {
   private isPublic(context: ExecutionContext): boolean {
     return (
       this.reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, [
+        context.getHandler(),
+        context.getClass(),
+      ]) === true
+    );
+  }
+
+  private allowsPendingTerms(context: ExecutionContext): boolean {
+    return (
+      this.reflector.getAllAndOverride<boolean>(ALLOW_PENDING_TERMS_KEY, [
         context.getHandler(),
         context.getClass(),
       ]) === true
