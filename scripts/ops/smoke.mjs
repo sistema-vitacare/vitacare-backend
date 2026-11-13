@@ -237,6 +237,9 @@ const fullJourney = async (report) => {
         email,
         cpf: cpf(),
         profileCode: role,
+        // Senha provisoria explicita (BE-31): com o SMTP ligado o padrao seria
+        // o link por e-mail, sem senha na resposta.
+        channel: 'temporary_password',
       });
       expectStatus(invited, 201);
       A.users[role] = dataOf(invited).user.id;

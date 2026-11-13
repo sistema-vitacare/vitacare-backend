@@ -31,7 +31,11 @@ import { ChangePasswordUseCase } from './ChangePassword/changePassword.useCase';
 import { CompleteFirstAccessDto } from './CompleteFirstAccess/completeFirstAccess.dto';
 import { CompleteFirstAccessUseCase } from './CompleteFirstAccess/completeFirstAccess.useCase';
 import { CurrentSessionId } from './guards/currentSessionId.decorator';
-import { AllowSessionTypes, Public } from './guards/public.decorator';
+import {
+  AllowPendingTerms,
+  AllowSessionTypes,
+  Public,
+} from './guards/public.decorator';
 import { RequirePermissions } from './guards/requiredPermissions.decorator';
 import {
   InspectInvitationDto,
@@ -123,6 +127,7 @@ export class AuthController {
 
   @Post('logout')
   @AllowSessionTypes('normal', 'password_change')
+  @AllowPendingTerms()
   @HttpCode(HttpStatus.OK)
   @ApiBearerAuth(BEARER_SECURITY_SCHEME)
   @ApiOperation({ summary: 'Revoga apenas a sessao apresentada.' })

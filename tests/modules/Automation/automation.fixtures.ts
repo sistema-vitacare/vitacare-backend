@@ -24,6 +24,7 @@ import { AddProfileManagePermission1791800000000 } from '@/database/migrations/1
 import { CreatePlanExpiryNotices1791900000000 } from '@/database/migrations/1791900000000-CreatePlanExpiryNotices';
 import { AddManagementReportsPermission1792000000000 } from '@/database/migrations/1792000000000-AddManagementReportsPermission';
 import { CreateUserInvitations1792100000000 } from '@/database/migrations/1792100000000-CreateUserInvitations';
+import { CreateTermsOfUse1792200000000 } from '@/database/migrations/1792200000000-CreateTermsOfUse';
 import { SnakeNamingStrategy } from '@/database/snakeNaming.strategy';
 
 const SRC_ROOT = join(__dirname, '..', '..', '..', 'src');
@@ -52,17 +53,22 @@ export const ALL_MIGRATIONS = [
   CreatePlanExpiryNotices1791900000000,
   AddManagementReportsPermission1792000000000,
   CreateUserInvitations1792100000000,
+  // So a estrutura: sem versao publicada ninguem e bloqueado pelo termo (BE-32).
+  CreateTermsOfUse1792200000000,
 ];
 
 export const TRUNCATE_AUTOMATION =
-  'TRUNCATE user_invitations, plan_expiry_notice_deliveries, plan_expiry_notices, notification_deliveries, push_subscriptions, alert_notifications, notification_preferences, alerts, follow_up_absence_monitors, alert_rules, medication_reminders, medications, follow_up_attachments, follow_up_response_items, follow_up_responses, follow_up_records, follow_up_form_patients, follow_up_form_fields, follow_up_form_versions, follow_up_forms, user_patients, patients, organization_plan_terms, plan_change_requests, audit_events, auth_sessions, password_reset_tokens, users, profile_permissions, permissions, access_profiles, organizations, usage_plans CASCADE';
+  'TRUNCATE terms_acceptances, user_invitations, plan_expiry_notice_deliveries, plan_expiry_notices, notification_deliveries, push_subscriptions, alert_notifications, notification_preferences, alerts, follow_up_absence_monitors, alert_rules, medication_reminders, medications, follow_up_attachments, follow_up_response_items, follow_up_responses, follow_up_records, follow_up_form_patients, follow_up_form_fields, follow_up_form_versions, follow_up_forms, user_patients, patients, organization_plan_terms, plan_change_requests, audit_events, auth_sessions, password_reset_tokens, users, profile_permissions, permissions, access_profiles, organizations, usage_plans CASCADE';
 
-export const testDataSource = (url: string) =>
+export const testDataSource = (
+  url: string,
+  migrations: ReadonlyArray<new () => unknown> = ALL_MIGRATIONS,
+) =>
   new DataSource({
     type: 'postgres',
     url,
     entities: [join(SRC_ROOT, 'modules/**/*.entity.{ts,js}')],
-    migrations: ALL_MIGRATIONS as never,
+    migrations: migrations as never,
     namingStrategy: new SnakeNamingStrategy(),
     synchronize: false,
     migrationsRun: false,

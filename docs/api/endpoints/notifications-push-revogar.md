@@ -1,7 +1,7 @@
 ---
 title: Revogar inscrição de push
 status: atual
-updated: 2026-11-06
+updated: 2026-11-13
 method: POST
 path: /api/v1/notifications/push-subscriptions/revoke
 source: src/modules/Notification/notification.controller.ts
@@ -13,7 +13,7 @@ source: src/modules/Notification/notification.controller.ts
 
 Revoga a inscrição de push **do próprio usuário** identificada pelo `endpoint` (BE-17). O frontend obtém o endpoint em `PushManager.getSubscription()` e deve chamar esta rota **antes do logout** ou quando o usuário desliga o push no aparelho. A inscrição fica no banco com `deleted_at` e o motivo `user`. Pushes ainda pendentes para ela não saem (`skipped`, `PUSH_SUBSCRIPTION_REVOKED`). Auditoria `push_subscription.revoked` com `reason: "user"`, sem o `endpoint`.
 
-Autenticação: `Authorization: Bearer <token>` com `alerts:read` (`admin`, `professional`, `caregiver`, `family`); master `403`. Endpoint de outro usuário ou já revogado responde `404`.
+Autenticação: `Authorization: Bearer <token>` com `alerts:read` (`admin`, `professional`, `caregiver`, `family`); master `403`. Endpoint de outro usuário ou já revogado responde `404`. Também responde à sessão que ainda não aceitou o termo de uso vigente (BE-32): parar o push faz parte de sair, inclusive para quem recusa uma versão nova.
 
 ## Request
 

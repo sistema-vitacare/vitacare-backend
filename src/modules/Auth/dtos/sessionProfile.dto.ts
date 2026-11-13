@@ -128,6 +128,32 @@ export class SessionOrganizationDto {
  * Sessao do usuario (BE-27): o mesmo formato no login e em `/profile`, para o
  * frontend montar menus e redirecionar por perfil.
  */
+export class SessionTermsDto {
+  @ApiProperty({
+    example: true,
+    description:
+      '`true` quando o usuario ainda nao aceitou a versao vigente do termo de uso: so le a propria sessao, aceita o termo e sai; o resto responde `403 TERMS_ACCEPTANCE_REQUIRED`.',
+  })
+  required!: boolean;
+
+  @ApiProperty({
+    example: 1,
+    nullable: true,
+    type: Number,
+    description:
+      'Versao vigente (a maior publicada); `null` sem nenhuma versao.',
+  })
+  currentVersion!: number | null;
+
+  @ApiProperty({
+    example: null,
+    nullable: true,
+    type: Number,
+    description: 'Maior versao ja aceita pelo usuario; `null` sem aceite.',
+  })
+  acceptedVersion!: number | null;
+}
+
 export class SessionProfileDto {
   @ApiProperty({ type: SessionUserDto })
   user!: SessionUserDto;
@@ -140,10 +166,16 @@ export class SessionProfileDto {
     isArray: true,
     example: ['alerts:read', 'patients:read', 'profile:manage'],
     description:
-      'Permissoes efetivas da sessao, em ordem alfabetica; as mesmas que a API aplica. Vazia na sessao restrita do primeiro acesso.',
+      'Permissoes efetivas da sessao, em ordem alfabetica; as mesmas que a API aplica. Vazia na sessao restrita do primeiro acesso e enquanto o termo de uso vigente nao for aceito (`terms.required`).',
   })
   permissions!: string[];
 
   @ApiProperty({ type: SessionOrganizationDto })
   organization!: SessionOrganizationDto;
+
+  @ApiProperty({
+    type: SessionTermsDto,
+    description: 'Situacao do aceite do termo de uso (BE-32).',
+  })
+  terms!: SessionTermsDto;
 }

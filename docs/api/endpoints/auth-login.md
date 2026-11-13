@@ -18,6 +18,8 @@ A resposta diz em qual estado a sessão nasceu:
 - `authenticated`: sessão normal, válida por 12 horas absolutas e 30 minutos sem atividade. Cada requisição aceita renova a janela de inatividade.
 - `password_change_required`: sessão **restrita**, válida por 10 minutos, que só alcança [primeiro acesso](auth-primeiro-acesso.md) e [logout](auth-logout.md). Ela aparece quando o usuário tem troca obrigatória pendente (master criado por `npm run seed:platform`, administrador criado com a organização, senha redefinida por administrador ou **usuário convidado**). O convidado cadastrado por [POST /users](users-criar.md) tem status `pending` e entra **só** por esta sessão, com a senha provisória do convite dentro de 24 h; ele nunca recebe sessão normal antes de concluir o [primeiro acesso](auth-primeiro-acesso.md) (BE-06, 2026-11-03). O convidado **por link** (canal `email`, BE-31) não tem senha até [aceitar o convite](auth-convite-aceitar.md): o login responde `401 AUTH_INVALID_CREDENTIALS`, com o mesmo tempo e a mesma resposta de qualquer credencial inválida. Depois do aceite, ele é `active` e entra direto com sessão normal, sem primeiro acesso.
 
+- `terms_acceptance_required` (BE-32, decisão de Mateus em 2026-11-12/13): sessão **normal** (mesmos prazos de `authenticated`) de quem ainda não aceitou a versão vigente do [termo de uso e privacidade](terms-vigente.md), inclusive o master e quem já tinha conta. Ela só alcança [GET /profile](profile-consultar.md), [POST /terms/acceptances](terms-aceitar.md), [GET /terms/acceptances/me](terms-meus-aceites.md), [revogar o push](notifications-push-revogar.md) e [logout](auth-logout.md); as demais rotas protegidas respondem `403 TERMS_ACCEPTANCE_REQUIRED`. O aceite libera a mesma sessão, sem novo login. A troca de senha obrigatória tem prioridade: o termo vem depois do primeiro acesso e do novo login. Sem nenhuma versão publicada, ninguém cai neste estado.
+
 Desde o BE-27 (decisão de Mateus em 2026-11-12) a resposta também traz `data.session`: quem é o usuário, o perfil, as permissões efetivas e a organização. É o que o frontend usa para montar menus e redirecionar ao painel do perfil (UC01, passo 6). O bloco tem o mesmo formato de [GET /profile](profile-consultar.md), exceto o CPF, que no login sai **mascarado**.
 
 O token é opaco: o servidor guarda apenas o SHA-256 dele. Não decodifique, não confie em nada escrito nele e não o persista em armazenamento compartilhado.
@@ -103,6 +105,11 @@ curl -i -X POST 'https://api.example.com/api/v1/auth/login' \
           ],
           "termStatus": "active"
         }
+      },
+      "terms": {
+        "required": false,
+        "currentVersion": 1,
+        "acceptedVersion": 1
       }
     }
   },
@@ -115,7 +122,7 @@ curl -i -X POST 'https://api.example.com/api/v1/auth/login' \
 
 | Propriedade JSON | Tipo | Sempre presente | Significado |
 | --- | --- | --- | --- |
-| `data.state` | texto | sim | `authenticated` ou `password_change_required`. |
+| `data.state` | texto | sim | `authenticated`, `password_change_required` ou `terms_acceptance_required` (BE-32). |
 | `data.accessToken` | texto base64url | sim | Token opaco de 256 bits. Exemplo truncado de propósito. |
 | `data.tokenType` | texto | sim | Sempre `Bearer`. |
 | `data.expiresAt` | texto ISO 8601, UTC | sim | Prazo **absoluto** da sessão: 12h na sessão normal, 10min na restrita. |
@@ -130,7 +137,7 @@ curl -i -X POST 'https://api.example.com/api/v1/auth/login' \
 | `data.session.user.createdAt` | texto ISO 8601, UTC | sim | Data do cadastro. |
 | `data.session.profile.code` | texto | sim | `admin`, `professional`, `caregiver`, `family` ou `platform_admin` (master). |
 | `data.session.profile.name` | texto | sim | Nome do perfil para exibição. |
-| `data.session.permissions` | lista de texto | sim | Permissões efetivas, em ordem alfabética, lidas da **mesma fonte que a API aplica** em cada requisição; as `platform_*` só aparecem na organização de plataforma. **Vazia** na sessão restrita. |
+| `data.session.permissions` | lista de texto | sim | Permissões efetivas, em ordem alfabética, lidas da **mesma fonte que a API aplica** em cada requisição; as `platform_*` só aparecem na organização de plataforma. **Vazia** na sessão restrita e enquanto o termo vigente não for aceito (`terms.required`). |
 | `data.session.organization.id` | texto UUID | sim | Organização da sessão. |
 | `data.session.organization.code` | texto | sim | O mesmo `organizationCode` enviado no login. |
 | `data.session.organization.name` | texto | sim | Nome fantasia. |
@@ -142,6 +149,9 @@ curl -i -X POST 'https://api.example.com/api/v1/auth/login' \
 | `data.session.organization.plan.name` | texto | sim | Nome do plano. |
 | `data.session.organization.plan.features` | lista de texto | sim | Recursos do Quadro 2. Sem `operational_dashboard`, o [painel](dashboard-resumo.md) responde `403`: o frontend esconde o item do menu. |
 | `data.session.organization.plan.termStatus` | texto | sim | `active` ou `expired`; vencido bloqueia novos cadastros, nunca a leitura. Sem termo corrente, `active`. |
+| `data.session.terms.required` | booleano | sim | `true` quando falta aceitar a versão vigente do termo de uso (BE-32). |
+| `data.session.terms.currentVersion` | inteiro ou `null` | sim | Versão vigente (a maior publicada); `null` sem versão publicada. |
+| `data.session.terms.acceptedVersion` | inteiro ou `null` | sim | Maior versão aceita pelo usuário; `null` sem aceite. |
 | `meta.requestId` | texto | sim | Correlação. |
 | `meta.timestamp` | texto ISO 8601 | sim | Momento da resposta. |
 

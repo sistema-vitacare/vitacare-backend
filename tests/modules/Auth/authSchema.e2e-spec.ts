@@ -20,6 +20,7 @@ import { CreateAlertNotifications1791500000000 } from '@/database/migrations/179
 import { AuditEventQuery1791700000000 } from '@/database/migrations/1791700000000-AuditEventQuery';
 import { CreatePlanExpiryNotices1791900000000 } from '@/database/migrations/1791900000000-CreatePlanExpiryNotices';
 import { CreateUserInvitations1792100000000 } from '@/database/migrations/1792100000000-CreateUserInvitations';
+import { CreateTermsOfUse1792200000000 } from '@/database/migrations/1792200000000-CreateTermsOfUse';
 import { SnakeNamingStrategy } from '@/database/snakeNaming.strategy';
 import { ChangePasswordUseCase } from '@/modules/Auth/ChangePassword/changePassword.useCase';
 import { CompleteFirstAccessUseCase } from '@/modules/Auth/CompleteFirstAccess/completeFirstAccess.useCase';
@@ -262,6 +263,7 @@ describeWithDatabase('autenticacao em PostgreSQL descartavel', () => {
         AuditEventQuery1791700000000,
         CreatePlanExpiryNotices1791900000000,
         CreateUserInvitations1792100000000,
+        CreateTermsOfUse1792200000000,
       ],
       namingStrategy: new SnakeNamingStrategy(),
       synchronize: false,
@@ -280,7 +282,7 @@ describeWithDatabase('autenticacao em PostgreSQL descartavel', () => {
     }
 
     migrated = (await dataSource.runMigrations()).length;
-    expect(migrated).toBe(19);
+    expect(migrated).toBe(20);
 
     passwords = new PasswordHasher();
     tokens = new TokenService();
@@ -1051,7 +1053,7 @@ describeWithDatabase('autenticacao em PostgreSQL descartavel', () => {
   });
 
   describe('schema completo', () => {
-    it('mapeia as trinta e tres tabelas nas entidades TypeORM', () => {
+    it('mapeia as trinta e cinco tabelas nas entidades TypeORM', () => {
       expect(
         dataSource.entityMetadatas.map((metadata) => metadata.tableName).sort(),
       ).toEqual([
@@ -1084,6 +1086,8 @@ describeWithDatabase('autenticacao em PostgreSQL descartavel', () => {
         'plan_expiry_notices',
         'profile_permissions',
         'push_subscriptions',
+        'terms_acceptances',
+        'terms_versions',
         'usage_plans',
         'user_invitations',
         'user_patients',

@@ -1,7 +1,7 @@
 ---
 title: Logout
 status: atual
-updated: 2026-09-22
+updated: 2026-11-13
 method: POST
 path: /api/v1/auth/logout
 source: src/modules/Auth/auth.controller.ts
@@ -13,7 +13,7 @@ source: src/modules/Auth/auth.controller.ts
 
 Encerra **apenas a sessão apresentada** (RF001, UC01). Outros dispositivos do mesmo usuário continuam válidos; para derrubar todos, use [troca de senha](auth-alterar-senha.md) ou a [redefinição administrativa](auth-redefinir-senha-usuario.md).
 
-Autenticação: `Authorization: Bearer <token>`. Aceita sessão `normal` **e** a restrita de primeiro acesso — quem desistiu da troca obrigatória precisa conseguir sair. Sem permissão nomeada; o alvo é a própria sessão.
+Autenticação: `Authorization: Bearer <token>`. Aceita sessão `normal` **e** a restrita de primeiro acesso — quem desistiu da troca obrigatória precisa conseguir sair. Também responde à sessão normal que ainda não aceitou o termo de uso vigente (BE-32): quem não aceita só pode sair. Sem permissão nomeada; o alvo é a própria sessão.
 
 ## Request
 

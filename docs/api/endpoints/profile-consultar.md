@@ -1,7 +1,7 @@
 ---
 title: Consulta do próprio cadastro
 status: atual
-updated: 2026-11-12
+updated: 2026-11-13
 method: GET
 path: /api/v1/profile
 source: src/modules/Profile/profile.controller.ts
@@ -13,7 +13,7 @@ source: src/modules/Profile/profile.controller.ts
 
 Devolve o cadastro do usuário da sessão no mesmo formato do bloco `session` do [login](auth-login.md): usuário, perfil, permissões efetivas e organização. O CPF sai **completo**, porque é dado do próprio titular (BE-27, decisão de Mateus em 2026-11-12). É a fonte para a tela de dados pessoais e para recarregar a sessão guardada pelo frontend (UC01; RF005). O TCC não prevê o autoatendimento do próprio cadastro: no RF004 e no UC03, só o administrador edita usuários, e a Figura 46 só mostra configurações da organização. A rota é um **acréscimo** decidido por Mateus, registrado no vault.
 
-Autenticação: `Authorization: Bearer <token>` de sessão **normal**. Permissão `profile:manage`, que todos os perfis têm (`admin`, `professional`, `caregiver`, `family` e o master `platform_admin`). A rota **não recebe identificador**: o alvo é sempre o usuário e a organização da sessão. Não há como ler o cadastro de outra pessoa por aqui; para isso existe [GET /users/:userId](users-consultar.md), só do admin.
+Autenticação: `Authorization: Bearer <token>` de sessão **normal**. Permissão `profile:manage`, que todos os perfis têm (`admin`, `professional`, `caregiver`, `family` e o master `platform_admin`). A rota **não recebe identificador**: o alvo é sempre o usuário e a organização da sessão. Responde também à sessão que **ainda não aceitou o termo de uso vigente** (BE-32): é como o frontend lê `terms` e, depois do aceite, recebe as permissões. Não há como ler o cadastro de outra pessoa por aqui; para isso existe [GET /users/:userId](users-consultar.md), só do admin.
 
 ## Request
 
@@ -75,6 +75,11 @@ curl -i 'https://api.example.com/api/v1/profile' \
         ],
         "termStatus": "active"
       }
+    },
+    "terms": {
+      "required": false,
+      "currentVersion": 1,
+      "acceptedVersion": 1
     }
   },
   "meta": {
@@ -95,7 +100,7 @@ curl -i 'https://api.example.com/api/v1/profile' \
 | `data.user.createdAt` | texto ISO 8601, UTC | não | Data do cadastro. |
 | `data.profile.code` | texto | não | `admin`, `professional`, `caregiver`, `family` ou `platform_admin`. |
 | `data.profile.name` | texto | não | Nome do perfil para exibição. |
-| `data.permissions` | lista de texto | não | Permissões efetivas em ordem alfabética, lidas da mesma consulta que o guard usa a cada requisição; as `platform_*` só aparecem na organização de plataforma. |
+| `data.permissions` | lista de texto | não | Permissões efetivas em ordem alfabética, lidas da mesma consulta que o guard usa a cada requisição; as `platform_*` só aparecem na organização de plataforma. **Vazia** enquanto o termo de uso vigente não for aceito (`terms.required`). |
 | `data.organization.id` | texto UUID | não | Organização da sessão. |
 | `data.organization.code` | texto | não | Código público usado no login. |
 | `data.organization.name` | texto | não | Nome fantasia. |
@@ -107,6 +112,9 @@ curl -i 'https://api.example.com/api/v1/profile' \
 | `data.organization.plan.name` | texto | não | Nome do plano. |
 | `data.organization.plan.features` | lista de texto | não | Recursos do Quadro 2 (`patient_management`, `health_records`, `patient_history`, `automatic_alerts`, `responsive_access`, `extended_registration`, `management_reports`, `operational_dashboard`, `custom_deployment`). |
 | `data.organization.plan.termStatus` | texto | não | `active` ou `expired`; sem termo corrente, `active`. |
+| `data.terms.required` | booleano | não | `true` quando falta aceitar a versão vigente do termo de uso (BE-32). |
+| `data.terms.currentVersion` | inteiro | sim | Versão vigente; `null` sem versão publicada. |
+| `data.terms.acceptedVersion` | inteiro | sim | Maior versão aceita; `null` sem aceite. |
 | `meta.requestId` | texto | não | Correlação. |
 | `meta.timestamp` | texto ISO 8601 | não | Momento da resposta. |
 

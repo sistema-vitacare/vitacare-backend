@@ -20,6 +20,7 @@ import { Permissions } from '@/modules/Access/access.permissions';
 import { ChangePasswordDto } from '@/modules/Auth/ChangePassword/changePassword.dto';
 import { ChangePasswordUseCase } from '@/modules/Auth/ChangePassword/changePassword.useCase';
 import { SessionProfileDto } from '@/modules/Auth/dtos/sessionProfile.dto';
+import { AllowPendingTerms } from '@/modules/Auth/guards/public.decorator';
 import { RequirePermissions } from '@/modules/Auth/guards/requiredPermissions.decorator';
 
 import { GetOwnProfileUseCase } from './GetOwnProfile/getOwnProfile.useCase';
@@ -41,6 +42,7 @@ export class ProfileController {
   ) {}
 
   @Get()
+  @AllowPendingTerms()
   @RequirePermissions(Permissions.PROFILE_MANAGE)
   @ApiOperation({
     summary: 'Consulta o proprio cadastro: sessao do login com o CPF completo.',

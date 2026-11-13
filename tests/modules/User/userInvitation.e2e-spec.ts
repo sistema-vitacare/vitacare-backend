@@ -204,7 +204,11 @@ describeWithInfrastructure(
       http('post', `/users/${userId}/invitation`, tenant.adminToken, body);
 
     beforeAll(async () => {
-      t = await bootFullApp(databaseUrl!, redisUrl!, { emailSender: sender });
+      t = await bootFullApp(databaseUrl!, redisUrl!, {
+        emailSender: sender,
+        // Sem termo publicado: o login daqui testa o convite, nao o aceite (BE-32).
+        termsPublished: false,
+      });
 
       const master = await login(
         t.master.organizationCode,

@@ -167,6 +167,42 @@ describeWithInfrastructure('homologacao funcional dos 14 casos de uso', () => {
       ).status,
     ).toBe(200);
 
+    // BE-32: no primeiro acesso a sessao nova ainda nao aceitou o termo de uso
+    // vigente; so le o termo e a propria sessao, aceita e sai. Quem ja aceitou
+    // (senha redefinida pelo admin) entra direto.
+    const pending = await login(organizationCode, email, PASSWORD);
+    const pendingToken = dataOf<{ accessToken: string }>(pending).accessToken;
+
+    if (
+      dataOf<{ state: string }>(pending).state === 'terms_acceptance_required'
+    ) {
+      expect(
+        dataOf<{ session: { permissions: string[] } }>(pending).session
+          .permissions,
+      ).toEqual([]);
+
+      const blocked = await http('get', '/organizations/me', pendingToken);
+
+      expect(blocked.status).toBe(403);
+      expect((blocked.body as { error: { code: string } }).error.code).toBe(
+        'TERMS_ACCEPTANCE_REQUIRED',
+      );
+
+      const terms = dataOf<{ version: number }>(
+        await http('get', '/terms/current'),
+      );
+
+      expect(
+        (
+          await http('post', '/terms/acceptances', pendingToken, {
+            version: terms.version,
+          })
+        ).status,
+      ).toBe(200);
+    }
+
+    expect((await http('post', '/auth/logout', pendingToken)).status).toBe(200);
+
     const session = await login(organizationCode, email, PASSWORD);
 
     expect(dataOf<{ state: string }>(session).state).toBe('authenticated');
@@ -202,7 +238,7 @@ describeWithInfrastructure('homologacao funcional dos 14 casos de uso', () => {
     it('aplica todas as migrations no banco vazio, como o entrypoint de producao', () => {
       expect(t.executedMigrations).toHaveLength(migrationFiles().length);
       expect(t.executedMigrations.at(-1)).toBe(
-        'CreateUserInvitations1792100000000',
+        'PublishTermsOfUseV11792200000001',
       );
     });
 
@@ -1482,7 +1518,10 @@ describeWithInfrastructure('homologacao funcional dos 14 casos de uso', () => {
 
       const session = await login(tenants.A.code, email, PASSWORD);
 
-      expect(dataOf<{ state: string }>(session).state).toBe('authenticated');
+      // Sem primeiro acesso por senha provisoria, mas com o termo (BE-32).
+      expect(dataOf<{ state: string }>(session).state).toBe(
+        'terms_acceptance_required',
+      );
       expect(
         (
           await http('post', '/auth/invitations/accept', null, {

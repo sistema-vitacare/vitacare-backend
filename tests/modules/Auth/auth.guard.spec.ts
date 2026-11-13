@@ -4,6 +4,7 @@ import { DomainException } from '@/common/errors/domain.exception';
 
 import { AuthGuard } from '@/modules/Auth/guards/auth.guard';
 import {
+  ALLOW_PENDING_TERMS_KEY,
   ALLOWED_SESSION_TYPES_KEY,
   IS_PUBLIC_KEY,
 } from '@/modules/Auth/guards/public.decorator';
@@ -17,6 +18,7 @@ const principal = {
   profile: 'admin' as never,
   permissions: new Set(['users:reset_password']),
   absoluteExpiresAt: new Date('2026-09-22T12:00:00.000Z'),
+  termsAccepted: true,
 };
 
 const contextFor = (request: Record<string, unknown>) =>
@@ -151,6 +153,72 @@ describe('AuthGuard', () => {
       organizationKind: 'tenant',
       profile: 'admin',
       permissions: principal.permissions,
+    });
+  });
+
+  describe('termo de uso (BE-32)', () => {
+    const pending = { ...principal, termsAccepted: false };
+    const bearer = () =>
+      contextFor({ headers: { authorization: 'Bearer token-opaco' } });
+
+    it('recusa sessao normal sem aceite da versao vigente com 403 TERMS_ACCEPTANCE_REQUIRED', async () => {
+      const guard = new AuthGuard(
+        reflectorFor({}) as never,
+        { resolve: jest.fn().mockResolvedValue(pending) } as never,
+      );
+
+      await expect(guard.canActivate(bearer())).rejects.toMatchObject<
+        Partial<DomainException>
+      >({ code: 'TERMS_ACCEPTANCE_REQUIRED' });
+      await expect(guard.canActivate(bearer())).rejects.toMatchObject({
+        status: 403,
+      });
+    });
+
+    it('fecha a porta quando a sessao nao informa o aceite', async () => {
+      const { termsAccepted: _ignored, ...unknown } = principal;
+      const guard = new AuthGuard(
+        reflectorFor({}) as never,
+        { resolve: jest.fn().mockResolvedValue(unknown) } as never,
+      );
+
+      await expect(guard.canActivate(bearer())).rejects.toMatchObject<
+        Partial<DomainException>
+      >({ code: 'TERMS_ACCEPTANCE_REQUIRED' });
+    });
+
+    it('libera a rota marcada com AllowPendingTerms', async () => {
+      const guard = new AuthGuard(
+        reflectorFor({ [ALLOW_PENDING_TERMS_KEY]: true }) as never,
+        { resolve: jest.fn().mockResolvedValue(pending) } as never,
+      );
+
+      await expect(guard.canActivate(bearer())).resolves.toBe(true);
+    });
+
+    it('a sessao de primeiro acesso nao passa pela checagem do termo', async () => {
+      const guard = new AuthGuard(
+        reflectorFor({
+          [ALLOWED_SESSION_TYPES_KEY]: ['password_change'],
+        }) as never,
+        {
+          resolve: jest.fn().mockResolvedValue({
+            ...pending,
+            sessionType: 'password_change',
+          }),
+        } as never,
+      );
+
+      await expect(guard.canActivate(bearer())).resolves.toBe(true);
+    });
+
+    it('sessao com aceite passa normalmente', async () => {
+      const guard = new AuthGuard(
+        reflectorFor({}) as never,
+        { resolve: jest.fn().mockResolvedValue(principal) } as never,
+      );
+
+      await expect(guard.canActivate(bearer())).resolves.toBe(true);
     });
   });
 });

@@ -33,6 +33,8 @@ interface SessionUserRow {
   legalName: string | null;
   organizationKind: OrganizationKind;
   organizationStatus: SessionProfileRow['organization']['status'];
+  termsCurrentVersion: number | null;
+  termsAcceptedVersion: number | null;
 }
 
 /**
@@ -144,7 +146,11 @@ export class AuthIdentityRepository {
               o.trade_name AS "tradeName",
               o.legal_name AS "legalName",
               o.kind AS "organizationKind",
-              o.status AS "organizationStatus"
+              o.status AS "organizationStatus",
+              (SELECT max(v.version) FROM terms_versions v) AS "termsCurrentVersion",
+              (SELECT max(a.terms_version) FROM terms_acceptances a
+                WHERE a.user_id = u.id
+                  AND a.organization_id = u.organization_id) AS "termsAcceptedVersion"
          FROM users u
          JOIN access_profiles p
            ON p.id = u.profile_id
@@ -189,6 +195,10 @@ export class AuthIdentityRepository {
         kind: row.organizationKind,
         status: row.organizationStatus,
         plan,
+      },
+      terms: {
+        currentVersion: row.termsCurrentVersion,
+        acceptedVersion: row.termsAcceptedVersion,
       },
     };
   }

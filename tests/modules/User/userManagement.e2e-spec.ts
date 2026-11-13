@@ -25,6 +25,7 @@ import { ApplyPlanCatalogRules1790600000000 } from '@/database/migrations/179060
 import { CreatePatients1790700000000 } from '@/database/migrations/1790700000000-CreatePatients';
 import { AuditEventQuery1791700000000 } from '@/database/migrations/1791700000000-AuditEventQuery';
 import { CreateUserInvitations1792100000000 } from '@/database/migrations/1792100000000-CreateUserInvitations';
+import { CreateTermsOfUse1792200000000 } from '@/database/migrations/1792200000000-CreateTermsOfUse';
 import { runPlatformSeed } from '@/database/seeds/platformSeed';
 import { SnakeNamingStrategy } from '@/database/snakeNaming.strategy';
 import type { TenantProfileCode } from '@/modules/Access/access.permissions';
@@ -76,10 +77,11 @@ const MIGRATIONS = [
   CreatePatients1790700000000,
   AuditEventQuery1791700000000,
   CreateUserInvitations1792100000000,
+  CreateTermsOfUse1792200000000,
 ];
 
 const TRUNCATE_ALL =
-  'TRUNCATE user_invitations, user_patients, patients, organization_plan_terms, plan_change_requests, audit_events, auth_sessions, password_reset_tokens, users, profile_permissions, permissions, access_profiles, organizations, usage_plans';
+  'TRUNCATE terms_acceptances, user_invitations, user_patients, patients, organization_plan_terms, plan_change_requests, audit_events, auth_sessions, password_reset_tokens, users, profile_permissions, permissions, access_profiles, organizations, usage_plans';
 
 const SETTINGS: Record<string, number> = {
   'auth.sessionIdleSeconds': 1800,

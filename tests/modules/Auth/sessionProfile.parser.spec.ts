@@ -30,6 +30,7 @@ const row = (
       termStatus: 'active',
     },
   },
+  terms: { currentVersion: null, acceptedVersion: null },
   ...overrides,
 });
 
@@ -123,5 +124,58 @@ describe('toSessionProfileResponse (BE-27)', () => {
       'alerts:read',
       'profile:manage',
     ]);
+  });
+
+  describe('termo de uso (BE-32)', () => {
+    it('sem nenhuma versao publicada, nada e exigido', () => {
+      const session = toSessionProfileResponse(row(), {
+        cpf: 'full',
+        restricted: false,
+      });
+
+      expect(session.terms).toEqual({
+        required: false,
+        currentVersion: null,
+        acceptedVersion: null,
+      });
+      expect(session.permissions).toHaveLength(3);
+    });
+
+    it('vigente nao aceita: exige o aceite e nao entrega permissoes', () => {
+      const session = toSessionProfileResponse(
+        row({ terms: { currentVersion: 1, acceptedVersion: null } }),
+        { cpf: 'full', restricted: false },
+      );
+
+      expect(session.terms).toEqual({
+        required: true,
+        currentVersion: 1,
+        acceptedVersion: null,
+      });
+      expect(session.permissions).toEqual([]);
+    });
+
+    it('aceite de versao anterior nao basta', () => {
+      expect(
+        toSessionProfileResponse(
+          row({ terms: { currentVersion: 2, acceptedVersion: 1 } }),
+          { cpf: 'full', restricted: false },
+        ).terms.required,
+      ).toBe(true);
+    });
+
+    it('vigente aceita: permissoes ordenadas', () => {
+      const session = toSessionProfileResponse(
+        row({ terms: { currentVersion: 1, acceptedVersion: 1 } }),
+        { cpf: 'full', restricted: false },
+      );
+
+      expect(session.terms.required).toBe(false);
+      expect(session.permissions).toEqual([
+        'alerts:read',
+        'patients:read',
+        'profile:manage',
+      ]);
+    });
   });
 });

@@ -5,7 +5,10 @@ import { DomainException } from '@/common/errors/domain.exception';
 
 import { AuthErrors } from '../auth.errors';
 import type { SessionProfileDto } from '../dtos/sessionProfile.dto';
-import { toSessionProfileResponse } from '../parsers/sessionProfile.parser';
+import {
+  termsAcceptanceRequired,
+  toSessionProfileResponse,
+} from '../parsers/sessionProfile.parser';
 import { AuthIdentityRepository } from '../repositories/authIdentity.repository';
 import { AuthTransactionRepository } from '../repositories/authTransaction.repository';
 import { AuthRateLimiter } from '../security/authRateLimiter';
@@ -14,7 +17,8 @@ import { TokenService } from '../security/token.service';
 import type { LoginIdentity } from '../types/auth.types';
 
 export interface LoginResult {
-  state: 'authenticated' | 'password_change_required';
+  state:
+    'authenticated' | 'password_change_required' | 'terms_acceptance_required';
   accessToken: string;
   tokenType: 'Bearer';
   expiresAt: Date;
@@ -127,8 +131,16 @@ export class LoginUseCase {
       throw new Error('Usuario autenticado sem cadastro legivel no login.');
     }
 
+    // A troca obrigatoria vem antes do termo; o termo antes do acesso (BE-32).
+    const state =
+      type !== 'normal'
+        ? 'password_change_required'
+        : termsAcceptanceRequired(session.terms)
+          ? 'terms_acceptance_required'
+          : 'authenticated';
+
     return {
-      state: type === 'normal' ? 'authenticated' : 'password_change_required',
+      state,
       accessToken: token.raw,
       tokenType: 'Bearer',
       expiresAt,

@@ -126,8 +126,9 @@ volume se chama `vitacare_vitacare-storage` (prefixo = nome da stack).
   arquivo responde `404 ATTACHMENT_CONTENT_MISSING` e loga `error`; arquivo sem
   linha fica inacessível e aparece em `storage-orphans.js`.
 - **Retenção:** o anexo fica enquanto a linha existir; a remoção pela API apaga
-  o arquivo. Prazo de guarda clínica e descarte de paciente inativo dependem da
-  decisão LGPD (P31), ainda pendente.
+  o arquivo. A P31 foi resolvida no escopo acadêmico com o termo de uso e o
+  aceite (BE-32, decisão de Mateus em 2026-11-12): o prazo definitivo de guarda
+  e o descarte de paciente inativo são decisão da organização, como diz o termo.
 
 ## Hierarquia de timeouts (crescente de dentro para fora)
 
@@ -138,8 +139,9 @@ keepAliveTimeout do Node (65s) > keepalive de qualquer cliente ou balanceador (�
 
 ## Passo a passo do zero ao ar (acesso por IP, sem domínio)
 
-O acesso é **sempre** por `http://<IP-da-VPS>:1050`, sem domínio nem HTTPS
-(decisão de Mateus em 2026-11-10; ver [Acesso por IP, sem HTTPS](#acesso-por-ip-sem-https)).
+Hoje o acesso é por `http://<IP-da-VPS>:1050`, sem domínio nem HTTPS. Em
+2026-11-13 Mateus decidiu que **haverá HTTPS** e vai configurá-lo; até lá valem
+os riscos de [Acesso por IP, sem HTTPS](#acesso-por-ip-sem-https).
 
 ### 0. Pré-requisitos na VPS
 
@@ -261,8 +263,8 @@ ativa **quatro envios de uma vez**:
    administrador criado pelo master continua com senha provisória.
 
 Antes de ligar, publique no frontend a página de aceite do convite (guia em
-`docs/api/README.md`, "Página de aceite do convite"). Enquanto o acesso for por
-IP, sem HTTPS, o link do convite e o da recuperação trafegam sem criptografia.
+`docs/api/README.md`, "Página de aceite do convite"). Até o HTTPS ser
+configurado, o link do convite e o da recuperação trafegam sem criptografia.
 Ligar o SMTP não exige migration: a tabela `user_invitations` já vem na
 `1792100000000-CreateUserInvitations`, que o entrypoint aplica no deploy.
 
@@ -345,7 +347,9 @@ docker exec -it postgresql psql -U vitacare -d vitacare -c \
 ```
 
 Depois o master faz login com o código da plataforma, troca a senha provisória
-no primeiro acesso e cadastra cada organização com o primeiro administrador em
+no primeiro acesso, entra de novo, **aceita o termo de uso** (BE-32: sem o
+aceite, toda rota protegida responde `403 TERMS_ACCEPTANCE_REQUIRED`) e cadastra
+cada organização com o primeiro administrador em
 `POST /api/v1/organizations` (manual:
 [`organizations-criar.md`](api/endpoints/organizations-criar.md)).
 
@@ -510,16 +514,21 @@ Sem SLA ou SLO de disponibilidade: não declarar.
 
 ## Antes de dados reais (checklist)
 
-- [ ] Ciência dos riscos do acesso por IP sem HTTPS ([abaixo](#acesso-por-ip-sem-https)) registrada na decisão LGPD (P31); firewall só com as portas necessárias.
+- [ ] HTTPS configurado (decisão de Mateus em 2026-11-13); enquanto não estiver, valem os riscos de [Acesso por IP, sem HTTPS](#acesso-por-ip-sem-https). Firewall só com as portas necessárias.
+- [ ] Termo de uso publicado: `curl -s <APP_URL>/api/v1/terms/current` responde a versão esperada e `<APP_URL>/termos` abre no navegador; o frontend linka `/termos` no rodapé e trata `403 TERMS_ACCEPTANCE_REQUIRED` ([Termo de uso](#termo-de-uso-e-aceite-be-32)).
 - [ ] `CORS_ORIGINS` só com a origem do frontend.
 - [ ] Monitores `vitacare` app, `vitacare workers` e `vitacare backup` no Kuma, UP.
 - [ ] Cron do `backup.sh` com push; primeira pasta conferida.
 - [ ] Cópia externa criptografada dos backups (camada 3).
 - [ ] Ensaio de restauração na VPS com o tempo anotado (RTO).
 - [ ] Medição de carga (`load.mjs`) contra um ambiente com o tamanho da VPS.
-- [ ] **LGPD (P31):** base legal, controlador/operador, encarregado e processo
-      de direitos do titular definidos por Mateus e orientação jurídica;
-      retenção clínica de registros e anexos de paciente inativo.
+- [x] **LGPD (P31), escopo acadêmico** (decisão de Mateus em 2026-11-12): o
+      VitaCare é projeto acadêmico, não produto comercial em conformidade plena.
+      A P31 se resolve com o termo de uso e privacidade e o registro do aceite
+      (BE-32). Fora de escopo: funções de direitos do titular (exportar,
+      anonimizar, excluir), encarregado formal e parecer jurídico; os pedidos do
+      titular são atendidos à mão pela organização, e o prazo de guarda clínica é
+      decisão dela. Uso fora do escopo acadêmico exige rever essa decisão.
 - [ ] Senhas da stack e chaves VAPID trocadas das de teste; acesso ao Portainer e ao root restrito.
 
 ## Se algo falhar
@@ -555,10 +564,46 @@ Sem SLA ou SLO de disponibilidade: não declarar.
 > trouxe migration, o código antigo precisa ser compatível com o schema novo ou
 > exige `migration:revert` consciente (nunca automático).
 
+## Termo de uso e aceite (BE-32)
+
+- **Texto:** `docs/termos/termo-de-uso-v<N>.md`, versionado no repositório. A
+  versão publicada é identificada pelo número e pelo SHA-256 do conteúdo.
+- **Publicação:** só por migration, no deploy. A versão 1 vem da
+  `1792200000001-PublishTermsOfUseV1`, que guarda o texto e o hash como
+  constantes (um teste confere que batem com o arquivo). Para uma versão nova:
+  1. criar `docs/termos/termo-de-uso-v<N>.md` (Markdown simples: `#`, `##`,
+     parágrafos, listas `-` e `1.`, negrito `**`; sem tabela nem link);
+  2. criar a migration `PublishTermsOfUseV<N>` no mesmo molde, com teste de
+     hash igual ao da v1;
+  3. merge na `main`: o entrypoint aplica a migration e, a partir da requisição
+     seguinte, **todos** os usuários precisam aceitar de novo (inclusive quem
+     está logado). Os aceites antigos continuam guardados.
+- **Página:** `<APP_URL>/termos` (e `/termos?versao=N`), pública mesmo com
+  `SWAGGER_ENABLED=false`. Linkar no rodapé do frontend e nos e-mails.
+- **Prova:** `terms_acceptances` (imutável por trigger) com data e hora do
+  servidor, IP (regra `TRUST_PROXY`), navegador, versão, hash, perfil e
+  requisição; consulta em `GET /api/v1/terms/acceptances` (admin da própria
+  organização, master de todas). O backup diário leva a tabela junto.
+- **Reverter** a publicação é recusado quando alguém já aceitou a versão: o
+  aceite é prova e não pode perder o texto.
+- **Smoke e carga:** o modo `read` não faz login; `full`, `verify` e
+  `load.mjs` aceitam o termo com as contas sintéticas que criam.
+- **Ordem de publicação:** o merge na `main` dispara o deploy, e o entrypoint
+  publica a versão 1 na subida. A partir da requisição seguinte, **todo**
+  usuário recebe `terms_acceptance_required` no login e `403
+  TERMS_ACCEPTANCE_REQUIRED` nas demais rotas. Publique o frontend com a tela
+  do termo e o tratamento do `403` **antes ou junto** deste merge; sem isso,
+  ninguém consegue usar o sistema, nem em demonstração.
+
 ## Acesso por IP, sem HTTPS
 
 Decisão de Mateus em 2026-11-10: o sistema não terá domínio nem HTTPS; o acesso
 é sempre por IP e porta. Diverge do TCC (p. PDF 50: "requisições HTTPS").
+
+> **Revista em 2026-11-13:** Mateus decidiu que haverá HTTPS e vai
+> configurá-lo. Esta seção vale até lá; quando o HTTPS estiver no ar, ajustar
+> `APP_URL`, `CORS_ORIGINS`, `PASSWORD_RESET_URL`, `INVITATION_ACCEPT_URL`,
+> `NOTIFICATION_APP_URL` e esta página.
 
 - **Stack:** `APP_BIND=0.0.0.0` é permanente; a porta `1050` fica aberta no
   firewall; `APP_URL=http://<IP-da-VPS>:1050` no GitHub; `CORS_ORIGINS` com
@@ -578,8 +623,10 @@ Decisão de Mateus em 2026-11-10: o sistema não terá domínio nem HTTPS; o ace
   `UPTIME_KUMA_PUSH_URL` e os três monitores; cron único do `backup.sh`;
   ensaio de restauração com tempo; medição de carga com o tamanho real.
 - **Cópia externa** dos backups (camada 3), criptografada.
-- **Sem HTTPS** por decisão (2026-11-10): riscos e efeito no push em [Acesso por IP, sem HTTPS](#acesso-por-ip-sem-https).
-- **LGPD (P31)** e retenção clínica: ver o checklist.
+- **HTTPS** decidido em 2026-11-13 e ainda não configurado: até lá, riscos e
+  efeito no push em [Acesso por IP, sem HTTPS](#acesso-por-ip-sem-https).
+- **LGPD (P31)** resolvida no escopo acadêmico com o termo de uso (BE-32): ver
+  o checklist.
 - **S3**: anexos usam o volume local (decisão de 2026-11-05). **SMTP**: desligado
   até haver servidor. Ligá-lo ativa a recuperação de senha, os e-mails de alerta
   (BE-17) e o aviso de vencimento do plano (BE-28); ver [Variáveis](#4-variáveis-envproduction-nunca-commitado).

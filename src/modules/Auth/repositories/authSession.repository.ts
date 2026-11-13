@@ -16,6 +16,8 @@ interface SessionRow extends Omit<AuthenticatedPrincipal, 'permissions'> {
  * foi revogada, esta dentro do prazo absoluto e da janela de inatividade, e
  * tanto o usuario quanto a organizacao continuam ativos. A mesma sentenca
  * renova `last_activity_at`, entao nao existe janela entre validar e renovar.
+ * Ela tambem diz se o usuario aceitou a versao vigente do termo de uso
+ * (BE-32): uma versao nova vale na requisicao seguinte, ate em sessao aberta.
  */
 @Injectable()
 export class AuthSessionRepository {
@@ -61,7 +63,15 @@ export class AuthSessionRepository {
               t.kind AS "organizationKind",
               t.expires_at AS "absoluteExpiresAt",
               t.profile_id AS "profileId",
-              p.code AS profile
+              p.code AS profile,
+              (NOT EXISTS (SELECT 1 FROM terms_versions)
+               OR EXISTS (
+                 SELECT 1 FROM terms_acceptances a
+                  WHERE a.user_id = t.user_id
+                    AND a.organization_id = t.organization_id
+                    AND a.terms_version_id = (SELECT v.id FROM terms_versions v
+                                               ORDER BY v.version DESC LIMIT 1)
+               )) AS "termsAccepted"
          FROM touched t
          JOIN access_profiles p
            ON p.id = t.profile_id

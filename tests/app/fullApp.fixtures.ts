@@ -149,6 +149,13 @@ export const migrationFiles = (): string[] =>
 export interface FullAppOptions {
   /** Porta SMTP falsa (BE-31): troca o `EMAIL_SENDER` de todos os modulos. */
   emailSender?: EmailSender;
+  /**
+   * Termo de uso publicado, como em producao (padrao). `false` apaga a
+   * versao publicada pela migration: sem versao ninguem e bloqueado, para as
+   * suites que testam outra coisa no login (BE-32). O `TRUNCATE` passa pelo
+   * trigger de imutabilidade.
+   */
+  termsPublished?: boolean;
 }
 
 export const bootFullApp = async (
@@ -181,6 +188,10 @@ export const bootFullApp = async (
   }
 
   const executed = await migrations.runMigrations();
+
+  if (options.termsPublished === false) {
+    await migrations.query('TRUNCATE terms_versions CASCADE');
+  }
 
   await migrations.destroy();
 

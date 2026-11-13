@@ -19,6 +19,7 @@ import { BEARER_SECURITY_SCHEME } from '@/common/http/bearerAuth';
 import type { EnvelopePayload } from '@/common/http/envelope';
 import { UuidParam } from '@/common/http/uuidParam.pipe';
 import { Permissions } from '@/modules/Access/access.permissions';
+import { AllowPendingTerms } from '@/modules/Auth/guards/public.decorator';
 import { RequirePermissions } from '@/modules/Auth/guards/requiredPermissions.decorator';
 
 import { CountUnreadNotificationsUseCase } from './CountUnreadNotifications/countUnreadNotifications.useCase';
@@ -171,6 +172,9 @@ export class NotificationController {
   }
 
   @Post('push-subscriptions/revoke')
+  // Parar o push faz parte de sair: vale tambem para quem ainda nao aceitou
+  // o termo de uso vigente (BE-32).
+  @AllowPendingTerms()
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Para o push neste navegador (chamar antes do logout).',

@@ -41,11 +41,16 @@ export class LoginDto {
 
 export class LoginResponseDto {
   @ApiProperty({
-    enum: ['authenticated', 'password_change_required'],
+    enum: [
+      'authenticated',
+      'password_change_required',
+      'terms_acceptance_required',
+    ],
     description:
-      '`password_change_required` significa sessao restrita: so primeiro acesso e logout.',
+      '`password_change_required` significa sessao restrita: so primeiro acesso e logout. `terms_acceptance_required` (BE-32) significa sessao normal que ainda nao aceitou o termo de uso vigente: so le o termo e a propria sessao, aceita e sai; o resto responde `403 TERMS_ACCEPTANCE_REQUIRED`.',
   })
-  state!: 'authenticated' | 'password_change_required';
+  state!:
+    'authenticated' | 'password_change_required' | 'terms_acceptance_required';
 
   @ApiProperty({ description: 'Token opaco; enviar como `Bearer`.' })
   accessToken!: string;
