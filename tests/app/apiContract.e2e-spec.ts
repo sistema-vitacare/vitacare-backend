@@ -22,6 +22,7 @@ const DOCS_DIR = join(__dirname, '..', '..', 'docs', 'api');
 /** Rotas reais que ficam fora do OpenAPI de proposito. */
 const OUTSIDE_OPENAPI = [
   'GET /health/live',
+  'GET /termos',
   'GET /api/docs',
   'GET /api/docs-json',
 ];
@@ -35,6 +36,8 @@ const PUBLIC = [
   'POST /api/v1/auth/login',
   'POST /api/v1/auth/password-recovery/request',
   'POST /api/v1/auth/password-recovery/reset',
+  'GET /api/v1/terms/current',
+  'GET /api/v1/terms/versions/:version',
 ];
 
 /** Respostas de sucesso fora do envelope `{ data, meta }`, com o tipo publicado. */
@@ -212,6 +215,20 @@ describeWithInfrastructure(
       }
     });
 
+    it('o esquema Bearer avisa o 403 transversal do termo de uso (BE-32)', () => {
+      const schemes = (
+        openApi as unknown as {
+          components: {
+            securitySchemes: Record<string, { description?: string }>;
+          };
+        }
+      ).components.securitySchemes;
+
+      expect(
+        Object.values(schemes).map((scheme) => scheme.description ?? ''),
+      ).toEqual([expect.stringContaining('403 TERMS_ACCEPTANCE_REQUIRED')]);
+    });
+
     it('todo sucesso JSON sai no envelope; os binarios e o 204 declaram o proprio tipo', () => {
       for (const { key, operation } of operations) {
         const successes = Object.entries(operation.responses).filter(
@@ -285,6 +302,7 @@ describeWithInfrastructure(
           'GET /health/live',
           'GET /api/docs',
           'GET /api/docs-json',
+          'GET /termos',
         ].sort(),
       );
     });

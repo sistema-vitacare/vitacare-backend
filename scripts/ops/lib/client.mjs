@@ -122,9 +122,24 @@ export const eventually = async (probe, accept, timeoutMs = 30_000) => {
   return value;
 };
 
+/** Aceite do termo vigente pela sessao; a mesma sessao segue liberada. */
+const acceptTerms = async (api, token) => {
+  const current = await api.request('GET', '/api/v1/terms/current');
+  expectStatus(current, 200, 'termo de uso vigente');
+  const accepted = await api.request('POST', '/api/v1/terms/acceptances', {
+    token,
+    json: { version: dataOf(current).version },
+  });
+  expectStatus(accepted, 200, 'aceite do termo de uso');
+  return token;
+};
+
 /**
  * Sessao: login e, se a senha for provisoria, primeiro acesso com a definitiva.
- * Aceita conta ja ativada (segunda execucao contra o mesmo banco).
+ * Aceita conta ja ativada (segunda execucao contra o mesmo banco). Se faltar o
+ * aceite do termo de uso vigente (BE-32), aceita-o: so o `full`, o `verify` e
+ * a carga entram aqui, sempre com contas sinteticas de homologacao; o modo
+ * `read`, o unico seguro em producao, nao faz login.
  */
 export const signIn = async (
   api,
@@ -143,6 +158,9 @@ export const signIn = async (
     const { state, accessToken } = dataOf(login);
 
     if (state === 'authenticated') return accessToken;
+    if (state === 'terms_acceptance_required') {
+      return acceptTerms(api, accessToken);
+    }
 
     const changed = await api.request(
       'POST',
@@ -158,7 +176,10 @@ export const signIn = async (
       json: { organizationCode, email, password: finalPassword },
     });
     expectStatus(session, 200, 'login apos primeiro acesso');
-    return dataOf(session).accessToken;
+    const after = dataOf(session);
+    return after.state === 'terms_acceptance_required'
+      ? acceptTerms(api, after.accessToken)
+      : after.accessToken;
   }
 
   throw new CheckFailed(
