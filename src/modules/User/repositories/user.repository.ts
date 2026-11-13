@@ -245,7 +245,10 @@ export class UserRepository {
     });
   }
 
-  /** Grava so o que mudou; nada mudou nao grava nem audita. */
+  /**
+   * Grava so o que mudou; nada mudou nao grava nem audita. Trocar o e-mail
+   * revoga o convite por link e apaga os links de recuperacao (BE-31).
+   */
   async update(command: UpdateUserCommand): Promise<UpdateUserOutcome> {
     return this.write(async (manager) => {
       const current = await this.findIn(
@@ -287,6 +290,22 @@ export class UserRepository {
         ],
       );
 
+      // E-mail novo: o link de convite e os de recuperacao foram para o
+      // endereco antigo e morrem aqui; o admin reemite o convite (BE-31).
+      if (changed.includes('email')) {
+        await revokeLiveUserInvitations(manager, {
+          organizationId: command.organizationId,
+          userId: command.targetUserId,
+          reason: 'email_changed',
+        });
+        await manager.query(
+          `DELETE FROM password_reset_tokens
+            WHERE user_id = $1
+              AND organization_id = $2`,
+          [command.targetUserId, command.organizationId],
+        );
+      }
+
       await this.audit(manager, command, current.id, 'user.updated', {
         fields: changed,
       });
@@ -304,7 +323,9 @@ export class UserRepository {
 
   /**
    * Revoga o acesso na hora (sessoes, links de recuperacao e, se pendente, o
-   * convite) e preserva o resto: autoria, auditoria e registros ficam.
+   * convite: a senha provisoria vence e o link e revogado) e preserva o resto:
+   * autoria, auditoria e registros ficam. So o modo senha provisoria tem prazo
+   * a vencer; o pendente por link nao tem (`users_temporary_password_expiry_check`).
    */
   async deactivate(command: TargetUserCommand): Promise<DeactivateUserOutcome> {
     return this.write(async (manager) => {
@@ -319,7 +340,7 @@ export class UserRepository {
             SET status = 'inactive',
                 deleted_at = now(),
                 temporary_password_expires_at = CASE
-                  WHEN status = 'pending' THEN now()
+                  WHEN status = 'pending' AND must_change_password THEN now()
                   ELSE temporary_password_expires_at
                 END,
                 updated_at = now()
@@ -341,6 +362,12 @@ export class UserRepository {
             AND organization_id = $2`,
         [command.targetUserId, command.organizationId],
       );
+
+      await revokeLiveUserInvitations(manager, {
+        organizationId: command.organizationId,
+        userId: command.targetUserId,
+        reason: 'user_deactivated',
+      });
 
       await this.audit(
         manager,

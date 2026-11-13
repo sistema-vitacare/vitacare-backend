@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { DataSource, type EntityManager } from 'typeorm';
 
 import type { RequestContext } from '@/common/context/requestContext.type';
+import { revokeLiveUserInvitations } from '@/modules/Auth/repositories/userInvitation.repository';
 import { DomainException } from '@/common/errors/domain.exception';
 import { translatePgError } from '@/common/errors/pgError.translator';
 import { provisionTenantProfiles } from '@/modules/Access/repositories/tenantProfileProvisioning.repository';
@@ -325,6 +326,12 @@ export class OrganizationRepository {
           AND revoked_at IS NULL`,
       [organizationId],
     );
+
+    // Reativar a organizacao nao restaura convite: o admin reemite (BE-31).
+    await revokeLiveUserInvitations(manager, {
+      organizationId,
+      reason: 'organization_deactivated',
+    });
   }
 
   private async audit(

@@ -105,7 +105,7 @@ describeWithInfrastructure(
     let t: FullApp;
     const sender = new FakeEmailSender();
     let masterToken: string;
-    const tenants = {} as Record<'A' | 'B' | 'L' | 'X', Tenant>;
+    const tenants = {} as Record<'A' | 'B' | 'D' | 'L' | 'X', Tenant>;
 
     const http = (...args: Parameters<FullApp['http']>) => t.http(...args);
 
@@ -267,6 +267,7 @@ describeWithInfrastructure(
       await createTenant('B');
       await createTenant('L', tightPlan);
       await createTenant('X');
+      await createTenant('D');
     }, 180000);
 
     afterAll(async () => {
@@ -734,6 +735,157 @@ describeWithInfrastructure(
 
         expect(codes.slice(0, 30).every((status) => status === 422)).toBe(true);
         expect(codes[30]).toBe(429);
+      });
+    });
+
+    describe('revogacoes antes do aceite', () => {
+      const resetInvitationLimit = async () => {
+        const client = new Redis(redisUrl!, { lazyConnect: true });
+
+        await client.connect();
+        const keys = await client.keys('*auth:invitation-ip:*');
+
+        if (keys.length > 0) await client.del(...keys);
+        await client.quit();
+      };
+
+      const accept = (token: string) =>
+        http('post', '/auth/invitations/accept', null, {
+          token,
+          newPassword: PASSWORD,
+        });
+
+      beforeEach(resetInvitationLimit);
+
+      it('inativar o pendente por link responde 200 e mata o link', async () => {
+        const { email, id } = await invite(tenants.A);
+        const token = sender.tokenFor(email);
+
+        const response = await http(
+          'post',
+          `/users/${id}/deactivate`,
+          tenants.A.adminToken,
+        );
+
+        expect(response.status).toBe(200);
+        expect(await invitationRows(id)).toEqual([
+          { sent: true, consumed: false, revokedReason: 'user_deactivated' },
+        ]);
+        expect(codeOf(await accept(token))).toBe(
+          'AUTH_INVITATION_INVALID_OR_EXPIRED',
+        );
+
+        // Reativado sem senha: entra pela redefinicao administrativa (BE-06).
+        expect(
+          (await http('post', `/users/${id}/reactivate`, tenants.A.adminToken))
+            .status,
+        ).toBe(200);
+        expect((await login(tenants.A.code, email, PASSWORD)).status).toBe(401);
+      });
+
+      it('trocar o e-mail do pendente mata o link, apaga a recuperacao e nao reenvia', async () => {
+        const { email, id } = await invite(tenants.A);
+        const token = sender.tokenFor(email);
+        const sentBefore = sender.invitations().length;
+
+        await t.dataSource.query(
+          `INSERT INTO password_reset_tokens
+             (organization_id, user_id, token_hash, expires_at)
+           VALUES ($1, $2, $3, now() + interval '15 minutes')`,
+          [tenants.A.id, id, 'e'.repeat(64)],
+        );
+
+        const response = await http(
+          'patch',
+          `/users/${id}`,
+          tenants.A.adminToken,
+          { email: nextEmail() },
+        );
+
+        expect(response.status).toBe(200);
+        expect(
+          dataOf<{ invitation: Invitation }>(response).invitation,
+        ).toMatchObject({ channel: 'email', status: 'invalidated' });
+        expect(sender.invitations()).toHaveLength(sentBefore);
+        expect(codeOf(await accept(token))).toBe(
+          'AUTH_INVITATION_INVALID_OR_EXPIRED',
+        );
+        expect(await invitationRows(id)).toEqual([
+          { sent: true, consumed: false, revokedReason: 'email_changed' },
+        ]);
+        expect(
+          await scalar(
+            'SELECT count(*)::text AS value FROM password_reset_tokens WHERE user_id = $1',
+            [id],
+          ),
+        ).toBe('0');
+      });
+
+      it('editar outro campo nao mexe no link', async () => {
+        const { email, id } = await invite(tenants.A);
+
+        await http('patch', `/users/${id}`, tenants.A.adminToken, {
+          name: 'Ana Renomeada',
+        });
+
+        expect((await accept(sender.tokenFor(email))).status).toBe(200);
+      });
+
+      it('inativar a organizacao mata os links e reativar nao os restaura', async () => {
+        const { email, id } = await invite(tenants.D);
+        const token = sender.tokenFor(email);
+
+        expect(
+          (
+            await http(
+              'post',
+              `/organizations/${tenants.D.id}/deactivate`,
+              masterToken,
+            )
+          ).status,
+        ).toBe(200);
+        expect(await invitationRows(id)).toEqual([
+          {
+            sent: true,
+            consumed: false,
+            revokedReason: 'organization_deactivated',
+          },
+        ]);
+        expect(codeOf(await accept(token))).toBe(
+          'AUTH_INVITATION_INVALID_OR_EXPIRED',
+        );
+
+        expect(
+          (
+            await http(
+              'post',
+              `/organizations/${tenants.D.id}/reactivate`,
+              masterToken,
+            )
+          ).status,
+        ).toBe(200);
+        expect(codeOf(await accept(token))).toBe(
+          'AUTH_INVITATION_INVALID_OR_EXPIRED',
+        );
+      });
+
+      it('aceite simultaneo a inativacao nunca responde 500 nem deixa ativo um inativado', async () => {
+        for (let round = 0; round < 5; round += 1) {
+          const { email, id } = await invite(tenants.A);
+
+          const [accepted, deactivated] = await Promise.all([
+            accept(sender.tokenFor(email)),
+            http('post', `/users/${id}/deactivate`, tenants.A.adminToken),
+          ]);
+
+          expect(deactivated.status).toBe(200);
+          expect([200, 422]).toContain(accepted.status);
+          expect(
+            await scalar('SELECT status AS value FROM users WHERE id = $1', [
+              id,
+            ]),
+          ).toBe('inactive');
+        }
       });
     });
 
