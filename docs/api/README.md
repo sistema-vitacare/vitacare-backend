@@ -28,6 +28,8 @@ O corpo das rotas de negócio é JSON quando aplicável. Autenticação usa Bear
 | `POST /api/v1/auth/password-recovery/request` | Solicita recuperação | [auth-solicitar-recuperacao.md](endpoints/auth-solicitar-recuperacao.md) |
 | `POST /api/v1/auth/password-recovery/reset` | Redefine com token | [auth-redefinir-senha.md](endpoints/auth-redefinir-senha.md) |
 | `POST /api/v1/auth/users/:userId/temporary-password` | Redefinição administrativa | [auth-redefinir-senha-usuario.md](endpoints/auth-redefinir-senha-usuario.md) |
+| `POST /api/v1/auth/invitations/inspect` | Lê o convite por link sem consumi-lo (pública) | [auth-convite-consultar.md](endpoints/auth-convite-consultar.md) |
+| `POST /api/v1/auth/invitations/accept` | Aceita o convite: o convidado cadastra a senha (pública) | [auth-convite-aceitar.md](endpoints/auth-convite-aceitar.md) |
 | `GET /api/v1/profile` | Consulta o próprio cadastro (sessão com CPF completo) | [profile-consultar.md](endpoints/profile-consultar.md) |
 | `PATCH /api/v1/profile` | Edita nome, telefone e e-mail do próprio cadastro | [profile-atualizar.md](endpoints/profile-atualizar.md) |
 | `PUT /api/v1/profile/password` | Troca a própria senha (equivale a `PUT /auth/password`) | [profile-alterar-senha.md](endpoints/profile-alterar-senha.md) |
@@ -40,13 +42,13 @@ O corpo das rotas de negócio é JSON quando aplicável. Autenticação usa Bear
 | `POST /api/v1/organizations/:organizationId/deactivate` | Inativa organização (plataforma) | [organizations-inativar.md](endpoints/organizations-inativar.md) |
 | `POST /api/v1/organizations/:organizationId/reactivate` | Reativa organização (plataforma) | [organizations-reativar.md](endpoints/organizations-reativar.md) |
 | `GET /api/v1/access-profiles` | Lista os perfis de acesso da organização e suas permissões | [access-profiles-listar.md](endpoints/access-profiles-listar.md) |
-| `POST /api/v1/users` | Cadastra usuário pendente e devolve a senha provisória do convite | [users-criar.md](endpoints/users-criar.md) |
+| `POST /api/v1/users` | Cadastra usuário pendente e envia o convite (link por e-mail ou senha provisória) | [users-criar.md](endpoints/users-criar.md) |
 | `GET /api/v1/users` | Lista os usuários da organização | [users-listar.md](endpoints/users-listar.md) |
 | `GET /api/v1/users/:userId` | Consulta um usuário da organização | [users-consultar.md](endpoints/users-consultar.md) |
 | `PATCH /api/v1/users/:userId` | Edita nome, e-mail, CPF ou telefone | [users-atualizar.md](endpoints/users-atualizar.md) |
 | `POST /api/v1/users/:userId/deactivate` | Inativa o usuário e revoga o acesso | [users-inativar.md](endpoints/users-inativar.md) |
 | `POST /api/v1/users/:userId/reactivate` | Reativa o usuário, respeitando o limite do plano | [users-reativar.md](endpoints/users-reativar.md) |
-| `POST /api/v1/users/:userId/invitation` | Reemite o convite de usuário pendente | [users-reemitir-convite.md](endpoints/users-reemitir-convite.md) |
+| `POST /api/v1/users/:userId/invitation` | Reemite o convite de usuário pendente, no mesmo canal ou trocando-o | [users-reemitir-convite.md](endpoints/users-reemitir-convite.md) |
 | `PATCH /api/v1/users/:userId/profile` | Troca o perfil de acesso de um usuário da organização | [users-alterar-perfil.md](endpoints/users-alterar-perfil.md) |
 | `POST /api/v1/patients` | Cadastra paciente com o profissional responsável | [patients-criar.md](endpoints/patients-criar.md) |
 | `GET /api/v1/patients` | Lista os pacientes ao alcance da sessão (ativos por padrão) | [patients-listar.md](endpoints/patients-listar.md) |
@@ -153,13 +155,20 @@ Cada requisição aceita renova a janela de inatividade da sessão normal; o pra
 
 Todo usuário de organização cliente tem um de quatro **perfis fixos**: `admin`, `professional`, `caregiver` e `family`. O catálogo de permissões e a matriz de cada perfil são consultados em [GET /access-profiles](endpoints/access-profiles-listar.md); o administrador troca o perfil de um usuário por [PATCH /users/:userId/profile](endpoints/users-alterar-perfil.md). As permissões são relidas do banco a cada requisição, então a troca vale na chamada seguinte do usuário, sem revogar a sessão.
 
-### Usuários e convite sem e-mail
+### Usuários e convite
 
-O administrador da organização gerencia os usuários do próprio tenant pelas rotas `/api/v1/users` (BE-06, 2026-11-03). Como não há SMTP, o **convite** é uma senha provisória devolvida uma única vez no [cadastro](endpoints/users-criar.md): o administrador a entrega fora da API, o usuário nasce `pending`, entra só pela sessão restrita e vira `active` ao concluir o [primeiro acesso](endpoints/auth-primeiro-acesso.md). A senha vale 24 horas; vencida ou perdida, o administrador a [reemite](endpoints/users-reemitir-convite.md), e a anterior para de valer. Usuários `pending` e `active` — o primeiro administrador incluído — contam no limite de usuários efetivo do plano (personalizado do termo de vigência, senão `usage_plans.user_limit`), verificado no cadastro e na reativação; com a vigência vencida, ambos são bloqueados. [Inativar](endpoints/users-inativar.md) revoga sessões, links de recuperação e convite na hora, sem apagar histórico; não existe exclusão.
+O administrador da organização gerencia os usuários do próprio tenant pelas rotas `/api/v1/users` (BE-06, 2026-11-03). O usuário nasce `pending` no [cadastro](endpoints/users-criar.md), e o **convite** do UC03 sai por um de dois canais (BE-31, decisões de Mateus em 2026-11-12/13). A troca entre eles é só de configuração (`SMTP_ENABLED`):
 
-Rotas públicas de autenticação: login, solicitação de recuperação e redefinição por token. Todo o resto exige Bearer, e o OpenAPI marca isso no esquema `bearer`.
+- **SMTP desligado (produção hoje): senha provisória.** A senha é devolvida uma única vez ao administrador, que a entrega fora da API. O usuário entra só pela sessão restrita e vira `active` ao concluir o [primeiro acesso](endpoints/auth-primeiro-acesso.md). Vale 24 horas. A resposta é a de antes do BE-31, com o campo `channel: "temporary_password"` a mais.
+- **SMTP ligado: link por e-mail.** O usuário nasce sem senha e recebe um link de uso único para a página de aceite do frontend (`INVITATION_ACCEPT_URL?token=…`), onde **ele mesmo** cadastra a senha. O link vale `INVITATION_TTL_HOURS` (padrão 72 h). O admin **não vê senha nenhuma**: a resposta traz `channel: "email"` e `delivery.status` (`sent` ou `failed`). Se o envio falhar, o link é revogado na hora. Com o SMTP ligado, o admin ainda pode pedir `channel: "temporary_password"`.
 
-> **Não existe SMTP configurado em nenhum ambiente** (decisão de 2026-09-22). A solicitação de recuperação responde `202` com `meta.message` orientando a procurar o administrador, mas não cria token nem envia mensagem. O canal operacional de recuperação é a [redefinição administrativa](endpoints/auth-redefinir-senha-usuario.md) (recuperação assistida, 2026-10-29): senha temporária válida por 24 horas, reemitida pelo administrador quando vence ou se perde. O envio por link passa a valer apenas quando houver servidor de e-mail.
+Vencido, perdido ou com o envio falho, o convite é [reemitido](endpoints/users-reemitir-convite.md), no mesmo canal ou trocando-o, e o anterior para de valer antes do envio. `invitation` em cada usuário mostra `channel`, `status` (`pending`, `expired` ou `invalidated`, este quando o link foi revogado), `expiresAt` e `sentAt`. O link também morre quando o e-mail do pendente [muda](endpoints/users-atualizar.md), quando o usuário é [inativado](endpoints/users-inativar.md) ou quando a organização é [inativada](endpoints/organizations-inativar.md). O primeiro administrador criado pelo master continua com senha provisória sem prazo.
+
+Usuários `pending` e `active`, o primeiro administrador incluído, contam no limite de usuários efetivo do plano (personalizado do termo de vigência, senão `usage_plans.user_limit`). O limite é verificado no cadastro e na reativação, antes de qualquer token ou envio; com a vigência vencida, os dois são bloqueados. [Inativar](endpoints/users-inativar.md) revoga sessões, links de recuperação e convite na hora, sem apagar histórico; não existe exclusão.
+
+Rotas públicas de autenticação: login, solicitação de recuperação, redefinição por token e, desde o BE-31, [consulta](endpoints/auth-convite-consultar.md) e [aceite](endpoints/auth-convite-aceitar.md) do convite por link. Todo o resto exige Bearer, e o OpenAPI marca isso no esquema `bearer`.
+
+> **Não existe SMTP configurado em nenhum ambiente** (decisão de 2026-09-22). Por isso, em produção o convite de usuário é a senha provisória. A solicitação de recuperação responde `202` com `meta.message` orientando a procurar o administrador, mas não cria token nem envia mensagem. O canal operacional de recuperação é a [redefinição administrativa](endpoints/auth-redefinir-senha-usuario.md) (recuperação assistida, 2026-10-29): senha temporária válida por 24 horas, reemitida pelo administrador quando vence ou se perde. O envio por link passa a valer apenas quando houver servidor de e-mail.
 
 A senha tem de 8 a 128 **caracteres**, aceita espaços e Unicode e não tem regra de composição. O armazenamento usa Argon2id.
 
@@ -569,6 +578,17 @@ A mesma API e os mesmos contratos atendem o frontend React/PWA em computador, ta
 **Sessão.** Faça login, guarde o token só pelo tempo da sessão e envie-o em toda rota protegida. `401` em qualquer chamada significa sessão encerrada (logout, expiração, inativação, organização inativada ou troca de senha): volte ao login. Com `data.state = password_change_required`, só [primeiro acesso](endpoints/auth-primeiro-acesso.md) e [logout](endpoints/auth-logout.md) respondem. `403` é falta de permissão do perfil; `404` cobre recurso inexistente, de outra organização ou de paciente sem vínculo, sem distinção.
 
 **Sessão do usuário como cache.** Guarde `data.session` do login junto do token e use-o para montar o menu e redirecionar ao painel do perfil (`session.profile.code`), mostrar ou esconder ações (`session.permissions`) e esconder o painel e os relatórios gerenciais no plano sem `operational_dashboard` ou `management_reports` (`session.organization.plan.features`). O CPF do login vem mascarado; a tela de dados pessoais lê [GET /profile](endpoints/profile-consultar.md), que traz o completo. Recarregue a sessão por `GET /profile` depois de [editar o próprio cadastro](endpoints/profile-atualizar.md) (ou use o `data` da própria resposta), depois de o admin trocar o seu perfil e ao receber um `403` inesperado: as permissões são relidas a cada requisição, e a lista guardada pode ter ficado velha. Depois de trocar o e-mail, o login seguinte já usa o e-mail novo; a troca de senha encerra todas as sessões e exige login de novo. A sessão restrita traz `permissions: []` e só serve para exibir nome e organização na tela de primeiro acesso.
+
+**Página de aceite do convite (BE-31).** Com o SMTP ligado, o convidado recebe por e-mail o link `INVITATION_ACCEPT_URL?token=<token>`. A página nessa URL:
+
+1. lê `token` da query string da página e não o envia em URL da API nem o grava em log, analytics ou `localStorage`;
+2. chama [POST /auth/invitations/inspect](endpoints/auth-convite-consultar.md) com `{ token }` no corpo e mostra nome, organização, perfil e validade. Um `422 AUTH_INVITATION_INVALID_OR_EXPIRED` significa link inválido, vencido, já usado ou revogado: mostre `error.message`, que orienta a pedir um novo convite ao administrador;
+3. pede a senha (8 a 128 caracteres) e a confirmação, e chama [POST /auth/invitations/accept](endpoints/auth-convite-aceitar.md) com `{ token, newPassword }`;
+4. no `200`, mostra `meta.message` e redireciona ao login com `organizationCode` e `email` da resposta já preenchidos. O aceite **não** abre sessão: o usuário entra pelo login, que devolve a sessão normal e o bloco `session`.
+
+As duas rotas são públicas e somam um limite de 30 tentativas por IP por hora (`429 AUTH_TEMPORARILY_BLOCKED`). Enquanto o acesso for por IP, sem HTTPS, o link trafega sem criptografia.
+
+**Tela de usuários (BE-31).** No cadastro e na reemissão, `data.channel` diz o que mostrar: `temporary_password` exibe a senha e `expiresAt` uma única vez; `email` exibe `meta.message`, que confirma o envio com a validade ou avisa a falha, e nunca traz senha. Trate `invitation.status = invalidated` como convite a reemitir e ofereça a opção "gerar senha provisória" (`channel: "temporary_password"`) para quem não recebe e-mail. Com o SMTP ligado, a resposta espera o servidor de e-mail; com o SMTP fora do ar, pode levar cerca de 30 s até `failed`.
 
 **Erros por campo.** `422` traz `error.fields` com `field` (campo aninhado como `pai.filho`), `code` e `message`; use-os para marcar o campo no formulário. Os demais erros trazem só `error.code` estável e `error.message` exibível. Trate pelo `code`, cite `meta.requestId` ao reportar e espere `429 RATE_LIMITED` se o limite de requisições estourar.
 

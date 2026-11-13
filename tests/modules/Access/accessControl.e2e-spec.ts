@@ -48,6 +48,8 @@ import { PasswordResetRepository } from '@/modules/Auth/repositories/passwordRes
 import { RequestPasswordRecoveryUseCase } from '@/modules/Auth/RequestPasswordRecovery/requestPasswordRecovery.useCase';
 import { ResetPasswordUseCase } from '@/modules/Auth/ResetPassword/resetPassword.useCase';
 import { ResetUserPasswordAsAdminUseCase } from '@/modules/Auth/ResetUserPasswordAsAdmin/resetUserPasswordAsAdmin.useCase';
+import { AcceptInvitationUseCase } from '@/modules/Auth/AcceptInvitation/acceptInvitation.useCase';
+import { InspectInvitationUseCase } from '@/modules/Auth/InspectInvitation/inspectInvitation.useCase';
 import { AuthRateLimiter } from '@/modules/Auth/security/authRateLimiter';
 import { PasswordHasher } from '@/modules/Auth/security/passwordHasher';
 import { TokenService } from '@/modules/Auth/security/token.service';
@@ -62,6 +64,8 @@ import { UpdateOrganizationUseCase } from '@/modules/Organization/UpdateOrganiza
 import { UserRepository } from '@/modules/User/repositories/user.repository';
 import { UserController } from '@/modules/User/user.controller';
 import { USER_USE_CASES } from '@/modules/User/user.module';
+
+import { userInvitationTestProviders } from '../User/userInvitation.testProviders';
 
 /**
  * BE-05 de ponta a ponta: `AuthGuard` e `PermissionsGuard` reais resolvendo a
@@ -330,6 +334,8 @@ describeWithDatabase('autorizacao por perfil em PostgreSQL (e2e)', () => {
         RequestPasswordRecoveryUseCase,
         ResetPasswordUseCase,
         ResetUserPasswordAsAdminUseCase,
+        InspectInvitationUseCase,
+        AcceptInvitationUseCase,
         AuthIdentityRepository,
         AuthSessionRepository,
         AuthTransactionRepository,
@@ -349,6 +355,7 @@ describeWithDatabase('autorizacao por perfil em PostgreSQL (e2e)', () => {
         AccessProfileRepository,
 
         ...USER_USE_CASES,
+        ...userInvitationTestProviders(),
         UserRepository,
 
         { provide: APP_GUARD, useClass: AuthGuard },

@@ -94,6 +94,18 @@ export class AuthRateLimiter {
     });
   }
 
+  /** Consulta e aceite do convite (BE-31): mesmo contador por IP. */
+  async assertInvitationAllowed(ip: string): Promise<void> {
+    const ttl = this.config.getOrThrow<number>('auth.invitationWindowSeconds');
+    const limit = this.config.getOrThrow<number>('auth.invitationMaxPerIp');
+    const key = this.key('invitation-ip', ip);
+
+    await this.guardDependency(async () => {
+      await this.assertUnderLimit(key, limit, 'tentativas de convite');
+      await this.redis.incrementWithTtl(key, ttl);
+    });
+  }
+
   private async assertUnderLimit(
     key: string,
     limit: number,

@@ -16,6 +16,10 @@ import { setupApp } from '@/app.setup';
 import { runPlatformSeed } from '@/database/seeds/platformSeed';
 import { buildDataSourceOptions } from '@/database/typeorm.options';
 import { PasswordHasher } from '@/modules/Auth/security/passwordHasher';
+import {
+  EMAIL_SENDER,
+  type EmailSender,
+} from '@/modules/Notification/channels/emailSender';
 
 /**
  * A API inteira (BE-24): `AppModule` sem nenhum provider trocado, sobre um
@@ -92,6 +96,8 @@ const applyEnvironment = (
     THROTTLE_TTL_MS: '60000',
     THROTTLE_LIMIT: '100000',
     SMTP_ENABLED: 'false',
+    INVITATION_ACCEPT_URL: `${CORS_ORIGIN}/aceitar-convite`,
+    INVITATION_TTL_HOURS: '72',
     WEB_PUSH_ENABLED: 'false',
     NOTIFICATION_APP_URL: '',
     DB_HOST: database.hostname,
@@ -140,9 +146,15 @@ export const migrationFiles = (): string[] =>
     .filter((file) => file.endsWith('.ts'))
     .sort();
 
+export interface FullAppOptions {
+  /** Porta SMTP falsa (BE-31): troca o `EMAIL_SENDER` de todos os modulos. */
+  emailSender?: EmailSender;
+}
+
 export const bootFullApp = async (
   databaseUrl: string,
   redisUrl: string,
+  options: FullAppOptions = {},
 ): Promise<FullApp> => {
   const database = new URL(databaseUrl);
   const redis = new URL(redisUrl);
@@ -174,9 +186,13 @@ export const bootFullApp = async (
 
   // O ConfigModule le o ambiente quando o modulo e importado.
   const { AppModule } = await import('@/app.module');
-  const moduleRef = await Test.createTestingModule({
-    imports: [AppModule],
-  }).compile();
+  const builder = Test.createTestingModule({ imports: [AppModule] });
+
+  if (options.emailSender) {
+    builder.overrideProvider(EMAIL_SENDER).useValue(options.emailSender);
+  }
+
+  const moduleRef = await builder.compile();
   const app = moduleRef.createNestApplication<NestExpressApplication>({
     logger: false,
   });

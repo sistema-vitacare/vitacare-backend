@@ -86,8 +86,10 @@ services:
       THROTTLE_LIMIT: ${THROTTLE_LIMIT:-120}
 
       # --- E-mail: decisão de 2026-09-22, não existe SMTP no projeto. Ligado,
-      # serve à recuperação de senha, aos e-mails de alerta (BE-17) e ao aviso
-      # de vencimento do plano (BE-28), sem mudança de código.
+      # serve à recuperação de senha, aos e-mails de alerta (BE-17), ao aviso
+      # de vencimento do plano (BE-28) e ao convite por link (BE-31), sem
+      # mudança de código. Ligado, exige PASSWORD_RESET_URL e
+      # INVITATION_ACCEPT_URL; desligado, o convite é a senha provisória.
       SMTP_ENABLED: ${SMTP_ENABLED:-false}
       SMTP_HOST: ${SMTP_HOST:-}
       SMTP_PORT: ${SMTP_PORT:-587}
@@ -96,6 +98,8 @@ services:
       SMTP_PASSWORD: ${SMTP_PASSWORD:-}
       SMTP_FROM: ${SMTP_FROM:-}
       PASSWORD_RESET_URL: ${PASSWORD_RESET_URL:-}
+      INVITATION_ACCEPT_URL: ${INVITATION_ACCEPT_URL:-}
+      INVITATION_TTL_HOURS: ${INVITATION_TTL_HOURS:-72}
 
       # --- Push do navegador (BE-17). Chaves VAPID de
       # `npx web-push generate-vapid-keys`; a privada é segredo.

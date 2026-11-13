@@ -1,45 +1,44 @@
 import { Injectable } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 
 import type { RequestContext } from '@/common/context/requestContext.type';
 import { DomainException } from '@/common/errors/domain.exception';
+import { type EnvelopePayload, withMeta } from '@/common/http/envelope';
 import { AuthErrors } from '@/modules/Auth/auth.errors';
-import { PasswordHasher } from '@/modules/Auth/security/passwordHasher';
-import { generateTemporaryPassword } from '@/modules/Auth/security/temporaryPassword';
 
 import type { UserInvitationResponseDto } from '../dtos/user.dto';
 import { UserRepository } from '../repositories/user.repository';
+import { InvitationIssuer } from '../services/invitationIssuer.service';
+import type { InvitationChannel } from '../types/user.types';
 import { UserErrors } from '../user.errors';
 
 /**
  * Reenvio do convite: so para quem ainda esta `pending`, vencido ou nao. Cada
- * emissao troca a senha provisoria e o prazo, entao a anterior para de valer.
+ * emissao invalida a anterior (senha provisoria ou link) antes do envio e pode
+ * trocar o canal (BE-31).
  */
 @Injectable()
 export class ReissueUserInvitationUseCase {
   constructor(
     private readonly users: UserRepository,
-    private readonly passwords: PasswordHasher,
-    private readonly config: ConfigService,
+    private readonly issuer: InvitationIssuer,
   ) {}
 
   async execute(
     userId: string,
+    channel: InvitationChannel | undefined,
     ctx: RequestContext,
-  ): Promise<UserInvitationResponseDto> {
-    const temporaryPassword = generateTemporaryPassword();
-    const expiresAt = new Date(
-      Date.now() +
-        this.config.getOrThrow<number>('auth.temporaryPasswordSeconds') * 1000,
-    );
-
-    const outcome = await this.users.reissueInvitation({
+  ): Promise<EnvelopePayload<UserInvitationResponseDto>> {
+    const issued = await this.issuer.issue(channel);
+    const actor = {
       organizationId: ctx.organizationId,
       actorUserId: ctx.userId,
       requestId: ctx.requestId,
+    };
+
+    const outcome = await this.users.reissueInvitation({
+      ...actor,
       targetUserId: userId,
-      passwordHash: await this.passwords.hash(temporaryPassword),
-      expiresAt,
+      invitation: issued.invitation,
     });
 
     switch (outcome.kind) {
@@ -67,8 +66,15 @@ export class ReissueUserInvitationUseCase {
           detail: 'O ator deixou de ser administrador ativo antes do reenvio.',
         });
 
-      default:
-        return { temporaryPassword, expiresAt: expiresAt.toISOString() };
+      default: {
+        const { response, message } = await this.issuer.complete(
+          issued,
+          outcome.mail,
+          actor,
+        );
+
+        return withMeta(response, message ? { message } : {});
+      }
     }
   }
 }

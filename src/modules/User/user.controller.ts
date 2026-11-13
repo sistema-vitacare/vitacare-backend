@@ -10,7 +10,7 @@ import {
   Query,
   Res,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiBody, ApiOperation, ApiTags } from '@nestjs/swagger';
 import type { Response } from 'express';
 
 import { CurrentContext } from '@/common/context/currentContext.decorator';
@@ -39,6 +39,7 @@ import { GetUserUseCase } from './GetUser/getUser.useCase';
 import { ListUsersQueryDto } from './ListUsers/listUsers.dto';
 import { ListUsersUseCase } from './ListUsers/listUsers.useCase';
 import { ReactivateUserUseCase } from './ReactivateUser/reactivateUser.useCase';
+import { ReissueUserInvitationDto } from './ReissueUserInvitation/reissueUserInvitation.dto';
 import { ReissueUserInvitationUseCase } from './ReissueUserInvitation/reissueUserInvitation.useCase';
 import { UpdateUserDto } from './UpdateUser/updateUser.dto';
 import { UpdateUserUseCase } from './UpdateUser/updateUser.useCase';
@@ -47,6 +48,10 @@ const UNAUTHENTICATED = { status: 401, codes: ['AUTH_UNAUTHENTICATED'] };
 const FORBIDDEN = { status: 403, codes: ['AUTH_FORBIDDEN'] };
 const NOT_FOUND = { status: 404, codes: ['USER_NOT_FOUND'] };
 const VALIDATION = { status: 422, codes: ['VALIDATION_FAILED'] };
+const INVITATION_VALIDATION = {
+  status: 422,
+  codes: ['VALIDATION_FAILED', 'USER_INVITATION_EMAIL_UNAVAILABLE'],
+};
 const DUPLICATE = {
   status: 409,
   codes: ['USER_DUPLICATE_EMAIL', 'USER_DUPLICATE_CPF'],
@@ -71,7 +76,7 @@ export class UserController {
   @RequirePermissions(Permissions.USERS_CREATE)
   @ApiOperation({
     summary:
-      'Cadastra um usuario pendente na organizacao da sessao e devolve a senha provisoria do convite.',
+      'Cadastra um usuario pendente e envia o convite: link por e-mail (SMTP ligado) ou senha provisoria devolvida uma vez ao administrador.',
   })
   @ApiEnvelope(CreateUserResponseDto, { status: HttpStatus.CREATED })
   @ApiErrors(
@@ -85,13 +90,13 @@ export class UserController {
         'USER_PLAN_EXPIRED',
       ],
     },
-    VALIDATION,
+    INVITATION_VALIDATION,
   )
   async create(
     @Body() body: CreateUserDto,
     @CurrentContext() ctx: RequestContext,
     @Res({ passthrough: true }) response: Response,
-  ): Promise<CreateUserResponseDto> {
+  ): Promise<EnvelopePayload<CreateUserResponseDto>> {
     response.setHeader('Cache-Control', 'no-store');
 
     return this.createUser.execute(body, ctx);
@@ -199,8 +204,9 @@ export class UserController {
   @RequirePermissions(Permissions.USERS_CREATE)
   @ApiOperation({
     summary:
-      'Reemite o convite de um usuario pendente: nova senha provisoria de 24 h, a anterior deixa de valer.',
+      'Reemite o convite de um usuario pendente por link (e-mail) ou senha provisoria; o convite anterior deixa de valer antes do envio.',
   })
+  @ApiBody({ type: ReissueUserInvitationDto, required: false })
   @ApiEnvelope(UserInvitationResponseDto, { status: HttpStatus.CREATED })
   @ApiErrors(
     UNAUTHENTICATED,
@@ -210,16 +216,17 @@ export class UserController {
       status: 409,
       codes: ['USER_INVITATION_ALREADY_ACCEPTED', 'USER_INACTIVE'],
     },
-    VALIDATION,
+    INVITATION_VALIDATION,
   )
   async reissueInvitation(
     @Param('userId', UuidParam('userId')) userId: string,
+    @Body() body: ReissueUserInvitationDto,
     @CurrentContext() ctx: RequestContext,
     @Res({ passthrough: true }) response: Response,
-  ): Promise<UserInvitationResponseDto> {
+  ): Promise<EnvelopePayload<UserInvitationResponseDto>> {
     response.setHeader('Cache-Control', 'no-store');
 
-    return this.reissueUserInvitation.execute(userId, ctx);
+    return this.reissueUserInvitation.execute(userId, body?.channel, ctx);
   }
 
   @Patch(':userId/profile')

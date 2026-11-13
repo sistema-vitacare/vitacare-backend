@@ -1,7 +1,7 @@
 ---
 title: Listar usuários
 status: atual
-updated: 2026-11-03
+updated: 2026-11-13
 method: GET
 path: /api/v1/users
 source: src/modules/User/user.controller.ts
@@ -64,8 +64,10 @@ curl -i 'https://api.example.com/api/v1/users?status=pending&search=ana&page=1&l
         "name": "Cuidador"
       },
       "invitation": {
+        "channel": "temporary_password",
         "status": "pending",
-        "expiresAt": "2026-11-04T12:30:00.000Z"
+        "expiresAt": "2026-11-04T12:30:00.000Z",
+        "sentAt": null
       },
       "lastAccessAt": null,
       "createdAt": "2026-11-03T12:30:00.000Z",
@@ -100,8 +102,10 @@ curl -i 'https://api.example.com/api/v1/users?status=pending&search=ana&page=1&l
 | `data[].profile.code` | texto, enum | não | `admin`, `professional`, `caregiver` ou `family`. |
 | `data[].profile.name` | texto | não | Nome do perfil para exibição. |
 | `data[].invitation` | objeto | sim | Situação do convite; `null` sempre que `status` não for `pending`. |
-| `data[].invitation.status` | texto, enum | não | `pending` enquanto a senha provisória vale; `expired` depois do prazo (reemitir o convite). |
-| `data[].invitation.expiresAt` | texto ISO 8601 (UTC) | não | Fim da validade da senha provisória do convite. |
+| `data[].invitation.channel` | texto, enum | não | `email` (link enviado ao usuário, BE-31) ou `temporary_password` (senha provisória entregue pelo admin). |
+| `data[].invitation.status` | texto, enum | não | `pending` enquanto o convite vale; `expired` depois do prazo; `invalidated` (só `email`) quando o link foi revogado, porque o envio falhou ou o e-mail mudou. Em `expired` e `invalidated`, reemitir o convite. |
+| `data[].invitation.expiresAt` | texto ISO 8601 (UTC) | não | Fim da validade do convite: senha provisória (24 h) ou link mais recente (padrão 72 h). |
+| `data[].invitation.sentAt` | texto ISO 8601 (UTC) | sim | Quando o SMTP aceitou o e-mail do convite; `null` no canal `temporary_password` ou se o envio não saiu. |
 | `data[].lastAccessAt` | texto ISO 8601 (UTC) | sim | Último login aceito (inclusive o de primeiro acesso); `null` se nunca entrou. |
 | `data[].createdAt` | texto ISO 8601 (UTC) | não | Cadastro. |
 | `data[].updatedAt` | texto ISO 8601 (UTC) | não | Última alteração do registro. |
@@ -194,3 +198,5 @@ O CPF sai **mascarado** na listagem (minimização: a lista mostra só os seis d
 ## Origem e validação
 
 Controller `src/modules/User/user.controller.ts`; caso de uso `src/modules/User/ListUsers/listUsers.useCase.ts` e `ListUsers/listUsers.dto.ts`; DTO de resposta `src/modules/User/dtos/user.dto.ts`; parser `src/modules/User/parsers/user.parser.ts`; transação/consulta `src/modules/User/repositories/user.repository.ts`; erros `src/modules/User/user.errors.ts`. Testes: `tests/modules/User/listUsers.useCase.spec.ts` (regras do caso de uso), `tests/modules/User/user.e2e-spec.ts` (HTTP com guard dublê: 403 para os três perfis não admin e o master sem tocar o repositório, contrato OpenAPI com Bearer, envelope e erros) e `tests/modules/User/userManagement.e2e-spec.ts` (PostgreSQL descartável com `AuthGuard` e `PermissionsGuard` reais e duas organizações). Conferido contra o OpenAPI gerado (`/api/docs-json`, tag `users`) em 2026-11-03. Spec `docs/superpowers/specs/2026-11-03-be-06-usuarios-convite-design.md`. Vault: [[2026-10-29-be-06-users]] e [[2026-11-03-usuarios-e-convite-por-senha-provisoria]]. No e2e real: o usuário de uma organização não aparece na listagem da outra; busca por `%` não casa com todos.
+
+Desde o BE-31 (2026-11-13), `invitation` ganhou `channel`, `sentAt` e o status `invalidated`; o frontend deve tratar `invalidated` como convite a reemitir. Vault: [[2026-11-12-convite-por-email]].

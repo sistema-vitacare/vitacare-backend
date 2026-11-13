@@ -1,7 +1,7 @@
 ---
 title: Inativar organização
 status: atual
-updated: 2026-09-22
+updated: 2026-11-13
 method: POST
 path: /api/v1/organizations/{organizationId}/deactivate
 source: src/modules/Organization/organization.controller.ts
@@ -80,7 +80,7 @@ curl -i -X POST 'https://api.example.com/api/v1/organizations/7c1e2d3f-4a5b-4c6d
 Efeitos, na mesma transação:
 
 - `status = 'inactive'` e `deletedAt` preenchido, a partir do estado `active` lido — duas chamadas simultâneas não inativam duas vezes;
-- revoga todas as sessões abertas dos usuários da organização (`revoked_reason = 'organization_deactivated'`) e todos os links de recuperação pendentes;
+- revoga todas as sessões abertas dos usuários da organização (`revoked_reason = 'organization_deactivated'`), todos os links de recuperação pendentes e, desde o BE-31, todos os **convites por link** ainda vivos (`user_invitations.revoked_reason = 'organization_deactivated'`). Reativar a organização não restaura os convites: o admin os [reemite](users-reemitir-convite.md);
 - grava `organization.deactivated` na organização inativada (sistema, com `platformActorUserId`) e na de plataforma (master como autor).
 
 **Preservado:** cadastro, usuários, perfis, permissões e histórico. O status dos usuários **não** muda. Mesmo sem a revogação, o guard recusa sessão de organização inativa e o login responde `401 AUTH_INVALID_CREDENTIALS`.
@@ -139,3 +139,5 @@ Retenção, exclusão definitiva e o efeito da inativação sobre pacientes, job
 ## Origem e validação
 
 Controller `src/modules/Organization/organization.controller.ts`; caso de uso `src/modules/Organization/DeactivateOrganization/deactivateOrganization.useCase.ts`. Repositório `src/modules/Organization/repositories/organization.repository.ts`; parser `src/modules/Organization/parsers/organization.parser.ts`; política `src/modules/Organization/policies/organization.policy.ts`; permissões `src/modules/Access/access.permissions.ts`; migration `src/database/migrations/1790100000000-AddOrganizationKind.ts`. Testes: `tests/modules/Organization/changeOrganizationStatus.useCase.spec.ts`, `tests/modules/Organization/organization.e2e-spec.ts` e `tests/modules/Organization/organizationSchema.e2e-spec.ts` (sessão derrubada na hora, motivo de revogação, usuários preservados, 409 repetido, login recusado, plataforma protegida). Conferido contra o OpenAPI gerado e contra a API rodando sobre PostgreSQL descartável em 2026-09-22. Vault: [[2026-09-22-organizacoes-e-administracao-da-plataforma]] e [[2026-09-22-modulo-organizations]].
+
+BE-31: revogação dos convites por link testada em `tests/modules/User/userInvitation.e2e-spec.ts` (link `422` depois de inativar e depois de reativar a organização). Vault: [[2026-11-12-convite-por-email]].

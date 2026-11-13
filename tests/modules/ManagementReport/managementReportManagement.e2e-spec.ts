@@ -782,6 +782,7 @@ describeWithDatabase('relatorios gerenciais (e2e)', () => {
           ORDER BY o.code, ap.code`,
       );
 
+    await t.dataSource.undoLastMigration(); // CreateUserInvitations (BE-31), que vem depois
     await t.dataSource.undoLastMigration();
 
     try {

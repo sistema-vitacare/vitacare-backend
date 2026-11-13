@@ -23,6 +23,8 @@ import { RequestPasswordRecoveryUseCase } from '@/modules/Auth/RequestPasswordRe
 import { ResetPasswordUseCase } from '@/modules/Auth/ResetPassword/resetPassword.useCase';
 import { ResetUserPasswordAsAdminUseCase } from '@/modules/Auth/ResetUserPasswordAsAdmin/resetUserPasswordAsAdmin.useCase';
 import type { AuthenticatedRequest } from '@/modules/Auth/types/authenticatedRequest.type';
+import { AcceptInvitationUseCase } from '@/modules/Auth/AcceptInvitation/acceptInvitation.useCase';
+import { InspectInvitationUseCase } from '@/modules/Auth/InspectInvitation/inspectInvitation.useCase';
 
 interface EnvelopeBody<T> {
   data: T;
@@ -117,6 +119,8 @@ describe('Auth HTTP (e2e)', () => {
         { provide: RequestPasswordRecoveryUseCase, useValue: requestRecovery },
         { provide: ResetPasswordUseCase, useValue: resetPassword },
         { provide: ResetUserPasswordAsAdminUseCase, useValue: adminReset },
+        { provide: InspectInvitationUseCase, useValue: { execute: jest.fn() } },
+        { provide: AcceptInvitationUseCase, useValue: { execute: jest.fn() } },
         { provide: APP_GUARD, useClass: StubAuthGuard },
       ],
     }).compile();

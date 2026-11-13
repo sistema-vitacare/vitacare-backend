@@ -1,7 +1,7 @@
 ---
 title: Editar usuário
 status: atual
-updated: 2026-11-12
+updated: 2026-11-13
 method: PATCH
 path: /api/v1/users/{userId}
 source: src/modules/User/user.controller.ts
@@ -109,6 +109,10 @@ Nunca saem hash ou prazo bruto da senha, troca obrigatória, identificadores int
 - Compara com os valores atuais (e-mail sem diferenciar maiúsculas) e grava só os campos diferentes, com `updated_at`.
 - Duplicidade com outro usuário da organização, inclusive inativo → `409 USER_DUPLICATE_EMAIL` / `USER_DUPLICATE_CPF`.
 - Trocar o e-mail **não** revoga sessões: a sessão é do token, não do e-mail. O próximo login usa o e-mail novo.
+- Trocar o e-mail (BE-31, 2026-11-13), na mesma transação:
+  - **revoga o convite por link** ainda vivo do pendente (`user_invitations.revoked_reason = email_changed`), porque o link foi para o endereço antigo. O convite **não** é reenviado sozinho: `invitation.status` passa a `invalidated` e o admin [reemite](users-reemitir-convite.md);
+  - **apaga os links de recuperação de senha** pendentes do usuário, como faz o [PATCH /profile](profile-atualizar.md). Antes do BE-31, esta rota não os apagava.
+- Editar outros campos não mexe no convite.
 - Auditoria `user.updated` com `after_values = { "fields": ["name", "email", "phone"] }` — só os **nomes** dos campos alterados, nunca valores.
 
 ## Erros
@@ -187,3 +191,5 @@ Nunca saem hash ou prazo bruto da senha, troca obrigatória, identificadores int
 ## Origem e validação
 
 Controller `src/modules/User/user.controller.ts`; caso de uso `src/modules/User/UpdateUser/updateUser.useCase.ts` e `UpdateUser/updateUser.dto.ts`; DTO de resposta `src/modules/User/dtos/user.dto.ts`; parser `src/modules/User/parsers/user.parser.ts`; transação/consulta `src/modules/User/repositories/user.repository.ts`; erros `src/modules/User/user.errors.ts`. Testes: `tests/modules/User/updateUser.useCase.spec.ts` (regras do caso de uso), `tests/modules/User/user.e2e-spec.ts` (HTTP com guard dublê: 403 para os três perfis não admin e o master sem tocar o repositório, contrato OpenAPI com Bearer, envelope e erros) e `tests/modules/User/userManagement.e2e-spec.ts` (PostgreSQL descartável com `AuthGuard` e `PermissionsGuard` reais e duas organizações). Conferido contra o OpenAPI gerado (`/api/docs-json`, tag `users`) em 2026-11-03. Spec `docs/superpowers/specs/2026-11-03-be-06-usuarios-convite-design.md`. Vault: [[2026-10-29-be-06-users]] e [[2026-11-03-usuarios-e-convite-por-senha-provisoria]]. No e2e real: edição grava e-mail em minúsculas, repetição sem mudança não audita, auditoria só com `fields`, e-mail de outro usuário → `409`, alvo de outra organização → `404`.
+
+BE-31: revogação do convite e dos links de recuperação na troca de e-mail em `tests/modules/User/userInvitation.e2e-spec.ts` (API inteira, PostgreSQL e Redis reais). Vault: [[2026-11-12-convite-por-email]].

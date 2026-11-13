@@ -2,11 +2,13 @@ import { Global, Module, type Provider } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { APP_GUARD } from '@nestjs/core';
 
+import { AcceptInvitationUseCase } from './AcceptInvitation/acceptInvitation.useCase';
 import { AuthController } from './auth.controller';
 import { ChangePasswordUseCase } from './ChangePassword/changePassword.useCase';
 import { CompleteFirstAccessUseCase } from './CompleteFirstAccess/completeFirstAccess.useCase';
 import { AuthGuard } from './guards/auth.guard';
 import { PermissionsGuard } from './guards/permissions.guard';
+import { InspectInvitationUseCase } from './InspectInvitation/inspectInvitation.useCase';
 import { LoginUseCase } from './Login/login.useCase';
 import { LogoutUseCase } from './Logout/logout.useCase';
 import { DisabledPasswordRecoveryMailer } from './mail/disabledPasswordRecovery.mailer';
@@ -19,6 +21,7 @@ import { AuthIdentityRepository } from './repositories/authIdentity.repository';
 import { AuthSessionRepository } from './repositories/authSession.repository';
 import { AuthTransactionRepository } from './repositories/authTransaction.repository';
 import { PasswordResetRepository } from './repositories/passwordReset.repository';
+import { UserInvitationRepository } from './repositories/userInvitation.repository';
 import { RequestPasswordRecoveryUseCase } from './RequestPasswordRecovery/requestPasswordRecovery.useCase';
 import { ResetPasswordUseCase } from './ResetPassword/resetPassword.useCase';
 import { ResetUserPasswordAsAdminUseCase } from './ResetUserPasswordAsAdmin/resetUserPasswordAsAdmin.useCase';
@@ -61,11 +64,14 @@ export const passwordRecoveryMailerProviders: Provider[] = [
     RequestPasswordRecoveryUseCase,
     ResetPasswordUseCase,
     ResetUserPasswordAsAdminUseCase,
+    InspectInvitationUseCase,
+    AcceptInvitationUseCase,
 
     AuthIdentityRepository,
     AuthSessionRepository,
     AuthTransactionRepository,
     PasswordResetRepository,
+    UserInvitationRepository,
 
     ...passwordRecoveryMailerProviders,
 
@@ -82,6 +88,7 @@ export const passwordRecoveryMailerProviders: Provider[] = [
     AuthSessionRepository,
     PasswordHasher,
     TokenService,
+    UserInvitationRepository,
   ],
 })
 export class AuthModule {}

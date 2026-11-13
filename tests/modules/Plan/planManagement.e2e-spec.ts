@@ -23,6 +23,7 @@ import { AddPlanTermsAndChangeRequests1790500000000 } from '@/database/migration
 import { ApplyPlanCatalogRules1790600000000 } from '@/database/migrations/1790600000000-ApplyPlanCatalogRules';
 import { CreatePatients1790700000000 } from '@/database/migrations/1790700000000-CreatePatients';
 import { AuditEventQuery1791700000000 } from '@/database/migrations/1791700000000-AuditEventQuery';
+import { CreateUserInvitations1792100000000 } from '@/database/migrations/1792100000000-CreateUserInvitations';
 import { runPlatformSeed } from '@/database/seeds/platformSeed';
 import { SnakeNamingStrategy } from '@/database/snakeNaming.strategy';
 import { AuthGuard } from '@/modules/Auth/guards/auth.guard';
@@ -44,6 +45,8 @@ import { UserRepository } from '@/modules/User/repositories/user.repository';
 import { UserController } from '@/modules/User/user.controller';
 import { USER_USE_CASES } from '@/modules/User/user.module';
 
+import { userInvitationTestProviders } from '../User/userInvitation.testProviders';
+
 /**
  * BE-07 de ponta a ponta: guards reais em PostgreSQL descartavel, catalogo da
  * migration, duas organizacoes clientes (A e B) e o master da plataforma.
@@ -62,10 +65,11 @@ const MIGRATIONS = [
   ApplyPlanCatalogRules1790600000000,
   CreatePatients1790700000000,
   AuditEventQuery1791700000000,
+  CreateUserInvitations1792100000000,
 ];
 
 const TRUNCATE_ALL =
-  'TRUNCATE user_patients, patients, organization_plan_terms, plan_change_requests, audit_events, auth_sessions, password_reset_tokens, users, profile_permissions, permissions, access_profiles, organizations, usage_plans';
+  'TRUNCATE user_invitations, user_patients, patients, organization_plan_terms, plan_change_requests, audit_events, auth_sessions, password_reset_tokens, users, profile_permissions, permissions, access_profiles, organizations, usage_plans';
 
 const SETTINGS: Record<string, number> = {
   'auth.sessionIdleSeconds': 1800,
@@ -369,6 +373,7 @@ describeWithDatabase('planos de uso em PostgreSQL (e2e)', () => {
         OrganizationRepository,
 
         ...USER_USE_CASES,
+        ...userInvitationTestProviders(),
         UserRepository,
 
         ...PLAN_USE_CASES,
@@ -1234,7 +1239,8 @@ describeWithDatabase('planos de uso em PostgreSQL (e2e)', () => {
 
   describe('migration', () => {
     it('reverte as regras do Quadro 2 sem perder planos nem termos', async () => {
-      await dataSource.undoLastMigration(); // AuditEventQuery (BE-23), a ultima
+      await dataSource.undoLastMigration(); // CreateUserInvitations (BE-31), a ultima
+      await dataSource.undoLastMigration(); // AuditEventQuery (BE-23)
       await dataSource.undoLastMigration(); // CreatePatients, que vem depois
       await dataSource.undoLastMigration();
 
@@ -1260,6 +1266,7 @@ describeWithDatabase('planos de uso em PostgreSQL (e2e)', () => {
     });
 
     it('reverte e reaplica com dados, mantendo o plano do catalogo em uso', async () => {
+      await dataSource.undoLastMigration(); // CreateUserInvitations (BE-31)
       await dataSource.undoLastMigration(); // AuditEventQuery (BE-23)
       await dataSource.undoLastMigration(); // CreatePatients
       await dataSource.undoLastMigration();

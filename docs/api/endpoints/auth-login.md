@@ -1,7 +1,7 @@
 ---
 title: Login em uma organização
 status: atual
-updated: 2026-11-12
+updated: 2026-11-13
 method: POST
 path: /api/v1/auth/login
 source: src/modules/Auth/auth.controller.ts
@@ -16,7 +16,7 @@ Autentica um usuário dentro de **uma** organização e devolve o token de sess�
 A resposta diz em qual estado a sessão nasceu:
 
 - `authenticated`: sessão normal, válida por 12 horas absolutas e 30 minutos sem atividade. Cada requisição aceita renova a janela de inatividade.
-- `password_change_required`: sessão **restrita**, válida por 10 minutos, que só alcança [primeiro acesso](auth-primeiro-acesso.md) e [logout](auth-logout.md). Ela aparece quando o usuário tem troca obrigatória pendente (master criado por `npm run seed:platform`, administrador criado com a organização, senha redefinida por administrador ou **usuário convidado**). O convidado cadastrado por [POST /users](users-criar.md) tem status `pending` e entra **só** por esta sessão, com a senha provisória do convite dentro de 24 h; ele nunca recebe sessão normal antes de concluir o [primeiro acesso](auth-primeiro-acesso.md) (BE-06, 2026-11-03).
+- `password_change_required`: sessão **restrita**, válida por 10 minutos, que só alcança [primeiro acesso](auth-primeiro-acesso.md) e [logout](auth-logout.md). Ela aparece quando o usuário tem troca obrigatória pendente (master criado por `npm run seed:platform`, administrador criado com a organização, senha redefinida por administrador ou **usuário convidado**). O convidado cadastrado por [POST /users](users-criar.md) tem status `pending` e entra **só** por esta sessão, com a senha provisória do convite dentro de 24 h; ele nunca recebe sessão normal antes de concluir o [primeiro acesso](auth-primeiro-acesso.md) (BE-06, 2026-11-03). O convidado **por link** (canal `email`, BE-31) não tem senha até [aceitar o convite](auth-convite-aceitar.md): o login responde `401 AUTH_INVALID_CREDENTIALS`, com o mesmo tempo e a mesma resposta de qualquer credencial inválida. Depois do aceite, ele é `active` e entra direto com sessão normal, sem primeiro acesso.
 
 Desde o BE-27 (decisão de Mateus em 2026-11-12) a resposta também traz `data.session`: quem é o usuário, o perfil, as permissões efetivas e a organização. É o que o frontend usa para montar menus e redirecionar ao painel do perfil (UC01, passo 6). O bloco tem o mesmo formato de [GET /profile](profile-consultar.md), exceto o CPF, que no login sai **mascarado**.
 
@@ -212,3 +212,5 @@ A tentativa **recusada** também é auditada, como `auth.login_failed`, desde qu
 ## Origem e validação
 
 Controller `src/modules/Auth/auth.controller.ts`; DTO `src/modules/Auth/Login/login.dto.ts`; caso de uso `src/modules/Auth/Login/login.useCase.ts`; catálogo `src/modules/Auth/auth.errors.ts`; prazos em `src/config/auth.config.ts`; migration `src/database/migrations/1790000000000-CreateAuthSchema.ts`. Testes: `tests/modules/Auth/login.useCase.spec.ts`, `tests/modules/Auth/auth.e2e-spec.ts` (envelope, `no-store`, 401 uniforme, 422, `X-Forwarded-For`) e `tests/modules/Auth/authSchema.e2e-spec.ts` (duas organizações com o mesmo e-mail e os três desfechos de auditoria da tentativa falha, em PostgreSQL real). Login do convidado pendente: `tests/modules/Auth/login.useCase.spec.ts` (pendente dentro do prazo → sessão `password_change`; vencido → 401) e `tests/modules/User/userManagement.e2e-spec.ts` (PostgreSQL real). Bloco `session` (BE-27): `src/modules/Auth/dtos/sessionProfile.dto.ts`, `src/modules/Auth/parsers/sessionProfile.parser.ts`, leitura em `AuthIdentityRepository.findSessionProfile` e permissões em `src/modules/Auth/repositories/effectivePermissions.query.ts` (a mesma do guard); testes `tests/modules/Auth/sessionProfile.parser.spec.ts`, `tests/modules/Auth/login.useCase.spec.ts` e `tests/modules/Profile/profile.e2e-spec.ts` (cinco tipos de conta, permissões iguais às que o guard aplica, CPF mascarado). Conferido contra o OpenAPI gerado em 2026-09-22; texto de convidado revisto em 2026-11-03; bloco `session` conferido em 2026-11-12. Vault: [[2026-09-21-autenticacao-sessoes-recuperacao]], [[2026-09-22-auditoria-de-acesso]], [[2026-11-03-usuarios-e-convite-por-senha-provisoria]], [[2026-11-12-sessao-no-login-e-proprio-perfil]].
+
+BE-31: login do pendente por link antes do aceite (`401`) e depois dele (`200`, `authenticated`) em `tests/modules/User/userInvitation.e2e-spec.ts` e `tests/app/homologation.e2e-spec.ts`. Vault: [[2026-11-12-convite-por-email]].

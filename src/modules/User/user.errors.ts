@@ -61,6 +61,12 @@ export const UserErrors = {
     message:
       'O usuário já está ativo. Para uma nova senha, use a redefinição de senha.',
   },
+  INVITATION_EMAIL_UNAVAILABLE: {
+    code: 'USER_INVITATION_EMAIL_UNAVAILABLE',
+    status: HttpStatus.UNPROCESSABLE_ENTITY,
+    message:
+      'O envio de convite por e-mail não está disponível. Use a senha provisória.',
+  },
   INACTIVE: {
     code: 'USER_INACTIVE',
     status: HttpStatus.CONFLICT,

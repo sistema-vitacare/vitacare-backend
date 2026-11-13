@@ -30,6 +30,8 @@ const OUTSIDE_OPENAPI = [
 const PUBLIC = [
   'GET /api/v1',
   'GET /health/ready',
+  'POST /api/v1/auth/invitations/accept',
+  'POST /api/v1/auth/invitations/inspect',
   'POST /api/v1/auth/login',
   'POST /api/v1/auth/password-recovery/request',
   'POST /api/v1/auth/password-recovery/reset',

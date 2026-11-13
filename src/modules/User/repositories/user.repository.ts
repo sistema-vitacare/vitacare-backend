@@ -9,6 +9,10 @@ import { insertAuditEvent } from '@/modules/Audit/repositories/auditEvent.reposi
 import { revokeCareLinksOnProfileChange } from '@/modules/PatientAccess/repositories/patientLink.repository';
 import { checkPlanSeat } from '@/modules/Plan/repositories/planSeat.query';
 import { revokeUserSessions } from '@/modules/Auth/repositories/authTransaction.repository';
+import {
+  insertUserInvitation,
+  revokeLiveUserInvitations,
+} from '@/modules/Auth/repositories/userInvitation.repository';
 
 import type {
   ChangeProfileCommand,
@@ -18,6 +22,8 @@ import type {
   CreateUserCommand,
   CreateUserOutcome,
   DeactivateUserOutcome,
+  InvitationIssue,
+  InvitationMailContext,
   ListUsersFilter,
   ReactivateUserOutcome,
   ReissueInvitationCommand,
@@ -59,6 +65,9 @@ const USER_SELECT = `
          p.code AS "profileCode",
          p.name AS "profileName",
          u.temporary_password_expires_at AS "temporaryPasswordExpiresAt",
+         li.expires_at AS "invitationExpiresAt",
+         li.sent_at AS "invitationSentAt",
+         li.revoked_at AS "invitationRevokedAt",
          u.last_access_at AS "lastAccessAt",
          u.created_at AS "createdAt",
          u.updated_at AS "updatedAt",
@@ -66,7 +75,16 @@ const USER_SELECT = `
     FROM users u
     JOIN access_profiles p
       ON p.id = u.profile_id
-     AND p.organization_id = u.organization_id`;
+     AND p.organization_id = u.organization_id
+    LEFT JOIN LATERAL (
+      SELECT ui.expires_at, ui.sent_at, ui.revoked_at
+        FROM user_invitations ui
+       WHERE ui.user_id = u.id
+         AND ui.organization_id = u.organization_id
+         AND ui.deleted_at IS NULL
+       ORDER BY ui.created_at DESC, ui.id DESC
+       LIMIT 1
+    ) li ON u.status = 'pending'`;
 
 const PATCH_COLUMNS: Readonly<Record<keyof UserPatch, string>> = {
   name: 'name',
@@ -191,11 +209,13 @@ export class UserRepository {
         command.profileCode,
       );
 
+      const { invitation } = command;
+      const temporary = invitation.channel === 'temporary_password';
       const [{ id }] = await manager.query<Array<{ id: string }>>(
         `INSERT INTO users
            (organization_id, profile_id, name, email, cpf, phone, password_hash,
             status, must_change_password, temporary_password_expires_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, 'pending', true, $8)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, 'pending', $8, $9)
          RETURNING id`,
         [
           command.organizationId,
@@ -204,23 +224,31 @@ export class UserRepository {
           command.email,
           command.cpf,
           command.phone,
-          command.passwordHash,
-          command.expiresAt,
+          temporary ? invitation.passwordHash : null,
+          temporary,
+          temporary ? invitation.expiresAt : null,
         ],
       );
 
+      const mail = await this.issueLinkInvitation(manager, command, id);
+
       await this.audit(manager, command, id, 'user.created', {
         profile: command.profileCode,
+        channel: invitation.channel,
       });
 
       return {
         kind: 'created',
         user: (await this.findIn(manager, command.organizationId, id))!,
+        mail,
       };
     });
   }
 
-  /** Grava so o que mudou; nada mudou nao grava nem audita. */
+  /**
+   * Grava so o que mudou; nada mudou nao grava nem audita. Trocar o e-mail
+   * revoga o convite por link e apaga os links de recuperacao (BE-31).
+   */
   async update(command: UpdateUserCommand): Promise<UpdateUserOutcome> {
     return this.write(async (manager) => {
       const current = await this.findIn(
@@ -262,6 +290,22 @@ export class UserRepository {
         ],
       );
 
+      // E-mail novo: o link de convite e os de recuperacao foram para o
+      // endereco antigo e morrem aqui; o admin reemite o convite (BE-31).
+      if (changed.includes('email')) {
+        await revokeLiveUserInvitations(manager, {
+          organizationId: command.organizationId,
+          userId: command.targetUserId,
+          reason: 'email_changed',
+        });
+        await manager.query(
+          `DELETE FROM password_reset_tokens
+            WHERE user_id = $1
+              AND organization_id = $2`,
+          [command.targetUserId, command.organizationId],
+        );
+      }
+
       await this.audit(manager, command, current.id, 'user.updated', {
         fields: changed,
       });
@@ -279,7 +323,9 @@ export class UserRepository {
 
   /**
    * Revoga o acesso na hora (sessoes, links de recuperacao e, se pendente, o
-   * convite) e preserva o resto: autoria, auditoria e registros ficam.
+   * convite: a senha provisoria vence e o link e revogado) e preserva o resto:
+   * autoria, auditoria e registros ficam. So o modo senha provisoria tem prazo
+   * a vencer; o pendente por link nao tem (`users_temporary_password_expiry_check`).
    */
   async deactivate(command: TargetUserCommand): Promise<DeactivateUserOutcome> {
     return this.write(async (manager) => {
@@ -294,7 +340,7 @@ export class UserRepository {
             SET status = 'inactive',
                 deleted_at = now(),
                 temporary_password_expires_at = CASE
-                  WHEN status = 'pending' THEN now()
+                  WHEN status = 'pending' AND must_change_password THEN now()
                   ELSE temporary_password_expires_at
                 END,
                 updated_at = now()
@@ -316,6 +362,12 @@ export class UserRepository {
             AND organization_id = $2`,
         [command.targetUserId, command.organizationId],
       );
+
+      await revokeLiveUserInvitations(manager, {
+        organizationId: command.organizationId,
+        userId: command.targetUserId,
+        reason: 'user_deactivated',
+      });
 
       await this.audit(
         manager,
@@ -396,18 +448,31 @@ export class UserRepository {
       if (target === 'active') return { kind: 'already_accepted' };
       if (target === 'inactive') return { kind: 'inactive' };
 
+      const { invitation } = command;
+      const temporary = invitation.channel === 'temporary_password';
+
+      // O link vivo morre antes de qualquer envio: se o novo falhar, nao sobra
+      // link valido nenhum.
+      await revokeLiveUserInvitations(manager, {
+        organizationId: command.organizationId,
+        userId: command.targetUserId,
+        reason: temporary ? 'channel_changed' : 'reissued',
+      });
+
       await manager.query(
         `UPDATE users
             SET password_hash = $3,
-                temporary_password_expires_at = $4,
+                must_change_password = $4,
+                temporary_password_expires_at = $5,
                 updated_at = now()
           WHERE organization_id = $1
             AND id = $2`,
         [
           command.organizationId,
           command.targetUserId,
-          command.passwordHash,
-          command.expiresAt,
+          temporary ? invitation.passwordHash : null,
+          temporary,
+          temporary ? invitation.expiresAt : null,
         ],
       );
 
@@ -418,15 +483,21 @@ export class UserRepository {
         'invitation_reissued',
       );
 
+      const mail = await this.issueLinkInvitation(
+        manager,
+        command,
+        command.targetUserId,
+      );
+
       await this.audit(
         manager,
         command,
         command.targetUserId,
         'user.invitation_reissued',
-        null,
+        { channel: invitation.channel },
       );
 
-      return { kind: 'reissued' };
+      return { kind: 'reissued', mail };
     });
   }
 
@@ -508,6 +579,52 @@ export class UserRepository {
         },
       };
     });
+  }
+
+  /**
+   * No canal `email`, grava o convite e le o que o e-mail precisa, na mesma
+   * transacao. No canal `temporary_password` nao ha convite por link.
+   */
+  private async issueLinkInvitation(
+    manager: EntityManager,
+    command: UserActor & { invitation: InvitationIssue },
+    userId: string,
+  ): Promise<InvitationMailContext | null> {
+    const { invitation } = command;
+
+    if (invitation.channel !== 'email') return null;
+
+    const invitationId = await insertUserInvitation(manager, {
+      organizationId: command.organizationId,
+      userId,
+      invitedByUserId: command.actorUserId,
+      tokenHash: invitation.tokenHash,
+      expiresAt: invitation.expiresAt,
+    });
+
+    const [context] = await manager.query<
+      Array<Omit<InvitationMailContext, 'invitationId' | 'userId'>>
+    >(
+      `SELECT u.name AS "userName",
+              u.email::text AS email,
+              o.trade_name AS "organizationName",
+              o.code AS "organizationCode",
+              p.name AS "profileName",
+              actor.name AS "inviterName"
+         FROM users u
+         JOIN organizations o ON o.id = u.organization_id
+         JOIN access_profiles p
+           ON p.id = u.profile_id
+          AND p.organization_id = u.organization_id
+         JOIN users actor
+           ON actor.id = $3
+          AND actor.organization_id = u.organization_id
+        WHERE u.organization_id = $1
+          AND u.id = $2`,
+      [command.organizationId, userId, command.actorUserId],
+    );
+
+    return { invitationId, userId, ...context };
   }
 
   private async write<T>(work: (manager: EntityManager) => Promise<T>) {

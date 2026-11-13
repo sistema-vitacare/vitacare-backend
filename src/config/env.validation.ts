@@ -55,6 +55,15 @@ export const environmentValidationSchema = Joi.object({
       .required(),
     otherwise: Joi.string().allow('').optional(),
   }),
+  // Convite por e-mail (BE-31): pagina de aceite do frontend e validade do link.
+  INVITATION_ACCEPT_URL: Joi.when('SMTP_ENABLED', {
+    is: true,
+    then: Joi.string()
+      .uri({ scheme: ['http', 'https'] })
+      .required(),
+    otherwise: Joi.string().allow('').optional(),
+  }),
+  INVITATION_TTL_HOURS: Joi.number().integer().min(1).max(168).default(72),
   SMTP_CONNECTION_TIMEOUT_MS: Joi.number()
     .integer()
     .min(1000)

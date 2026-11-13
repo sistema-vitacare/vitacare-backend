@@ -26,6 +26,12 @@ export const AuthErrors = {
     status: HttpStatus.UNPROCESSABLE_ENTITY,
     message: 'Token de redefinição inválido ou expirado.',
   },
+  INVITATION_INVALID_OR_EXPIRED: {
+    code: 'AUTH_INVITATION_INVALID_OR_EXPIRED',
+    status: HttpStatus.UNPROCESSABLE_ENTITY,
+    message:
+      'Este convite não é mais válido. Peça um novo convite ao administrador da sua organização.',
+  },
   CURRENT_PASSWORD_INVALID: {
     code: 'AUTH_CURRENT_PASSWORD_INVALID',
     status: HttpStatus.UNPROCESSABLE_ENTITY,

@@ -1,7 +1,7 @@
 ---
 title: Inativar usuário
 status: atual
-updated: 2026-11-03
+updated: 2026-11-13
 method: POST
 path: /api/v1/users/{userId}/deactivate
 source: src/modules/User/user.controller.ts
@@ -81,8 +81,10 @@ curl -i -X POST 'https://api.example.com/api/v1/users/8f14e45f-ceea-4b7a-9f0b-1c
 | `data.profile.code` | texto, enum | não | `admin`, `professional`, `caregiver` ou `family`. |
 | `data.profile.name` | texto | não | Nome do perfil para exibição. |
 | `data.invitation` | objeto | sim | Situação do convite; `null` sempre que `status` não for `pending`. |
-| `data.invitation.status` | texto, enum | não | `pending` enquanto a senha provisória vale; `expired` depois do prazo (reemitir o convite). |
-| `data.invitation.expiresAt` | texto ISO 8601 (UTC) | não | Fim da validade da senha provisória do convite. |
+| `data.invitation.channel` | texto, enum | não | `email` (link enviado ao usuário, BE-31) ou `temporary_password` (senha provisória entregue pelo admin). |
+| `data.invitation.status` | texto, enum | não | `pending` enquanto o convite vale; `expired` depois do prazo; `invalidated` (só `email`) quando o link foi revogado, porque o envio falhou ou o e-mail mudou. Em `expired` e `invalidated`, reemitir o convite. |
+| `data.invitation.expiresAt` | texto ISO 8601 (UTC) | não | Fim da validade do convite: senha provisória (24 h) ou link mais recente (padrão 72 h). |
+| `data.invitation.sentAt` | texto ISO 8601 (UTC) | sim | Quando o SMTP aceitou o e-mail do convite; `null` no canal `temporary_password` ou se o envio não saiu. |
 | `data.lastAccessAt` | texto ISO 8601 (UTC) | sim | Último login aceito (inclusive o de primeiro acesso); `null` se nunca entrou. |
 | `data.createdAt` | texto ISO 8601 (UTC) | não | Cadastro. |
 | `data.updatedAt` | texto ISO 8601 (UTC) | não | Última alteração do registro. |
@@ -97,7 +99,7 @@ Nunca saem hash ou prazo bruto da senha, troca obrigatória, identificadores int
 3. Alvo inexistente ou de outra organização → `404`.
 4. Ator relido sob a trava: deixou de ser admin ativo → `403 AUTH_FORBIDDEN`. Dois admins inativando um ao outro ao mesmo tempo: um recebe `200`, o outro `403`, e a organização mantém um admin ativo.
 5. Já inativo → `409 USER_ALREADY_INACTIVE`.
-6. Grava `status = inactive` e `deleted_at = now()`. Se o alvo estava `pending`, vence o convite na hora (`temporary_password_expires_at = now()`), para que a senha provisória não volte a funcionar depois de uma reativação.
+6. Grava `status = inactive` e `deleted_at = now()`. Se o alvo estava `pending` com senha provisória, vence o convite na hora (`temporary_password_expires_at = now()`), para que a senha provisória não volte a funcionar depois de uma reativação. Se estava `pending` por link (BE-31), não há prazo de senha a vencer: o link vivo é revogado (`user_invitations.revoked_reason = user_deactivated`) e responde `422 AUTH_INVITATION_INVALID_OR_EXPIRED` na [consulta](auth-convite-consultar.md) e no [aceite](auth-convite-aceitar.md). Reativado, ele não tem senha e entra pela [redefinição administrativa](auth-redefinir-senha-usuario.md) ou, com o SMTP ligado, pela recuperação por link.
 7. Revoga **todas** as sessões abertas do alvo (`revoked_reason = user_deactivated`), inclusive a de primeiro acesso, e apaga os links de recuperação de senha pendentes dele.
 8. Audita `user.deactivated` com `{ "fromStatus": "pending" | "active" }`.
 
@@ -173,3 +175,5 @@ Nunca saem hash ou prazo bruto da senha, troca obrigatória, identificadores int
 ## Origem e validação
 
 Controller `src/modules/User/user.controller.ts`; caso de uso `src/modules/User/DeactivateUser/deactivateUser.useCase.ts` e a regra `policies/user.policy.ts`; DTO de resposta `src/modules/User/dtos/user.dto.ts`; parser `src/modules/User/parsers/user.parser.ts`; transação/consulta `src/modules/User/repositories/user.repository.ts`; erros `src/modules/User/user.errors.ts`. Testes: `tests/modules/User/changeUserStatus.useCase.spec.ts` (regras do caso de uso), `tests/modules/User/user.e2e-spec.ts` (HTTP com guard dublê: 403 para os três perfis não admin e o master sem tocar o repositório, contrato OpenAPI com Bearer, envelope e erros) e `tests/modules/User/userManagement.e2e-spec.ts` (PostgreSQL descartável com `AuthGuard` e `PermissionsGuard` reais e duas organizações). Conferido contra o OpenAPI gerado (`/api/docs-json`, tag `users`) em 2026-11-03. Spec `docs/superpowers/specs/2026-11-03-be-06-usuarios-convite-design.md`. Vault: [[2026-10-29-be-06-users]] e [[2026-11-03-usuarios-e-convite-por-senha-provisoria]]. No e2e real: a sessão aberta do alvo recebe `401` na chamada seguinte e o login falha; o link de recuperação some; a auditoria anterior continua; o pendente inativado perde a sessão de primeiro acesso e o convite; própria conta `409`; corrida entre dois admins em 5 rodadas resulta em `[200, 403]` e um admin ativo.
+
+Desde o BE-31 (2026-11-13), `invitation` ganhou `channel`, `sentAt` e o status `invalidated`; o frontend deve tratar `invalidated` como convite a reemitir. Vault: [[2026-11-12-convite-por-email]].
