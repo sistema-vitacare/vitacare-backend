@@ -169,7 +169,10 @@ describeWithInfrastructure('sessao no login e proprio cadastro (BE-27)', () => {
     );
 
   beforeAll(async () => {
-    t = await bootFullApp(databaseUrl!, redisUrl!);
+    t = await bootFullApp(databaseUrl!, redisUrl!, {
+      // Sem termo publicado: o login daqui testa permissoes, nao o aceite (BE-32).
+      termsPublished: false,
+    });
 
     const masterCpf = await t.dataSource.query<Array<{ cpf: string }>>(
       'SELECT cpf FROM users WHERE email = $1',
@@ -820,7 +823,7 @@ describeWithInfrastructure('sessao no login e proprio cadastro (BE-27)', () => {
       );
       expect(schemas.LoginResponseDto.required).toContain('session');
       expect(Object.keys(schemas.SessionProfileDto.properties!).sort()).toEqual(
-        ['organization', 'permissions', 'profile', 'user'],
+        ['organization', 'permissions', 'profile', 'terms', 'user'],
       );
       expect(Object.keys(schemas.SessionUserDto.properties!)).toContain('cpf');
       expect(
