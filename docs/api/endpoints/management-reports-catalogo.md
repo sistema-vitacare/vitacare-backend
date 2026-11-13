@@ -1,7 +1,7 @@
 ---
 title: Catálogo dos relatórios gerenciais
 status: atual
-updated: 2026-11-12
+updated: 2026-11-13
 method: GET
 path: /api/v1/management-reports
 source: src/modules/ManagementReport/managementReport.controller.ts
@@ -24,7 +24,7 @@ Lista os três tipos de relatório da Figura 43, com as rotas de cada um e o tot
 Headers: `Authorization: Bearer <token>` (sim). Sem path, query nem body. Query desconhecida responde `422 VALIDATION_FAILED`.
 
 ```bash
-curl -sS 'http://<IP>:1050/api/v1/management-reports' \
+curl -sS 'https://api.example.com/api/v1/management-reports' \
   -H 'Authorization: Bearer F3dQ2p...Zc9'
 ```
 

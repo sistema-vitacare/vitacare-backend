@@ -1,7 +1,7 @@
 ---
 title: Relatórios exportados recentemente
 status: atual
-updated: 2026-11-12
+updated: 2026-11-13
 method: GET
 path: /api/v1/management-reports/recent
 source: src/modules/ManagementReport/managementReport.controller.ts
@@ -25,7 +25,7 @@ Headers: `Authorization: Bearer <token>` (sim). Body: nenhum.
 | `limit` | inteiro | não | `20`, de 1 a 100 | Itens por página. |
 
 ```bash
-curl -sS 'http://<IP>:1050/api/v1/management-reports/recent?page=1&limit=20' \
+curl -sS 'https://api.example.com/api/v1/management-reports/recent?page=1&limit=20' \
   -H 'Authorization: Bearer F3dQ2p...Zc9'
 ```
 

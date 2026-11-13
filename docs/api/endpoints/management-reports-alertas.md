@@ -1,7 +1,7 @@
 ---
 title: Relatório de alertas e intercorrências
 status: atual
-updated: 2026-11-12
+updated: 2026-11-13
 method: GET
 path: /api/v1/management-reports/alerts
 source: src/modules/ManagementReport/managementReport.controller.ts
@@ -51,7 +51,7 @@ Headers: `Authorization: Bearer <token>` (sim). Body: nenhum.
 7. Teto (`422`).
 
 ```bash
-curl -sS 'http://<IP>:1050/api/v1/management-reports/alerts?from=2026-10-01&to=2026-10-31&condition=diab' \
+curl -sS 'https://api.example.com/api/v1/management-reports/alerts?from=2026-10-01&to=2026-10-31&condition=diab' \
   -H 'Authorization: Bearer F3dQ2p...Zc9'
 ```
 

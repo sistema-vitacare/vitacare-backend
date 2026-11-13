@@ -1,7 +1,7 @@
 ---
 title: Manual de integração da API VitaCare
 status: atual
-updated: 2026-11-12
+updated: 2026-11-13
 ---
 
 # Manual de integração da API VitaCare
@@ -10,7 +10,7 @@ Este diretório descreve **as rotas que existem no backend**, em Markdown legív
 
 ## Endereço e convenções
 
-Nos exemplos, `https://api.example.com` representa a origem do ambiente onde a API for publicada; não é um servidor VitaCare configurado. O prefixo (`API_PREFIX`, padrão `api`) e a versão URI (`API_VERSION`, padrão `1`) são configuráveis. Assim, as rotas de negócio atuais usam `/api/v1`; as rotas `/health/*` e a página `/termos` ficam fora do prefixo e da versão. O servidor usa HTTPS na arquitetura prevista, mas o ambiente local pode usar HTTP.
+Nos exemplos, `https://api.example.com` representa a origem do ambiente onde a API for publicada; não é um servidor VitaCare configurado. O prefixo (`API_PREFIX`, padrão `api`) e a versão URI (`API_VERSION`, padrão `1`) são configuráveis. Assim, as rotas de negócio atuais usam `/api/v1`; as rotas `/health/*` e a página `/termos` ficam fora do prefixo e da versão. O TCC prevê HTTPS; hoje a produção é acessada por IP e porta, sem domínio nem HTTPS (`http://<IP>:1050`, decisão de Mateus em 2026-11-10), e o HTTPS foi decidido em 2026-11-13, mas ainda não está configurado. Localmente a API usa HTTP. Troque a origem sintética pela do ambiente alvo.
 
 O corpo das rotas de negócio é JSON quando aplicável. Autenticação usa Bearer opaco e stateful: o token bruto só sai no login e seu hash é persistido; sessão revogada, expirada, inativa ou com senha alterada não continua válida. Não envie dados pessoais reais em exemplos de documentação.
 
@@ -380,7 +380,7 @@ Falha temporária (rede, `429`, `5xx`, SMTP `4xx`) tenta de novo após 1 min, 5 
 
 **Auditoria.** Grava `alert.resolved`, `notification_preferences.updated` (chaves alteradas) e `push_subscription.created|revoked` (sem `endpoint`). Leitura e tentativas não são auditadas.
 
-**Fora do escopo.** Relatório diário, aviso de acesso do familiar, "medicação pendente após 30 min", 2FA e sessão de 30 min (Figura 46, P28); aviso de plano vencido.
+**Fora do escopo do BE-17.** Relatório diário, aviso de acesso do familiar, "medicação pendente após 30 min" e 2FA (Figura 46, P28), com o encaminhamento decidido no BE-26 em [Capacidades dos protótipos sem API](#capacidades-dos-protótipos-sem-api). Desde então (nota de 2026-11-13), a sessão de 30 min sem atividade vale como valor fixo para todos (BE-26) e o aviso de plano vencido saiu por e-mail no BE-28 ([Aviso de vencimento](#plano-de-uso-vigência-e-solicitação-de-mudança)).
 
 ### Administração da plataforma
 
