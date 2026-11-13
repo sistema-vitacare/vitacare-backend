@@ -10,7 +10,7 @@ Este diretório descreve **as rotas que existem no backend**, em Markdown legív
 
 ## Endereço e convenções
 
-Nos exemplos, `https://api.example.com` representa a origem do ambiente onde a API for publicada; não é um servidor VitaCare configurado. O prefixo (`API_PREFIX`, padrão `api`) e a versão URI (`API_VERSION`, padrão `1`) são configuráveis. Assim, as rotas de negócio atuais usam `/api/v1`; as rotas `/health/*` ficam fora do prefixo e da versão. O servidor usa HTTPS na arquitetura prevista, mas o ambiente local pode usar HTTP.
+Nos exemplos, `https://api.example.com` representa a origem do ambiente onde a API for publicada; não é um servidor VitaCare configurado. O prefixo (`API_PREFIX`, padrão `api`) e a versão URI (`API_VERSION`, padrão `1`) são configuráveis. Assim, as rotas de negócio atuais usam `/api/v1`; as rotas `/health/*` e a página `/termos` ficam fora do prefixo e da versão. O servidor usa HTTPS na arquitetura prevista, mas o ambiente local pode usar HTTP.
 
 O corpo das rotas de negócio é JSON quando aplicável. Autenticação usa Bearer opaco e stateful: o token bruto só sai no login e seu hash é persistido; sessão revogada, expirada, inativa ou com senha alterada não continua válida. Não envie dados pessoais reais em exemplos de documentação.
 
@@ -33,6 +33,12 @@ O corpo das rotas de negócio é JSON quando aplicável. Autenticação usa Bear
 | `GET /api/v1/profile` | Consulta o próprio cadastro (sessão com CPF completo) | [profile-consultar.md](endpoints/profile-consultar.md) |
 | `PATCH /api/v1/profile` | Edita nome, telefone e e-mail do próprio cadastro | [profile-atualizar.md](endpoints/profile-atualizar.md) |
 | `PUT /api/v1/profile/password` | Troca a própria senha (equivale a `PUT /auth/password`) | [profile-alterar-senha.md](endpoints/profile-alterar-senha.md) |
+| `GET /termos` | Página HTML pública do termo de uso (fora do prefixo, do envelope e do OpenAPI) | [terms-pagina.md](endpoints/terms-pagina.md) |
+| `GET /api/v1/terms/current` | Termo de uso e privacidade vigente (pública) | [terms-vigente.md](endpoints/terms-vigente.md) |
+| `GET /api/v1/terms/versions/:version` | Uma versão publicada do termo, inclusive anterior (pública) | [terms-versao.md](endpoints/terms-versao.md) |
+| `POST /api/v1/terms/acceptances` | Registra o aceite do termo vigente (liberada sem aceite) | [terms-aceitar.md](endpoints/terms-aceitar.md) |
+| `GET /api/v1/terms/acceptances/me` | Aceites do próprio usuário (liberada sem aceite) | [terms-meus-aceites.md](endpoints/terms-meus-aceites.md) |
+| `GET /api/v1/terms/acceptances` | Prova dos aceites: admin da própria organização; master de todas | [terms-aceites-listar.md](endpoints/terms-aceites-listar.md) |
 | `GET /api/v1/organizations/me` | Consulta a organização da sessão | [organizations-consultar-propria.md](endpoints/organizations-consultar-propria.md) |
 | `PATCH /api/v1/organizations/me` | Atualiza a organização da sessão | [organizations-atualizar-propria.md](endpoints/organizations-atualizar-propria.md) |
 | `POST /api/v1/organizations` | Cadastra organização e primeiro administrador (plataforma) | [organizations-criar.md](endpoints/organizations-criar.md) |
@@ -148,6 +154,8 @@ Cada requisição recompõe o contexto no banco, então revogação, expiração
 | --- | --- | --- | --- |
 | `normal` | Login de conta sem troca pendente | 12 horas absolutas e 30 minutos sem atividade | Todas as rotas autenticadas |
 | `password_change` | Login de conta com troca obrigatória | 10 minutos absolutos | Apenas [primeiro acesso](endpoints/auth-primeiro-acesso.md) e [logout](endpoints/auth-logout.md) |
+
+**Termo de uso com aceite obrigatório (BE-32, decisões de Mateus em 2026-11-12/13).** Todo usuário, dos quatro perfis e o master, precisa aceitar a versão vigente do [termo de uso e privacidade](endpoints/terms-vigente.md) antes de usar o sistema; quem já tinha conta aceita no próximo acesso, e uma versão nova exige novo aceite. Não é outro tipo de sessão: a sessão é `normal`, e a mesma consulta que a valida a cada requisição diz se a vigente foi aceita. Sem o aceite, o login responde `data.state = "terms_acceptance_required"`, `session.permissions` vem vazia e `session.terms.required = true`, e toda rota protegida responde `403 TERMS_ACCEPTANCE_REQUIRED`, **exceto** [GET /profile](endpoints/profile-consultar.md), [POST /terms/acceptances](endpoints/terms-aceitar.md), [GET /terms/acceptances/me](endpoints/terms-meus-aceites.md) e [logout](endpoints/auth-logout.md). O aceite libera a mesma sessão na requisição seguinte. A versão nova vale também para quem já está logado: a próxima chamada recebe o `403`. O aceite é prova imutável (data e hora do servidor, IP, navegador, versão, hash, perfil e requisição) e sai na [consulta de aceites](endpoints/terms-aceites-listar.md), com a regra de escopo da auditoria. O texto fica versionado em `docs/termos/` e é publicado por migration, sem rota administrativa; a página pública é [`/termos`](endpoints/terms-pagina.md). A sessão restrita de primeiro acesso não passa por essa checagem: o aceite vem depois da troca de senha e do novo login.
 
 Cada requisição aceita renova a janela de inatividade da sessão normal; o prazo absoluto não é renovado. A organização efetiva **sempre** vem da sessão: nenhuma rota aceita `organizationId` do cliente como prova de autorização. Autorização por permissão nomeada usa o formato `recurso:acao`; falta de permissão responde `403 AUTH_FORBIDDEN`.
 
@@ -480,6 +488,7 @@ Escrita pode acrescentar `meta.message`:
 | `GET /health/ready` | Mantém o relatório de dependências, com `status`, `info`, `error` e `details`. |
 | `GET /api/docs` | HTML da interface Swagger. |
 | `GET /api/docs-json` | Documento OpenAPI, formato fixado pela especificação. |
+| `GET /termos` | Página HTML do termo de uso; até o `404` sai em HTML. Fora do prefixo, da versão e do OpenAPI. |
 | `GET /api/v1/follow-ups/:followUpId/attachments/:attachmentId/content` | Conteúdo binário do anexo; os erros continuam no formato JSON. |
 | `DELETE /api/v1/follow-ups/:followUpId/attachments/:attachmentId` | `204 No Content`, sem corpo. |
 | `GET /api/v1/patients/:patientId/report/pdf` | PDF binário do relatório; os erros continuam no formato JSON. |
@@ -549,7 +558,7 @@ Erro inesperado suprime o `detail` e não expõe a causa:
 | `202` | Pedido aceito sem afirmar o efeito, como a solicitação de recuperação de senha. |
 | `400` | Corpo malformado ou JSON inválido. Parâmetro de rota fora do formato responde `422`. |
 | `401` | Não autenticado: token ausente, expirado, revogado ou de tipo incompatível com a rota. |
-| `403` | Autenticado sem permissão de perfil ou sem vínculo com o paciente. |
+| `403` | Autenticado sem permissão de perfil ou sem vínculo com o paciente (`AUTH_FORBIDDEN`), ou sem o aceite do termo de uso vigente (`TERMS_ACCEPTANCE_REQUIRED`, em qualquer rota protegida). |
 | `404` | Recurso inexistente **ou** pertencente a outra organização. A API não distingue os dois casos de propósito. |
 | `409` | Conflito de estado: duplicidade, transição inválida, limite de plano atingido. |
 | `413` | Arquivo acima do limite (anexos). |
@@ -563,21 +572,31 @@ Códigos transversais de `error.code`: `BAD_REQUEST`, `VALIDATION_FAILED`, `UNAU
 
 ### Paginação, filtros e períodos
 
-Toda listagem paginada recebe `page` (inteiro, mínimo 1, padrão 1) e `limit` (inteiro de 1 a 100, padrão 20) e devolve `meta.pagination` (`page`, `limit`, `total`, `totalPages`). Página além da última responde `200` com `data: []` e o `total` real. São paginadas: `GET /organizations`, `/plan-change-requests`, `/users`, `/patients`, `/patient-links`, `/patient-links/eligible-users`, `/forms`, `/follow-ups`, `/alert-rules`, `/alerts`, `/medications`, `/notifications` e `/audit-events`. Os anexos de um registro (no máximo 5) e o catálogo de planos saem inteiros, sem `meta.pagination`.
+Toda listagem paginada recebe `page` (inteiro, mínimo 1, padrão 1) e `limit` (inteiro de 1 a 100, padrão 20) e devolve `meta.pagination` (`page`, `limit`, `total`, `totalPages`). Página além da última responde `200` com `data: []` e o `total` real. São paginadas: `GET /organizations`, `/plan-change-requests`, `/users`, `/patients`, `/patient-links`, `/patient-links/eligible-users`, `/forms`, `/follow-ups`, `/alert-rules`, `/alerts`, `/medications`, `/notifications`, `/audit-events` e `/terms/acceptances`. Os anexos de um registro (no máximo 5) e o catálogo de planos saem inteiros, sem `meta.pagination`.
 
-Filtros são parâmetros de query combinados com E; a nota de cada rota lista os aceitos, a ordenação fixa e os limites. Parâmetro desconhecido ou fora do formato responde `422 VALIDATION_FAILED` com o item em `fields`. Resultado vazio é sempre `200` com lista vazia, nunca `404`. Algumas leituras acrescentam `meta.message` quando não há dados — `GET /patients` (orientação a cuidador e familiar sem vínculo ou aviso de busca vazia), `/follow-ups`, `/patients/:id/overview`, `/patients/:id/evolution` (BE-29), `/audit-events` e o painel; a página além da última, com `total` maior que zero, não traz a mensagem.
+Filtros são parâmetros de query combinados com E; a nota de cada rota lista os aceitos, a ordenação fixa e os limites. Parâmetro desconhecido ou fora do formato responde `422 VALIDATION_FAILED` com o item em `fields`. Resultado vazio é sempre `200` com lista vazia, nunca `404`. Algumas leituras acrescentam `meta.message` quando não há dados — `GET /patients` (orientação a cuidador e familiar sem vínculo ou aviso de busca vazia), `/follow-ups`, `/patients/:id/overview`, `/patients/:id/evolution` (BE-29), `/audit-events`, `/terms/acceptances` e o painel; a página além da última, com `total` maior que zero, não traz a mensagem.
 
 Períodos (`from`/`to` em histórico, evolução, relatório, painel e auditoria) são dias `AAAA-MM-DD` inclusivos no fuso `America/Sao_Paulo`; a regra de padrão, máximo de 366 dias e `422 PERIOD_TOO_LONG` está na nota de cada rota. Instantes nas respostas saem em ISO 8601 UTC.
 
 ## Guia de integração dos clientes (desktop e mobile)
 
-A mesma API e os mesmos contratos atendem o frontend React/PWA em computador, tablet e celular (RF019, RNF002). O backend não diferencia dispositivo nem navegador: não lê `User-Agent`, não tem rota ou formato por plataforma e não mantém estado de tela. Responsividade, layout e compatibilidade visual com Chrome, Edge, Safari e Firefox (RNF001–003) são validadas no frontend.
+A mesma API e os mesmos contratos atendem o frontend React/PWA em computador, tablet e celular (RF019, RNF002). O backend não diferencia dispositivo nem navegador: não tem rota ou formato por plataforma e não mantém estado de tela. O `User-Agent` só é lido para gravar a prova do aceite do termo de uso, nunca para mudar a resposta. Responsividade, layout e compatibilidade visual com Chrome, Edge, Safari e Firefox (RNF001–003) são validadas no frontend.
 
 **Origem e CORS.** O frontend de outra origem só é aceito se estiver em `CORS_ORIGINS`; em produção, lista vazia desliga o CORS. O preflight libera `Authorization` e `Content-Type`, e a resposta expõe `Content-Disposition`, para o navegador entregar ao frontend o nome dos arquivos baixados. A sessão vai no header `Authorization: Bearer <token>`, não em cookie, então `CORS_CREDENTIALS` fica `false`.
 
-**Sessão.** Faça login, guarde o token só pelo tempo da sessão e envie-o em toda rota protegida. `401` em qualquer chamada significa sessão encerrada (logout, expiração, inativação, organização inativada ou troca de senha): volte ao login. Com `data.state = password_change_required`, só [primeiro acesso](endpoints/auth-primeiro-acesso.md) e [logout](endpoints/auth-logout.md) respondem. `403` é falta de permissão do perfil; `404` cobre recurso inexistente, de outra organização ou de paciente sem vínculo, sem distinção.
+**Sessão.** Faça login, guarde o token só pelo tempo da sessão e envie-o em toda rota protegida. `401` em qualquer chamada significa sessão encerrada (logout, expiração, inativação, organização inativada ou troca de senha): volte ao login. Com `data.state = password_change_required`, só [primeiro acesso](endpoints/auth-primeiro-acesso.md) e [logout](endpoints/auth-logout.md) respondem. Com `data.state = terms_acceptance_required`, siga o fluxo do termo de uso abaixo. `403` é falta de permissão do perfil; `404` cobre recurso inexistente, de outra organização ou de paciente sem vínculo, sem distinção.
 
 **Sessão do usuário como cache.** Guarde `data.session` do login junto do token e use-o para montar o menu e redirecionar ao painel do perfil (`session.profile.code`), mostrar ou esconder ações (`session.permissions`) e esconder o painel e os relatórios gerenciais no plano sem `operational_dashboard` ou `management_reports` (`session.organization.plan.features`). O CPF do login vem mascarado; a tela de dados pessoais lê [GET /profile](endpoints/profile-consultar.md), que traz o completo. Recarregue a sessão por `GET /profile` depois de [editar o próprio cadastro](endpoints/profile-atualizar.md) (ou use o `data` da própria resposta), depois de o admin trocar o seu perfil e ao receber um `403` inesperado: as permissões são relidas a cada requisição, e a lista guardada pode ter ficado velha. Depois de trocar o e-mail, o login seguinte já usa o e-mail novo; a troca de senha encerra todas as sessões e exige login de novo. A sessão restrita traz `permissions: []` e só serve para exibir nome e organização na tela de primeiro acesso.
+
+**Termo de uso e aceite (BE-32).** O login pode responder três estados, nesta ordem de prioridade: `password_change_required` (troca da senha provisória), `terms_acceptance_required` (falta aceitar o termo vigente) e `authenticated`. No segundo:
+
+1. guarde o token normalmente; ele já é da sessão normal;
+2. busque o texto em [GET /terms/current](endpoints/terms-vigente.md) (pública) e mostre o Markdown de `data.content` numa tela própria, com rolagem, o título e a versão; ofereça também o link da página [`/termos`](endpoints/terms-pagina.md) (`data.pageUrl`, relativo à origem da API);
+3. no botão "Aceito", envie [POST /terms/acceptances](endpoints/terms-aceitar.md) com `{ "version": data.version }` **da versão exibida**. Um `422 TERMS_VERSION_NOT_CURRENT` significa que saiu uma versão nova enquanto a pessoa lia: recarregue o texto e peça o aceite de novo;
+4. depois do `200`, chame [GET /profile](endpoints/profile-consultar.md) para receber as permissões (no login elas vieram vazias) e siga para o painel do perfil;
+5. sem aceitar, ofereça só "Sair" ([logout](endpoints/auth-logout.md)).
+
+Trate `403 TERMS_ACCEPTANCE_REQUIRED` **em qualquer chamada** como "levar para a tela do termo": é o que acontece com quem está logado quando uma versão nova é publicada. `session.terms` (`required`, `currentVersion`, `acceptedVersion`) também sai em `GET /profile`. Ponha o link `/termos` no rodapé de todas as telas, inclusive no login, e nos e-mails. O primeiro acesso fica em duas telas: troca da senha provisória, novo login e então o termo.
 
 **Página de aceite do convite (BE-31).** Com o SMTP ligado, o convidado recebe por e-mail o link `INVITATION_ACCEPT_URL?token=<token>`. A página nessa URL:
 
@@ -586,7 +605,7 @@ A mesma API e os mesmos contratos atendem o frontend React/PWA em computador, ta
 3. pede a senha (8 a 128 caracteres) e a confirmação, e chama [POST /auth/invitations/accept](endpoints/auth-convite-aceitar.md) com `{ token, newPassword }`;
 4. no `200`, mostra `meta.message` e redireciona ao login com `organizationCode` e `email` da resposta já preenchidos. O aceite **não** abre sessão: o usuário entra pelo login, que devolve a sessão normal e o bloco `session`.
 
-As duas rotas são públicas e somam um limite de 30 tentativas por IP por hora (`429 AUTH_TEMPORARILY_BLOCKED`). Enquanto o acesso for por IP, sem HTTPS, o link trafega sem criptografia.
+As duas rotas são públicas e somam um limite de 30 tentativas por IP por hora (`429 AUTH_TEMPORARILY_BLOCKED`). Até o HTTPS ser configurado (decidido por Mateus em 2026-11-13, ainda não aplicado), o link trafega sem criptografia.
 
 **Tela de usuários (BE-31).** No cadastro e na reemissão, `data.channel` diz o que mostrar: `temporary_password` exibe a senha e `expiresAt` uma única vez; `email` exibe `meta.message`, que confirma o envio com a validade ou avisa a falha, e nunca traz senha. Trate `invitation.status = invalidated` como convite a reemitir e ofereça a opção "gerar senha provisória" (`channel: "temporary_password"`) para quem não recebe e-mail. Com o SMTP ligado, a resposta espera o servidor de e-mail; com o SMTP fora do ar, pode levar cerca de 30 s até `failed`.
 
@@ -635,7 +654,7 @@ Os protótipos do TCC (Figuras 31–46) mostram elementos que **não têm rota n
 | Seletor "sessão máxima sem atividade" | 46 | valor fixo | informativo: 30 min sem atividade e 12 h absolutas, iguais para todos |
 | Aba Integrações; plano "Pro - Clínica", armazenamento, registros/mês | 46 | fora de escopo / catálogo Basic e Enterprise | `GET /organizations/me/plan` |
 
-Já atendidos pela API: relatórios Alertas e Intercorrências e Atividade dos Cuidadores (o "Eficiência" da Figura 43), filtro Condição, cards "N gerados" e lista de recentes (`/management-reports`, BE-30, plano Enterprise); logout (`POST /auth/logout`); resolver alerta, aba Resolvidos e marcar todos como lidos (`POST /alerts/{alertId}/resolve`, filtro `status`, `POST /notifications/read-all`); push e e-mail por preferência (`/notifications/preferences`), com o push indisponível no navegador enquanto o acesso for por IP sem HTTPS.
+Já atendidos pela API: relatórios Alertas e Intercorrências e Atividade dos Cuidadores (o "Eficiência" da Figura 43), filtro Condição, cards "N gerados" e lista de recentes (`/management-reports`, BE-30, plano Enterprise); logout (`POST /auth/logout`); resolver alerta, aba Resolvidos e marcar todos como lidos (`POST /alerts/{alertId}/resolve`, filtro `status`, `POST /notifications/read-all`); push e e-mail por preferência (`/notifications/preferences`), com o push indisponível no navegador enquanto o HTTPS não estiver configurado (decidido por Mateus em 2026-11-13).
 
 ## Manutenção do manual
 
