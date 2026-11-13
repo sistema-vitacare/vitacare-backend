@@ -17,6 +17,7 @@ import {
   PLAN_EXPIRY_NOTICES_QUEUE,
 } from '@/modules/PlanExpiryNotice/planExpiryNotice.processor';
 
+import { FakeEmailSender } from './fakeEmailSender';
 import {
   bootFullApp,
   CORS_ORIGIN,
@@ -110,6 +111,7 @@ const eventually = async <T>(
 
 describeWithInfrastructure('homologacao funcional dos 14 casos de uso', () => {
   let t: FullApp;
+  const mail = new FakeEmailSender(false);
 
   const plans: Record<string, string> = {};
   const tenants = {} as Record<'A' | 'B', Tenant>;
@@ -187,7 +189,9 @@ describeWithInfrastructure('homologacao funcional dos 14 casos de uso', () => {
   };
 
   beforeAll(async () => {
-    t = await bootFullApp(databaseUrl!, redisUrl!);
+    // Porta SMTP falsa desligada: o roteiro roda como em producao, sem SMTP.
+    // So o trecho do convite por e-mail (BE-31) a liga.
+    t = await bootFullApp(databaseUrl!, redisUrl!, { emailSender: mail });
   }, 120000);
 
   afterAll(async () => {
@@ -198,7 +202,7 @@ describeWithInfrastructure('homologacao funcional dos 14 casos de uso', () => {
     it('aplica todas as migrations no banco vazio, como o entrypoint de producao', () => {
       expect(t.executedMigrations).toHaveLength(migrationFiles().length);
       expect(t.executedMigrations.at(-1)).toBe(
-        'AddManagementReportsPermission1792000000000',
+        'CreateUserInvitations1792100000000',
       );
     });
 
@@ -1396,6 +1400,97 @@ describeWithInfrastructure('homologacao funcional dos 14 casos de uso', () => {
           .status,
       ).toBe(401);
       expect((await http('get', '/patients', A.tokens.admin)).status).toBe(200);
+    });
+  });
+
+  describe('UC03 — convite por e-mail com link de aceite (BE-31)', () => {
+    afterAll(() => {
+      mail.enabled = false;
+    });
+
+    it('SMTP desligado: o convite e a senha provisoria, com o canal na resposta', async () => {
+      const response = await http('post', '/users', tenants.A.tokens.admin, {
+        name: 'Convite Senha',
+        email: 'convite-senha@homologacao-a.test',
+        cpf: nextCpf(),
+        profileCode: 'caregiver',
+      });
+
+      expect(response.status).toBe(201);
+      expect(dataOf<{ channel: string }>(response).channel).toBe(
+        'temporary_password',
+      );
+      expect(
+        dataOf<{ temporaryPassword: string }>(response).temporaryPassword,
+      ).toHaveLength(20);
+      expect(
+        codeOf(
+          await http('post', '/users', tenants.A.tokens.admin, {
+            name: 'Convite Email',
+            email: 'convite-recusado@homologacao-a.test',
+            cpf: nextCpf(),
+            profileCode: 'caregiver',
+            channel: 'email',
+          }),
+        ),
+      ).toBe('USER_INVITATION_EMAIL_UNAVAILABLE');
+    });
+
+    it('SMTP ligado: o link chega por e-mail, o convidado cadastra a senha e entra pelo login', async () => {
+      mail.enabled = true;
+
+      const email = 'convite-link@homologacao-a.test';
+      const created = await http('post', '/users', tenants.A.tokens.admin, {
+        name: 'Convite Link',
+        email,
+        cpf: nextCpf(),
+        profileCode: 'professional',
+      });
+
+      expect(created.status).toBe(201);
+      expect(dataOf<object>(created)).toMatchObject({
+        channel: 'email',
+        delivery: { status: 'sent' },
+      });
+      expect(dataOf<object>(created)).not.toHaveProperty('temporaryPassword');
+
+      const token = mail.tokenFor(email);
+
+      expect((await login(tenants.A.code, email, PASSWORD)).status).toBe(401);
+
+      const preview = await http('post', '/auth/invitations/inspect', null, {
+        token,
+      });
+
+      expect(preview.status).toBe(200);
+      expect(dataOf<object>(preview)).toMatchObject({
+        user: { email },
+        organization: { code: tenants.A.code },
+        profile: { code: 'professional' },
+      });
+
+      const accepted = await http('post', '/auth/invitations/accept', null, {
+        token,
+        newPassword: PASSWORD,
+      });
+
+      expect(accepted.status).toBe(200);
+      expect(dataOf<object>(accepted)).toEqual({
+        organizationCode: tenants.A.code,
+        email,
+      });
+
+      const session = await login(tenants.A.code, email, PASSWORD);
+
+      expect(dataOf<{ state: string }>(session).state).toBe('authenticated');
+      expect(
+        (
+          await http('post', '/auth/invitations/accept', null, {
+            token,
+            newPassword: PASSWORD,
+          })
+        ).status,
+      ).toBe(422);
     });
   });
 

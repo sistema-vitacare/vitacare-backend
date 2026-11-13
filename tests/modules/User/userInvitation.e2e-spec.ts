@@ -1,11 +1,6 @@
-import type { DeliveryResult } from '@/modules/Notification/channels/deliveryResult.type';
-import type {
-  EmailMessage,
-  EmailSender,
-} from '@/modules/Notification/channels/emailSender';
-
 import Redis from 'ioredis';
 
+import { FakeEmailSender } from '../../app/fakeEmailSender';
 import { bootFullApp, type FullApp } from '../../app/fullApp.fixtures';
 
 /**
@@ -20,37 +15,6 @@ const describeWithInfrastructure =
   databaseUrl && redisUrl ? describe : describe.skip;
 
 const PASSWORD = 'senha definitiva do convite';
-const INVITATION_SUBJECT = 'Convite para acessar o VitaCare';
-
-/** Porta SMTP falsa: guarda as mensagens e devolve o resultado da fila. */
-class FakeEmailSender implements EmailSender {
-  enabled = true;
-  readonly messages: EmailMessage[] = [];
-  readonly results: DeliveryResult[] = [];
-
-  send(message: EmailMessage): Promise<DeliveryResult> {
-    const result = this.results.shift() ?? { kind: 'sent' };
-
-    if (result.kind === 'sent') this.messages.push(message);
-
-    return Promise.resolve(result);
-  }
-
-  invitations(): EmailMessage[] {
-    return this.messages.filter((m) => m.subject === INVITATION_SUBJECT);
-  }
-
-  tokenFor(email: string): string {
-    const message = this.invitations()
-      .filter((m) => m.to === email)
-      .at(-1);
-    const link = message?.text.match(/https?:\/\/\S+/)?.[0];
-
-    if (!link) throw new Error(`Nenhum convite capturado para ${email}.`);
-
-    return new URL(link).searchParams.get('token')!;
-  }
-}
 
 const cpfFrom = (base: string): string => {
   const digit = (digits: string, weightStart: number) => {

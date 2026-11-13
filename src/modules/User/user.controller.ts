@@ -10,7 +10,7 @@ import {
   Query,
   Res,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiBody, ApiOperation, ApiTags } from '@nestjs/swagger';
 import type { Response } from 'express';
 
 import { CurrentContext } from '@/common/context/currentContext.decorator';
@@ -206,6 +206,7 @@ export class UserController {
     summary:
       'Reemite o convite de um usuario pendente por link (e-mail) ou senha provisoria; o convite anterior deixa de valer antes do envio.',
   })
+  @ApiBody({ type: ReissueUserInvitationDto, required: false })
   @ApiEnvelope(UserInvitationResponseDto, { status: HttpStatus.CREATED })
   @ApiErrors(
     UNAUTHENTICATED,
