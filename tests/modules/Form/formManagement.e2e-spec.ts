@@ -25,6 +25,7 @@ import { CreatePatients1790700000000 } from '@/database/migrations/1790700000000
 import { AddPatientCareLinks1790800000000 } from '@/database/migrations/1790800000000-AddPatientCareLinks';
 import { CreateFollowUpForms1790900000000 } from '@/database/migrations/1790900000000-CreateFollowUpForms';
 import { AuditEventQuery1791700000000 } from '@/database/migrations/1791700000000-AuditEventQuery';
+import { CreateTermsOfUse1792200000000 } from '@/database/migrations/1792200000000-CreateTermsOfUse';
 import { runPlatformSeed } from '@/database/seeds/platformSeed';
 import { SnakeNamingStrategy } from '@/database/snakeNaming.strategy';
 import type { TenantProfileCode } from '@/modules/Access/access.permissions';
@@ -63,10 +64,11 @@ const MIGRATIONS = [
   AddPatientCareLinks1790800000000,
   CreateFollowUpForms1790900000000,
   AuditEventQuery1791700000000,
+  CreateTermsOfUse1792200000000,
 ];
 
 const TRUNCATE_ALL =
-  'TRUNCATE follow_up_form_patients, follow_up_form_fields, follow_up_form_versions, follow_up_forms, user_patients, patients, organization_plan_terms, plan_change_requests, audit_events, auth_sessions, password_reset_tokens, users, profile_permissions, permissions, access_profiles, organizations, usage_plans';
+  'TRUNCATE terms_acceptances, follow_up_form_patients, follow_up_form_fields, follow_up_form_versions, follow_up_forms, user_patients, patients, organization_plan_terms, plan_change_requests, audit_events, auth_sessions, password_reset_tokens, users, profile_permissions, permissions, access_profiles, organizations, usage_plans';
 
 const SETTINGS: Record<string, number> = {
   'auth.sessionIdleSeconds': 1800,

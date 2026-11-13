@@ -4,6 +4,8 @@ import {
 } from '@/modules/Access/access.permissions';
 import request from 'supertest';
 
+import { AddProfileManagePermission1791800000000 } from '@/database/migrations/1791800000000-AddProfileManagePermission';
+
 import { PasswordResetRepository } from '@/modules/Auth/repositories/passwordReset.repository';
 import { TokenService } from '@/modules/Auth/security/token.service';
 
@@ -850,17 +852,16 @@ describeWithInfrastructure('sessao no login e proprio cadastro (BE-27)', () => {
         );
       const token = tenants.A.accounts.caregiver.token;
 
-      expect(t.executedMigrations.slice(-4)).toEqual([
+      expect(t.executedMigrations).toContain(
         'AddProfileManagePermission1791800000000',
-        'CreatePlanExpiryNotices1791900000000',
-        'AddManagementReportsPermission1792000000000',
-        'CreateUserInvitations1792100000000',
-      ]);
+      );
 
-      await t.dataSource.undoLastMigration(); // CreateUserInvitations (BE-31), que vem depois
-      await t.dataSource.undoLastMigration(); // AddManagementReportsPermission (BE-30), que vem depois
-      await t.dataSource.undoLastMigration(); // CreatePlanExpiryNotices (BE-28), que vem depois
-      await t.dataSource.undoLastMigration();
+      // So o down/up desta migration: desfazer as posteriores tiraria as tabelas
+      // que o guard consulta a cada requisicao (termo de uso, BE-32).
+      const migration = new AddProfileManagePermission1791800000000();
+      const runner = t.dataSource.createQueryRunner();
+
+      await migration.down(runner);
 
       try {
         expect(await grants()).toEqual([]);
@@ -871,7 +872,8 @@ describeWithInfrastructure('sessao no login e proprio cadastro (BE-27)', () => {
         ).toEqual([]);
         expect((await http('get', '/profile', token)).status).toBe(403);
       } finally {
-        await t.dataSource.runMigrations();
+        await migration.up(runner);
+        await runner.release();
       }
 
       expect(await grants()).toEqual([

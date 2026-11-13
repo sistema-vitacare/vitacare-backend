@@ -676,6 +676,7 @@ describeWithDatabase('aviso de vencimento do plano (e2e)', () => {
       await dataSource.query(
         'TRUNCATE plan_expiry_notice_deliveries, plan_expiry_notices',
       );
+      await dataSource.undoLastMigration(); // CreateTermsOfUse (BE-32), que vem depois
       await dataSource.undoLastMigration(); // CreateUserInvitations (BE-31), que vem depois
       await dataSource.undoLastMigration(); // AddManagementReportsPermission (BE-30), que vem depois
       await dataSource.undoLastMigration();

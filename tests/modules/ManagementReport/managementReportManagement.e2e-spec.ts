@@ -1,6 +1,8 @@
 import request from 'supertest';
 import type { App } from 'supertest/types';
 
+import { AddManagementReportsPermission1792000000000 } from '@/database/migrations/1792000000000-AddManagementReportsPermission';
+
 import { EvaluateFollowUpAlertsUseCase } from '@/modules/Alert/EvaluateFollowUpAlerts/evaluateFollowUpAlerts.useCase';
 import { insertAuditEvent } from '@/modules/Audit/repositories/auditEvent.repository';
 import { DashboardController } from '@/modules/Dashboard/dashboard.controller';
@@ -782,14 +784,19 @@ describeWithDatabase('relatorios gerenciais (e2e)', () => {
           ORDER BY o.code, ap.code`,
       );
 
-    await t.dataSource.undoLastMigration(); // CreateUserInvitations (BE-31), que vem depois
-    await t.dataSource.undoLastMigration();
+    // So o down/up desta migration: desfazer as posteriores tiraria as tabelas
+    // que o guard consulta a cada requisicao (termo de uso, BE-32).
+    const migration = new AddManagementReportsPermission1792000000000();
+    const runner = t.dataSource.createQueryRunner();
+
+    await migration.down(runner);
 
     try {
       expect(await grants()).toEqual([]);
       expect((await report(A.tokens.admin, '/alerts')).status).toBe(403);
     } finally {
-      await t.dataSource.runMigrations();
+      await migration.up(runner);
+      await runner.release();
     }
 
     expect(await grants()).toEqual([
