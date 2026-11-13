@@ -19,6 +19,7 @@ import { AuthIdentityRepository } from './repositories/authIdentity.repository';
 import { AuthSessionRepository } from './repositories/authSession.repository';
 import { AuthTransactionRepository } from './repositories/authTransaction.repository';
 import { PasswordResetRepository } from './repositories/passwordReset.repository';
+import { UserInvitationRepository } from './repositories/userInvitation.repository';
 import { RequestPasswordRecoveryUseCase } from './RequestPasswordRecovery/requestPasswordRecovery.useCase';
 import { ResetPasswordUseCase } from './ResetPassword/resetPassword.useCase';
 import { ResetUserPasswordAsAdminUseCase } from './ResetUserPasswordAsAdmin/resetUserPasswordAsAdmin.useCase';
@@ -66,6 +67,7 @@ export const passwordRecoveryMailerProviders: Provider[] = [
     AuthSessionRepository,
     AuthTransactionRepository,
     PasswordResetRepository,
+    UserInvitationRepository,
 
     ...passwordRecoveryMailerProviders,
 
@@ -82,6 +84,7 @@ export const passwordRecoveryMailerProviders: Provider[] = [
     AuthSessionRepository,
     PasswordHasher,
     TokenService,
+    UserInvitationRepository,
   ],
 })
 export class AuthModule {}
