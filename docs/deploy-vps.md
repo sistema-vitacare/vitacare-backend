@@ -236,19 +236,35 @@ SMTP_USER=<usuario>          # vazio = sem autenticacao
 SMTP_PASSWORD=<senha, segredo>
 SMTP_FROM=VitaCare <no-reply@dominio>
 PASSWORD_RESET_URL=http://<IP-da-VPS>:1040/redefinir-senha
+INVITATION_ACCEPT_URL=http://<IP-da-VPS>:1040/aceitar-convite
+INVITATION_TTL_HOURS=72      # validade do link do convite, 1 a 168 horas
 ```
 
 Os timeouts do SMTP ficam no padrão de 10 s: a stack não repassa
 `SMTP_*_TIMEOUT_MS`.
 
-Com `SMTP_ENABLED=true`, a API **não sobe** sem `SMTP_HOST`, `SMTP_FROM` e
-`PASSWORD_RESET_URL` (validação do `.env`). Ligar ativa **três envios de uma
-vez**:
+Com `SMTP_ENABLED=true`, a API **não sobe** sem `SMTP_HOST`, `SMTP_FROM`,
+`PASSWORD_RESET_URL` e `INVITATION_ACCEPT_URL` (validação do `.env`). Ligar
+ativa **quatro envios de uma vez**:
 
 1. **Recuperação de senha** (UC02): o link sai por e-mail.
 2. **E-mails de alerta** do BE-17, conforme as preferências de cada usuário.
 3. **Aviso de vencimento do plano** (BE-28): enviado aos administradores
    ativos às 08:00 de Brasília, sete dias antes, um dia antes e no vencimento.
+4. **Convite de usuário** (BE-31): o cadastro e a reemissão enviam ao convidado
+   um link de uso único para a página `INVITATION_ACCEPT_URL`, onde ele mesmo
+   cadastra a senha. O link vale `INVITATION_TTL_HOURS` (padrão 72 h). O
+   administrador **deixa de ver a senha provisória**, a menos que a peça
+   (`channel: "temporary_password"`). Se o envio falhar, o link é revogado na
+   hora e a tela orienta a reemitir. Com o SMTP fora do ar, o cadastro leva
+   cerca de 30 s (os três timeouts de 10 s) até responder a falha. O primeiro
+   administrador criado pelo master continua com senha provisória.
+
+Antes de ligar, publique no frontend a página de aceite do convite (guia em
+`docs/api/README.md`, "Página de aceite do convite"). Enquanto o acesso for por
+IP, sem HTTPS, o link do convite e o da recuperação trafegam sem criptografia.
+Ligar o SMTP não exige migration: a tabela `user_invitations` já vem na
+`1792100000000-CreateUserInvitations`, que o entrypoint aplica no deploy.
 
 Com o SMTP desligado, os e-mails de alerta e de aviso ficam registrados no banco
 como não enviados (`skipped`/`CHANNEL_DISABLED`), sem erro no log. Ao ligar o
@@ -443,6 +459,12 @@ Anotar o `time` na nota da tarefa no vault: é a medição do RTO.
   `docker run --rm --network infra <variáveis do banco> ghcr.io/sistema-vitacare/vitacare-backend:sha-<commit-novo> revert`
   (uma migration por execução; o `down` pode apagar dado da migration), então
   `APP_IMAGE` com o commit anterior. Se o `down` não servir: restauração.
+- O `down` da `1792100000000-CreateUserInvitations` (BE-31) **recusa** a
+  reversão enquanto houver usuário `pending` por link (sem senha), com mensagem
+  que diz quantos. Reemita o convite deles com `channel: "temporary_password"`
+  ou inative-os antes de reverter. Com o SMTP desligado, não existe nenhum.
+  O código anterior ao BE-31 roda sobre o schema novo enquanto não houver
+  pendente por link.
 - Nunca automático; nunca `migration:revert` sem backup do dia.
 
 ## Observabilidade
