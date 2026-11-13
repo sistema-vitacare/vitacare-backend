@@ -19,6 +19,7 @@ import { CreateScheduledAlerts1791400000000 } from '@/database/migrations/179140
 import { CreateAlertNotifications1791500000000 } from '@/database/migrations/1791500000000-CreateAlertNotifications';
 import { AuditEventQuery1791700000000 } from '@/database/migrations/1791700000000-AuditEventQuery';
 import { CreatePlanExpiryNotices1791900000000 } from '@/database/migrations/1791900000000-CreatePlanExpiryNotices';
+import { CreateUserInvitations1792100000000 } from '@/database/migrations/1792100000000-CreateUserInvitations';
 import { SnakeNamingStrategy } from '@/database/snakeNaming.strategy';
 import { ChangePasswordUseCase } from '@/modules/Auth/ChangePassword/changePassword.useCase';
 import { CompleteFirstAccessUseCase } from '@/modules/Auth/CompleteFirstAccess/completeFirstAccess.useCase';
@@ -260,6 +261,7 @@ describeWithDatabase('autenticacao em PostgreSQL descartavel', () => {
         CreateAlertNotifications1791500000000,
         AuditEventQuery1791700000000,
         CreatePlanExpiryNotices1791900000000,
+        CreateUserInvitations1792100000000,
       ],
       namingStrategy: new SnakeNamingStrategy(),
       synchronize: false,
@@ -1049,7 +1051,7 @@ describeWithDatabase('autenticacao em PostgreSQL descartavel', () => {
   });
 
   describe('schema completo', () => {
-    it('mapeia as trinta e duas tabelas nas entidades TypeORM', () => {
+    it('mapeia as trinta e tres tabelas nas entidades TypeORM', () => {
       expect(
         dataSource.entityMetadatas.map((metadata) => metadata.tableName).sort(),
       ).toEqual([
@@ -1083,6 +1085,7 @@ describeWithDatabase('autenticacao em PostgreSQL descartavel', () => {
         'profile_permissions',
         'push_subscriptions',
         'usage_plans',
+        'user_invitations',
         'user_patients',
         'users',
       ]);
