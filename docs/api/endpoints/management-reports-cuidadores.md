@@ -1,7 +1,7 @@
 ---
 title: Relatório de atividade dos cuidadores
 status: atual
-updated: 2026-11-12
+updated: 2026-11-13
 method: GET
 path: /api/v1/management-reports/caregivers
 source: src/modules/ManagementReport/managementReport.controller.ts
@@ -27,7 +27,7 @@ Só contam pacientes que passam no filtro de condição. O perfil mostrado é o 
 Mesma query do [relatório de alertas](management-reports-alertas.md): `from`, `to` (regra do BE-20, padrão de 30 dias, máximo de 366, datas pela **visita** nos registros e pela **emissão**/**resolução** nos alertas) e `condition` (trecho, 1 a 100 caracteres).
 
 ```bash
-curl -sS 'http://<IP>:1050/api/v1/management-reports/caregivers?from=2026-10-01&to=2026-10-31' \
+curl -sS 'https://api.example.com/api/v1/management-reports/caregivers?from=2026-10-01&to=2026-10-31' \
   -H 'Authorization: Bearer F3dQ2p...Zc9'
 ```
 

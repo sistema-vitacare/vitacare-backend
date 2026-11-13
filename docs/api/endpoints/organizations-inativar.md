@@ -134,7 +134,12 @@ Efeitos, na mesma transação:
 
 ## Pendências
 
-Retenção, exclusão definitiva e o efeito da inativação sobre pacientes, jobs e notificações não foram decididos (P07); as tabelas desses fluxos ainda não existem.
+Retenção e exclusão definitiva continuam sem decisão (P07). A frase anterior desta seção dizia que as tabelas de pacientes, jobs e notificações ainda não existiam; elas existem desde os BE-09 a BE-28 (nota de 2026-11-13, DOC-01). O efeito implementado hoje sobre esses fluxos, sem decisão de produto própria, é:
+
+- pacientes, formulários, registros, medicamentos e alertas ficam intactos;
+- nenhuma notificação nova é criada para alerta de organização inativa, e push e e-mail ainda pendentes ficam `skipped` com `ORGANIZATION_INACTIVE` (BE-17);
+- o aviso de vencimento do plano não é gerado nem enviado (BE-28);
+- as varreduras de ausência e de lembrete de medicamento (BE-16) **não** consultam a situação da organização: continuam gravando alertas `absence` e `medication_reminder` para pacientes ativos dela, sem notificação. Mateus decidiu manter assim em 2026-11-13 ([[2026-11-12-doc-01-correcao-documentacao]]).
 
 ## Origem e validação
 

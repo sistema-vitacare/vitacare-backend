@@ -1,7 +1,7 @@
 ---
 title: Exportar relatório de alertas e intercorrências em PDF
 status: atual
-updated: 2026-11-12
+updated: 2026-11-13
 method: GET
 path: /api/v1/management-reports/alerts/pdf
 source: src/modules/ManagementReport/managementReport.controller.ts
@@ -32,7 +32,7 @@ Headers: `Authorization: Bearer <token>` (sim); `Accept: application/pdf` (não)
 
 ```bash
 curl -sS -o relatorio-alertas.pdf \
-  'http://<IP>:1050/api/v1/management-reports/alerts/pdf?from=2026-10-01&to=2026-10-31' \
+  'https://api.example.com/api/v1/management-reports/alerts/pdf?from=2026-10-01&to=2026-10-31' \
   -H 'Authorization: Bearer F3dQ2p...Zc9'
 ```
 
