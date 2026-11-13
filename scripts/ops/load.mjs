@@ -137,7 +137,14 @@ const prepare = async () => {
     const email = `${role}${i}@${code}.example.test`;
     const invited = await api.request('POST', '/api/v1/users', {
       token: admin,
-      json: { name: `${role} ${i}`, email, cpf: cpf(), profileCode: role },
+      // Senha provisoria explicita (BE-31): com SMTP ligado o padrao e o link.
+      json: {
+        name: `${role} ${i}`,
+        email,
+        cpf: cpf(),
+        profileCode: role,
+        channel: 'temporary_password',
+      },
     });
     expectStatus(invited, 201, `convite ${role}`);
     const token = await signIn(
