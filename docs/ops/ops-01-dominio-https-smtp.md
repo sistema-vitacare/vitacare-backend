@@ -45,8 +45,14 @@ O registro da tarefa no vault é
 | A10 | IP real do cliente atrás do NPM | ⏳ pendente | de dentro da VPS a auditoria gravou o IP público da VPS (não `172.x`): indício. Falta o teste de rede externa |
 | — | Seed da plataforma e master | ✅ concluído | `organization.platform_seeded` em 2026-11-16 20:30 UTC; primeiro acesso, troca de senha e aceite do termo v1 pelo domínio |
 | — | Log HTTP com o IP do cliente | ✅ no código (esta branch) | `req.remoteAddress` = `req.ip`; testes em `tests/common/logRedaction.spec.ts`; vale após o deploy |
-| B1 | Business Starter contratado, domínio `vitacare.bizys.com.br` | ⏳ em andamento | Hostinger aceitou o subdomínio; TXT de verificação publicado e visível em todos os resolvedores; verificação da Hostinger aguardando |
-| B2–B8 | Caixa, DNS do remetente, testes e Kuma | ⏳ pendente | — |
+| B1 | Business Starter contratado, domínio `vitacare.bizys.com.br` | ✅ concluído | verificado pela Hostinger em 2026-11-16, depois de um TXT de teste igual na raiz (já removido; o do subdomínio fica) |
+| B2 | Caixa `no-reply@vitacare.bizys.com.br` | ✅ criada por Mateus | senha só no cofre |
+| B3 | MX, SPF, DKIM e DMARC do subdomínio | ✅ publicado | em 2026-11-16, `d.sec.dns.br` e `f.sec.dns.br`: MX `mx1`/`mx2.hostinger.com` (5/10); TXT com a verificação e `v=spf1 include:_spf.mail.hostinger.com ~all`; CNAME `hostingermail-a/b/c._domainkey.vitacare` → `hostingermail-*.dkim.mail.hostinger.com` (o Google resolve até `v=DKIM1`); `_dmarc.vitacare` = `v=DMARC1; p=none`, como a Hostinger sugeriu, sem `rua`; raiz inalterada (MX `.com.br` e SPF próprio) |
+| B4 | hPanel verde e mail-tester | ✅ concluído | mail-tester **9,5/10** com envio pelo webmail em 2026-11-16 |
+| B5 | A VPS alcança o SMTP | ✅ concluído | `SMTP ok` no `verify()` de dentro do `app-vitacare` (465/TLS), 2026-11-16. A primeira senha vazou num `read` mal colado e foi trocada antes do teste |
+| B6 | Variáveis SMTP na stack | ✅ concluído | 2026-11-16: `printenv` no `app-vitacare` com `SMTP_ENABLED=true`, `smtp.hostinger.com:465` TLS, remetente e URLs em `https://vitacare.bizys.com.br`, senha presente; API subiu sem erro de validação e `/health/ready` ok |
+| B7 | Recuperação de senha real | ✅ concluído | 2026-11-16 20:20: e-mail "Redefinição de senha VitaCare" de `no-reply@vitacare.bizys.com.br` entregue em 3 s na caixa principal do Gmail, com o link `https://vitacare.bizys.com.br/redefinir-senha?token=...` (15 min); "Mostrar original": SPF `PASS`, DKIM `PASS` (`vitacare.bizys.com.br`), DMARC `PASS` |
+| B8 | SMTP no Kuma | ⏳ pendente | — |
 | C | Push (VAPID) | ⏳ pendente | teste no navegador depende do service worker do frontend |
 | D | Monitores do Kuma | ⏳ pendente | — |
 | E | Backup, cron, restauração | ⏳ pendente | cópia externa adiada |
@@ -61,6 +67,11 @@ Achados de 2026-11-16, já corrigidos na documentação:
   estava obsoleto e foi retirado.
 - **`read` colado com outras linhas consome a linha seguinte como senha.** Colar
   cada `read` sozinho.
+- **No `read`, a senha vai no prompt, não no comando.** O comando é colado como
+  está (`SMTP_TEST_PASS` é o nome da variável); a senha só depois de aparecer
+  `Senha no-reply:`. Senha colada no comando fica no histórico e exige troca.
+- **Senha sem `#`, `!`, `$`, aspas, crase, `\` ou espaço.** Quebram o shell e a
+  interpolação da stack.
 - **Falhas de login antes do seed contam no limite.** Elas não aparecem na
   auditoria, mas somam no Redis (5 em 15 min).
 - **Frontend ainda com dados simulados.** Não tem `/aceitar-convite`, tela do
@@ -120,10 +131,17 @@ Achados de 2026-11-16, já corrigidos na documentação:
    | MX | `vitacare` | `mx2.hostinger.com`, prioridade 10 |
    | TXT | `vitacare` | `v=spf1 include:_spf.mail.hostinger.com ~all` |
    | CNAME | `hostingermail-a._domainkey.vitacare` | `hostingermail-a.dkim.mail.hostinger.com` (idem `-b`, `-c`) |
-   | TXT | `_dmarc.vitacare` | `v=DMARC1; p=none; rua=mailto:<seu-email>` |
+   | TXT | `_dmarc.vitacare` | `v=DMARC1; p=none` (publicado assim) |
 
    Não toque nas linhas de `bizys.com.br`, `sistema` e `www`. Comece o DMARC com
-   `p=none` e passe para `quarantine` depois de semanas sem falhas.
+   `p=none` e passe para `quarantine` depois de semanas sem falhas. Para receber
+   os relatórios, acrescente `; rua=mailto:no-reply@vitacare.bizys.com.br`: um
+   endereço de outro domínio (Gmail) exige registro de autorização no destino e
+   os relatórios não chegam.
+
+   Se a verificação do B1 travar com o TXT visível em todos os resolvedores,
+   publique o mesmo TXT também na raiz `bizys.com.br` (foi o que destravou em
+   2026-11-16) e apague-o depois de verificado.
 4. **B4:** conferência. Depois, o status verde no hPanel e a nota no
    mail-tester.com, com um envio pelo webmail:
 
