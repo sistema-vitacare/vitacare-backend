@@ -10,7 +10,7 @@ Este diretório descreve **as rotas que existem no backend**, em Markdown legív
 
 ## Endereço e convenções
 
-Nos exemplos, `https://api.example.com` representa a origem do ambiente onde a API for publicada; não é um servidor VitaCare configurado. O prefixo (`API_PREFIX`, padrão `api`) e a versão URI (`API_VERSION`, padrão `1`) são configuráveis. Assim, as rotas de negócio atuais usam `/api/v1`; as rotas `/health/*` e a página `/termos` ficam fora do prefixo e da versão. O TCC prevê HTTPS; hoje a produção é acessada por IP e porta, sem domínio nem HTTPS (`http://<IP>:1050`, decisão de Mateus em 2026-11-10), e o HTTPS foi decidido em 2026-11-13, mas ainda não está configurado. Localmente a API usa HTTP. Troque a origem sintética pela do ambiente alvo.
+Nos exemplos, `https://api.example.com` representa a origem do ambiente onde a API for publicada; não é um servidor VitaCare configurado. O prefixo (`API_PREFIX`, padrão `api`) e a versão URI (`API_VERSION`, padrão `1`) são configuráveis. Assim, as rotas de negócio atuais usam `/api/v1`; as rotas `/health/*` e a página `/termos` ficam fora do prefixo e da versão. A produção está em **`https://api.vitacare.bizys.com.br`**, com HTTPS pelo Nginx Proxy Manager desde 2026-11-16 (OPS-01), como prevê o TCC; o frontend fica em `https://vitacare.bizys.com.br`, a única origem aceita no CORS. O acesso por IP e porta (`http://<IP>:1050`, de 2026-11-10 a 2026-11-16) foi desligado. Localmente a API usa HTTP. Troque a origem sintética pela do ambiente alvo.
 
 O corpo das rotas de negócio é JSON quando aplicável. Autenticação usa Bearer opaco e stateful: o token bruto só sai no login e seu hash é persistido; sessão revogada, expirada, inativa ou com senha alterada não continua válida. Não envie dados pessoais reais em exemplos de documentação.
 
@@ -605,7 +605,7 @@ Trate `403 TERMS_ACCEPTANCE_REQUIRED` **em qualquer chamada** como "levar para a
 3. pede a senha (8 a 128 caracteres) e a confirmação, e chama [POST /auth/invitations/accept](endpoints/auth-convite-aceitar.md) com `{ token, newPassword }`;
 4. no `200`, mostra `meta.message` e redireciona ao login com `organizationCode` e `email` da resposta já preenchidos. O aceite **não** abre sessão: o usuário entra pelo login, que devolve a sessão normal e o bloco `session`.
 
-As duas rotas são públicas e somam um limite de 30 tentativas por IP por hora (`429 AUTH_TEMPORARILY_BLOCKED`). Até o HTTPS ser configurado (decidido por Mateus em 2026-11-13, ainda não aplicado), o link trafega sem criptografia.
+As duas rotas são públicas e somam um limite de 30 tentativas por IP por hora (`429 AUTH_TEMPORARILY_BLOCKED`). O link aponta para `https://vitacare.bizys.com.br/aceitar-convite` em produção e trafega por HTTPS.
 
 **Tela de usuários (BE-31).** No cadastro e na reemissão, `data.channel` diz o que mostrar: `temporary_password` exibe a senha e `expiresAt` uma única vez; `email` exibe `meta.message`, que confirma o envio com a validade ou avisa a falha, e nunca traz senha. Trate `invitation.status = invalidated` como convite a reemitir e ofereça a opção "gerar senha provisória" (`channel: "temporary_password"`) para quem não recebe e-mail. Com o SMTP ligado, a resposta espera o servidor de e-mail; com o SMTP fora do ar, pode levar cerca de 30 s até `failed`.
 
@@ -654,7 +654,7 @@ Os protótipos do TCC (Figuras 31–46) mostram elementos que **não têm rota n
 | Seletor "sessão máxima sem atividade" | 46 | valor fixo | informativo: 30 min sem atividade e 12 h absolutas, iguais para todos |
 | Aba Integrações; plano "Pro - Clínica", armazenamento, registros/mês | 46 | fora de escopo / catálogo Basic e Enterprise | `GET /organizations/me/plan` |
 
-Já atendidos pela API: relatórios Alertas e Intercorrências e Atividade dos Cuidadores (o "Eficiência" da Figura 43), filtro Condição, cards "N gerados" e lista de recentes (`/management-reports`, BE-30, plano Enterprise); logout (`POST /auth/logout`); resolver alerta, aba Resolvidos e marcar todos como lidos (`POST /alerts/{alertId}/resolve`, filtro `status`, `POST /notifications/read-all`); push e e-mail por preferência (`/notifications/preferences`), com o push indisponível no navegador enquanto o HTTPS não estiver configurado (decidido por Mateus em 2026-11-13).
+Já atendidos pela API: relatórios Alertas e Intercorrências e Atividade dos Cuidadores (o "Eficiência" da Figura 43), filtro Condição, cards "N gerados" e lista de recentes (`/management-reports`, BE-30, plano Enterprise); logout (`POST /auth/logout`); resolver alerta, aba Resolvidos e marcar todos como lidos (`POST /alerts/{alertId}/resolve`, filtro `status`, `POST /notifications/read-all`); push e e-mail por preferência (`/notifications/preferences`), com o push possível no navegador desde o HTTPS de 2026-11-16, quando o frontend tiver o service worker e as chaves VAPID de produção estiverem configuradas.
 
 ## Manutenção do manual
 

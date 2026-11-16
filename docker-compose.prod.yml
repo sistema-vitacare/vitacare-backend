@@ -40,9 +40,9 @@ services:
       # Container único: é seguro e idempotente. "false" pula.
       RUN_MIGRATIONS: ${RUN_MIGRATIONS:-true}
 
-      # --- IP real do cliente. Acesso direto por IP: a conexão já é o cliente.
-      # Com o Nginx Proxy Manager (rede proxy, faixa privada), o IP vem em
-      # X-Forwarded-For. Nunca `true` (aceitaria IP forjado).
+      # --- IP real do cliente. O Nginx Proxy Manager chega pela rede proxy
+      # (faixa privada) e manda o IP em X-Forwarded-For; auditoria, rate limit,
+      # aceite do termo e log usam esse IP. Nunca `true` (aceitaria IP forjado).
       TRUST_PROXY: ${TRUST_PROXY:-loopback,uniquelocal}
       # Timeouts: consulta 30s < request 60s < proxy público (>= 90s).
       HTTP_REQUEST_TIMEOUT_MS: ${HTTP_REQUEST_TIMEOUT_MS:-60000}
@@ -85,11 +85,12 @@ services:
       THROTTLE_TTL_MS: ${THROTTLE_TTL_MS:-60000}
       THROTTLE_LIMIT: ${THROTTLE_LIMIT:-120}
 
-      # --- E-mail: decisão de 2026-09-22, não existe SMTP no projeto. Ligado,
+      # --- E-mail: Hostinger, no-reply@vitacare.bizys.com.br (OPS-01). Ligado,
       # serve à recuperação de senha, aos e-mails de alerta (BE-17), ao aviso
       # de vencimento do plano (BE-28) e ao convite por link (BE-31), sem
       # mudança de código. Ligado, exige PASSWORD_RESET_URL e
       # INVITATION_ACCEPT_URL; desligado, o convite é a senha provisória.
+      # SMTP_FROM é só o endereço: com nome de exibição a API não sobe.
       SMTP_ENABLED: ${SMTP_ENABLED:-false}
       SMTP_HOST: ${SMTP_HOST:-}
       SMTP_PORT: ${SMTP_PORT:-587}
@@ -123,8 +124,9 @@ services:
       # Backup diário junto com o banco: scripts/ops/backup.sh (docs/deploy-vps.md).
       - vitacare-storage:/app/storage
     ports:
-      # 127.0.0.1 por padrão. O acesso é sempre por http://IP:1050, sem domínio
-      # nem HTTPS (decisão de 2026-11-10): a stack usa APP_BIND=0.0.0.0.
+      # Presa em 127.0.0.1: o acesso público é https://api.vitacare.bizys.com.br
+      # pelo Nginx Proxy Manager (rede proxy), desde 2026-11-16 (OPS-01). A
+      # stack não define APP_BIND; a porta local serve a túnel SSH e ensaio.
       - "${APP_BIND:-127.0.0.1}:1050:1050"
     labels:
       # Vira o label `stack` no Loki; igual ao nome da stack no Portainer.
@@ -152,7 +154,7 @@ services:
       start_period: 60s
     networks:
       - infra                      # postgresql e redis pelo nome
-      - proxy                      # rede padrão das stacks; sem uso pela API (acesso por IP)
+      - proxy                      # o Nginx Proxy Manager chega na API por aqui
 
 volumes:
   # No host vira `vitacare_vitacare-storage` (prefixo = nome da stack).
