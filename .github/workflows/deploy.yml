@@ -18,7 +18,7 @@
 #
 # Configuração no GitHub (Settings → Secrets and variables → Actions):
 #   Secret   PORTAINER_WEBHOOK_URL   URL do webhook da stack (obrigatório)
-#   Variable APP_URL                 http://<IP>:1050 (acesso só por IP),
+#   Variable APP_URL                 https://api.vitacare.bizys.com.br,
 #                                    sem / no fim (opcional; sem ela o job não
 #                                    confere se a versão nova entrou no ar)
 name: CI e deploy

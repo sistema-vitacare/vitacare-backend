@@ -20,7 +20,8 @@ stdout JSON (pino, level_name) → Alloy → Loki · cAdvisor → Prometheus · 
 | --- | --- |
 | Stack / label `stack` | `vitacare` |
 | Container | `app-vitacare` |
-| Porta (host = interna) | `1050` (1000, 1010, 1020, 1030 já reservadas; `1040` é o frontend do VitaCare) |
+| Endereço público | `https://api.vitacare.bizys.com.br` (frontend em `https://vitacare.bizys.com.br`), pelo Nginx Proxy Manager, desde 2026-11-16 |
+| Porta (host = interna) | `1050`, presa em `127.0.0.1` (1000, 1010, 1020, 1030 já reservadas; `1040` é o frontend do VitaCare) |
 | Banco e usuário | `vitacare` / `vitacare`, no Postgres da stack `infra` |
 | Prefixo Redis | `vitacare:` (cache) e `vitacare` (filas BullMQ) |
 | Imagem | `ghcr.io/sistema-vitacare/vitacare-backend` (`:latest` e `:sha-<commit>`) |
@@ -137,11 +138,24 @@ statement_timeout (30s) < requestTimeout do Node (60s)
 keepAliveTimeout do Node (65s) > keepalive de qualquer cliente ou balanceador (≤ 60s)
 ```
 
-## Passo a passo do zero ao ar (acesso por IP, sem domínio)
+## Passo a passo do zero ao ar (domínio com HTTPS)
 
-Hoje o acesso é por `http://<IP-da-VPS>:1050`, sem domínio nem HTTPS. Em
-2026-11-13 Mateus decidiu que **haverá HTTPS** e vai configurá-lo; até lá valem
-os riscos de [Acesso por IP, sem HTTPS](#acesso-por-ip-sem-https).
+Desde 2026-11-16 (OPS-01, decisão de Mateus em 2026-11-12) o acesso é por
+domínio com HTTPS, atrás do Nginx Proxy Manager (NPM) da stack `proxy`:
+
+| Endereço | Destino |
+| --- | --- |
+| `https://api.vitacare.bizys.com.br` | API, `app-vitacare:1050` |
+| `https://vitacare.bizys.com.br` | frontend, `app-vitacare-frontend:1040` (repositório `vitacare-frontend`) |
+
+As portas `1050` e `1040` escutam só em `127.0.0.1` e ficam fechadas no
+firewall: só o NPM as alcança, pela rede `proxy`. O acesso por IP de
+2026-11-10 a 2026-11-16 está em [Histórico: acesso por IP](#histórico-acesso-por-ip-2026-11-10-a-2026-11-16).
+
+```text
+navegador ── https ──► NPM (80/443, Let's Encrypt) ── rede proxy ──► app-vitacare:1050
+                                                   └─────────────► app-vitacare-frontend:1040
+```
 
 ### 0. Pré-requisitos na VPS
 
@@ -187,19 +201,25 @@ docker exec -it postgresql psql "postgresql://vitacare:<senha>@localhost/vitacar
 
 ### 3. Firewall
 
-hPanel → VPS → Segurança → Firewall → TCP `1050`. (O `ufw` não vale para porta
-publicada pelo Docker.)
+hPanel → VPS → Segurança → Firewall: TCP `80` e `443` abertas (já existem para
+os outros sistemas). **Não** abrir `1050` nem `1040`. O `ufw` não vale para
+porta publicada pelo Docker.
 
 ### 4. Variáveis (`.env.production`, nunca commitado)
 
-Sem aspas e sem comentário na mesma linha:
+Sem aspas e sem comentário na mesma linha. **Sem `APP_BIND`**: a porta fica
+presa em `127.0.0.1` (padrão do compose).
 
 ```dotenv
 DB_PASSWORD=<senha do passo 2>
 REDIS_PASSWORD=<a mesma da stack infra>
-APP_BIND=0.0.0.0
-CORS_ORIGINS=http://<IP-da-VPS>:1040
+CORS_ORIGINS=https://vitacare.bizys.com.br
+NOTIFICATION_APP_URL=https://vitacare.bizys.com.br
 ```
+
+`TRUST_PROXY` fica no padrão `loopback,uniquelocal`: o NPM chega pela rede
+`proxy` (faixa privada), e o Express lê o IP do cliente no `X-Forwarded-For`
+para auditoria, rate limit, aceite do termo e log. Nunca `true`.
 
 Heartbeat dos workers (BE-25). No Kuma, monitor **Push** `vitacare workers`,
 intervalo 600 s; copiar o token:
@@ -208,42 +228,45 @@ intervalo 600 s; copiar o token:
 UPTIME_KUMA_PUSH_URL=http://uptime-kuma:3001/api/push/<token>
 ```
 
-Notificações (BE-17), opcionais. Sem elas, a caixa interna funciona, o push
-fica desligado e os e-mails ficam como não enviados (`CHANNEL_DISABLED`):
+Push do navegador (BE-17), opcional. Sem ele, a caixa interna funciona e o push
+fica desligado:
 
 ```dotenv
-# Push do navegador: gerar uma vez com `npx web-push generate-vapid-keys`.
-# Trocar o par invalida as inscrições existentes (os navegadores se inscrevem de novo).
+# Gerar UMA vez com `npx web-push generate-vapid-keys`. Trocar o par depois
+# invalida todas as inscrições (os navegadores precisam se inscrever de novo).
 WEB_PUSH_ENABLED=true
 WEB_PUSH_PUBLIC_KEY=<chave publica>
 WEB_PUSH_PRIVATE_KEY=<chave privada, segredo>
 WEB_PUSH_SUBJECT=mailto:<contato do operador>
-# Link do app no push e no e-mail.
-NOTIFICATION_APP_URL=http://<IP-da-VPS>:1040
 ```
 
 O container precisa de saída HTTPS para os serviços de push (`fcm.googleapis.com`,
-`*.push.services.mozilla.com`, `*.notify.windows.com`, `*.push.apple.com`) e,
-com SMTP ligado, para o servidor de e-mail.
+`*.push.services.mozilla.com`, `*.notify.windows.com`, `*.push.apple.com`) e
+para o servidor de e-mail.
 
-**E-mail (SMTP).** Hoje fica desligado (`SMTP_ENABLED=false`, o padrão). Ligar é só
-configuração, sem código novo nem migration:
+**E-mail (SMTP).** Provedor escolhido por Mateus em 2026-11-16: Hostinger
+Business Starter (1.000 envios/dia por caixa), com a caixa
+`no-reply@vitacare.bizys.com.br` no **subdomínio** `vitacare.bizys.com.br` —
+o `bizys.com.br` já tem MX e SPF de outra conta, que não são tocados.
+Desligado (`SMTP_ENABLED=false`, o padrão), nada sai por e-mail. Ligar é só
+configuração, sem código nem migration:
 
 ```dotenv
 SMTP_ENABLED=true
-SMTP_HOST=<servidor SMTP>
-SMTP_PORT=587
-SMTP_SECURE=false            # true na porta 465 (TLS direto)
-SMTP_USER=<usuario>          # vazio = sem autenticacao
-SMTP_PASSWORD=<senha, segredo>
-SMTP_FROM=VitaCare <no-reply@dominio>
-PASSWORD_RESET_URL=http://<IP-da-VPS>:1040/redefinir-senha
-INVITATION_ACCEPT_URL=http://<IP-da-VPS>:1040/aceitar-convite
-INVITATION_TTL_HOURS=72      # validade do link do convite, 1 a 168 horas
+SMTP_HOST=smtp.hostinger.com
+SMTP_PORT=465
+SMTP_SECURE=true
+SMTP_USER=no-reply@vitacare.bizys.com.br
+SMTP_PASSWORD=<senha da caixa, segredo>
+SMTP_FROM=no-reply@vitacare.bizys.com.br
+PASSWORD_RESET_URL=https://vitacare.bizys.com.br/redefinir-senha
+INVITATION_ACCEPT_URL=https://vitacare.bizys.com.br/aceitar-convite
+INVITATION_TTL_HOURS=72
 ```
 
-Os timeouts do SMTP ficam no padrão de 10 s: a stack não repassa
-`SMTP_*_TIMEOUT_MS`.
+`SMTP_FROM` é **só o endereço**: a validação exige e-mail puro e recusa
+`VitaCare <no-reply@...>` (a API não sobe). Os timeouts do SMTP ficam no padrão
+de 10 s: a stack não repassa `SMTP_*_TIMEOUT_MS`.
 
 Com `SMTP_ENABLED=true`, a API **não sobe** sem `SMTP_HOST`, `SMTP_FROM`,
 `PASSWORD_RESET_URL` e `INVITATION_ACCEPT_URL` (validação do `.env`). Ligar
@@ -263,8 +286,9 @@ ativa **quatro envios de uma vez**:
    administrador criado pelo master continua com senha provisória.
 
 Antes de ligar, publique no frontend a página de aceite do convite (guia em
-`docs/api/README.md`, "Página de aceite do convite"). Até o HTTPS ser
-configurado, o link do convite e o da recuperação trafegam sem criptografia.
+`docs/api/README.md`, "Página de aceite do convite"). **Em 2026-11-16 o
+frontend ainda usa dados simulados e não tem `/aceitar-convite`:** até a
+integração, cadastre usuários pela API com `"channel": "temporary_password"`.
 Ligar o SMTP não exige migration: a tabela `user_invitations` já vem na
 `1792100000000-CreateUserInvitations`, que o entrypoint aplica no deploy.
 
@@ -309,69 +333,199 @@ docker ps --filter name=app-vitacare --format '{{.Names}}\t{{.Status}}'   # Up (
 docker logs app-vitacare 2>&1 | grep -E "executed successfully|API em"
 # Migration CreateInitialIdentitySchema... executed successfully
 # Migration CreateAuthSchema... executed successfully
-# API em http://0.0.0.0:1050/api/v1
+# API em http://0.0.0.0:1050/api/v1   (dentro do container; fora, só 127.0.0.1)
+curl -s http://127.0.0.1:1050/health/ready    # na VPS
 ```
 
 Se a migration falhar, o container não sobe (restart em loop com o erro no log).
 
-### 7. Validação de fora
+### 7. Domínio, proxy e HTTPS
+
+**7.1 DNS** — a zona do `bizys.com.br` fica no **registro.br** (nameservers
+`d/f.sec.dns.br`): Painel → `bizys.com.br` → DNS → Configurar zona (modo
+avançado) → Nova entrada. O campo Nome recebe só o que vem antes de
+`.bizys.com.br`; depois de **Salvar alterações**, a lista mostra o nome inteiro.
+
+| Tipo | Nome | Dados |
+| --- | --- | --- |
+| A | `vitacare` | `<IP-da-VPS>` |
+| A | `api.vitacare` | `<IP-da-VPS>` |
+
+`vitacare` é **A, nunca CNAME**: o mesmo nome tem o MX do e-mail (passo 4), e
+CNAME não convive com MX. Sem AAAA. Não mexer nas linhas de `bizys.com.br`,
+`sistema` e `www` (outros sistemas e o e-mail da raiz).
 
 ```bash
-curl -s http://<IP-da-VPS>:1050/api/v1          # data.version = commit do merge
-curl -s http://<IP-da-VPS>:1050/health/ready    # postgres e redis "up"
+dig +short vitacare.bizys.com.br @d.sec.dns.br       # servidor do registro.br, sem cache
+dig +short api.vitacare.bizys.com.br @d.sec.dns.br
+dig +short api.vitacare.bizys.com.br @8.8.8.8        # pode levar até 15 min a mais (cache negativo)
 ```
 
-Swagger: `http://<IP-da-VPS>:1050/api/docs`.
+**7.2 Rede `proxy`** — o NPM só entrega a container que esteja nela:
 
-### 8. Plataforma, administrador master e primeira organização (uma vez)
+```bash
+docker network inspect proxy --format '{{range .Containers}}{{.Name}} {{end}}' | tr ' ' '\n' | grep -E 'nginx-proxy-manager|app-vitacare|uptime-kuma'
+```
 
-O banco nasce vazio e o `seed:dev` recusa produção. Primeiro a organização de
-plataforma e o administrador master (CPF válido; a senha provisória aparece uma
-única vez no terminal e não vai para log nem auditoria):
+**7.3 Proxy hosts no NPM** — o painel escuta só no localhost da VPS. No
+terminal do **PC** (não da VPS), abrir o túnel e deixá-lo aberto:
+
+```bash
+ssh -L 8181:127.0.0.1:81 mavila@<IP-da-VPS>
+```
+
+Navegador do PC → `http://localhost:8181` → Hosts → Proxy Hosts → Add Proxy Host:
+
+| Domain Names | Scheme · Forward | Opções | Advanced |
+| --- | --- | --- | --- |
+| `api.vitacare.bizys.com.br` | `http` · `app-vitacare` · `1050` | Block Common Exploits ligado; Cache Assets e Websockets desligados | abaixo |
+| `vitacare.bizys.com.br` | `http` · `app-vitacare-frontend` · `1040` | Block Common Exploits ligado | vazio |
+
+```nginx
+client_max_body_size 12m;
+proxy_connect_timeout 10s;
+proxy_send_timeout 90s;
+proxy_read_timeout 90s;
+```
+
+12m cobre o anexo de 10 MiB (BE-13) mais o envelope multipart; 90 s ficam acima
+do `requestTimeout` de 60 s ([Hierarquia de timeouts](#hierarquia-de-timeouts-crescente-de-dentro-para-fora)).
+
+Teste antes do certificado (não depende do DNS):
+
+```bash
+curl -s -H 'Host: api.vitacare.bizys.com.br' http://<IP-da-VPS>/health/ready; echo
+curl -s -o /dev/null -w '%{http_code}\n' -H 'Host: vitacare.bizys.com.br' http://<IP-da-VPS>/healthz
+```
+
+`502` = container fora da rede `proxy` ou nome/porta errados; `404` ou a página
+do NPM = nome digitado diferente.
+
+**7.4 Certificado** — só depois do `dig` responder. Em cada host: Edit → SSL →
+*Request a new SSL Certificate*, **Force SSL** e **HTTP/2** ligados, e-mail,
+aceitar os termos, Save. **HSTS:** no host do frontend ligado (HSTS Subdomains
+desligado); no host da API **desligado**, porque a API já envia o cabeçalho
+(Helmet, 1 ano, `includeSubDomains`) e dois cabeçalhos HSTS confundem a
+conferência. Erro "Internal Error" = DNS ainda não propagado ou porta 80
+fechada; depois de 5 falhas seguidas o Let's Encrypt bloqueia o nome por 1 hora.
+
+**7.5 Stacks** — na `vitacare` não pode existir `APP_BIND` (passo 4); na
+`vitacare-frontend`, `API_URL=https://api.vitacare.bizys.com.br` e sem
+`APP_BIND`. **Update the stack** nas duas.
+
+### 8. Validação de fora
+
+```bash
+API=https://api.vitacare.bizys.com.br
+curl -sI http://api.vitacare.bizys.com.br/health/ready | grep -iE '^HTTP|^location'   # 301 → https
+curl -sI $API/health/ready | grep -iE '^HTTP|strict-transport'                       # HTTP/2 200 + HSTS
+curl -s $API/api/v1 | grep -o '"version":"[^"]*"'                                     # = commit da main
+curl -s -o /dev/null -w 'frontend: %{http_code}\n' https://vitacare.bizys.com.br/healthz
+echo | openssl s_client -connect api.vitacare.bizys.com.br:443 -servername api.vitacare.bizys.com.br 2>/dev/null | openssl x509 -noout -issuer -enddate
+curl -si -X OPTIONS $API/api/v1/auth/login -H 'Origin: https://vitacare.bizys.com.br' \
+  -H 'Access-Control-Request-Method: POST' -H 'Access-Control-Request-Headers: content-type,authorization' | grep -iE '^HTTP|access-control'
+curl -s https://vitacare.bizys.com.br/config.js                                      # apiUrl = a API em https
+curl -m 5 -s -o /dev/null -w '%{http_code}\n' http://<IP-da-VPS>:1050/health/live || echo 'porta 1050 recusada (ok)'
+```
+
+Do lado de fora, conferir também o **IP real**: um login com senha errada feito
+de uma rede externa (4G, por exemplo; a rede da Unimed bloqueia o domínio)
+grava `auth.login_failed` com o IP que `curl -s https://ifconfig.me` mostra
+nessa rede, e não um `172.x`. Teste feito de dentro da VPS mostra o IP da
+própria VPS e não prova nada.
+
+```bash
+docker exec -it postgresql psql -U vitacare -d vitacare -c \
+  "select action, host(ip_address) as ip, occurred_at from audit_events where action like 'auth.login%' order by occurred_at desc limit 3;"
+```
+
+Swagger: `https://api.vitacare.bizys.com.br/api/docs`.
+
+### 9. Plataforma, administrador master e primeiro acesso (uma vez)
+
+O banco nasce vazio e o `seed:dev` recusa produção. Os planos **Basic** e
+**Enterprise** do Quadro 2 já vêm pelas migrations: **não** inserir nada em
+`usage_plans` à mão.
+
+Primeiro a organização de plataforma e o administrador master (CPF válido; a
+senha provisória aparece uma única vez no terminal e não vai para log nem
+auditoria):
 
 ```bash
 docker exec -it app-vitacare node dist/cli/seed-platform.js \
-  --organization-code <codigo-da-plataforma> --trade-name "VitaCare" \
+  --organization-code vitacare --trade-name "VitaCare" \
   --admin-name "<Nome>" --admin-email <email> --admin-cpf <cpf>
 ```
 
 O seed roda uma vez por banco; a segunda execução é recusada sem alterar nada.
+**Não tente o login antes do seed:** a tentativa conta no limite de 5 falhas em
+15 minutos (`AUTH_TEMPORARILY_BLOCKED`) mesmo sem gravar auditoria, porque a
+organização ainda não existe.
 
-As organizações clientes precisam de um plano de uso ativo (os limites ainda
-não são aplicados pela API — P05/P06):
+Primeiro acesso, troca da senha provisória e aceite do termo (leia antes em
+`https://api.vitacare.bizys.com.br/termos`). As senhas são digitadas sem
+aparecer e sem ir para o histórico. **Cole cada `read` sozinho e digite a senha
+em seguida**: colado junto com outras linhas, o `read` consome a linha seguinte
+do bloco como se fosse a senha.
 
 ```bash
-docker exec -it postgresql psql -U vitacare -d vitacare -c \
-  "INSERT INTO usage_plans (name, description, user_limit, patient_limit, monthly_price)
-   VALUES ('Inicial', 'Plano inicial de producao', 50, 500, NULL) RETURNING id;"
+read -rsp 'Senha provisoria: ' SENHA; echo
 ```
 
-Depois o master faz login com o código da plataforma, troca a senha provisória
-no primeiro acesso, entra de novo, **aceita o termo de uso** (BE-32: sem o
-aceite, toda rota protegida responde `403 TERMS_ACCEPTANCE_REQUIRED`) e cadastra
-cada organização com o primeiro administrador em
+```bash
+read -rsp 'Nova senha definitiva: ' NOVA; echo
+```
+
+```bash
+API=https://api.vitacare.bizys.com.br; ORG=vitacare; EMAIL=<email>
+login() { curl -s -X POST $API/api/v1/auth/login -H 'Content-Type: application/json' -d "{\"organizationCode\":\"$ORG\",\"email\":\"$EMAIL\",\"password\":\"$1\"}"; }
+R=$(login "$SENHA"); echo "$R" | grep -oE '"(state|code)":"[^"]*"'
+TOKEN=$(echo "$R" | grep -o '"accessToken":"[^"]*"' | cut -d'"' -f4)
+curl -s -o /dev/null -w 'primeiro acesso: %{http_code}\n' -X POST $API/api/v1/auth/password/first-access -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' -d "{\"newPassword\":\"$NOVA\"}"
+R=$(login "$NOVA"); echo "$R" | grep -oE '"(state|code)":"[^"]*"'
+TOKEN=$(echo "$R" | grep -o '"accessToken":"[^"]*"' | cut -d'"' -f4)
+curl -s -X POST $API/api/v1/terms/acceptances -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' -d '{"version":1}' | grep -oE '"(version|alreadyAccepted)":[a-z0-9]+'
+R=$(login "$NOVA"); echo "$R" | grep -oE '"(state|code)":"[^"]*"'
+TOKEN=$(echo "$R" | grep -o '"accessToken":"[^"]*"' | cut -d'"' -f4)
+curl -s -o /dev/null -w 'logout: %{http_code}\n' -X POST $API/api/v1/auth/logout -H "Authorization: Bearer $TOKEN"
+unset SENHA NOVA TOKEN R
+```
+
+Esperado: `password_change_required` → `primeiro acesso: 200` →
+`terms_acceptance_required` → `"version":1` e `"alreadyAccepted":false` →
+`authenticated` → `logout: 200` (as linhas `"code":"platform_admin"` e
+`"code":"vitacare"` são o perfil e a organização do bloco `session`).
+
+Depois o master cadastra cada organização com o primeiro administrador em
 `POST /api/v1/organizations` (manual:
 [`organizations-criar.md`](api/endpoints/organizations-criar.md)).
 
-### 9. GitHub
+### 10. GitHub
 
 Settings → Secrets and variables → Actions: secret `PORTAINER_WEBHOOK_URL` (URL
-do passo 5) e variable `APP_URL=http://<IP-da-VPS>:1050`. *Re-run all jobs* do
-workflow do passo 1: três jobs verdes (`testes`, `imagem`, `deploy`), com
-"Versão <commit> no ar em <APP_URL>" no fim do deploy (o job espera
+do passo 5) e variable `APP_URL=https://api.vitacare.bizys.com.br` (no
+repositório do frontend, `APP_URL=https://vitacare.bizys.com.br`). *Re-run all
+jobs* do workflow do passo 1: três jobs verdes (`testes`, `imagem`, `deploy`),
+com "Versão <commit> no ar em <APP_URL>" no fim do deploy (o job espera
 `GET /api/v1` mostrar o commit em `data.version` e `/health/ready` responder
 `200`, por até 6 minutos). A homologação da imagem não roda no CI: ver
 [Antes do merge na main](#antes-do-merge-na-main).
 
-### 10. Monitoramento e backup
+### 11. Monitoramento e backup
 
-**Uptime Kuma** (`http://<IP-da-VPS>:3001`), cada um com a notificação SMTP:
+**Uptime Kuma**, cada monitor com a notificação SMTP (a mesma caixa
+`no-reply@vitacare.bizys.com.br`, `smtp.hostinger.com:465`, Security TLS):
 
 | Monitor | Tipo | Alvo | Intervalo |
 | --- | --- | --- | --- |
-| `vitacare` app | HTTP | `http://<IP-da-VPS>:1050/health/ready` | 60 s |
+| `vitacare app` | HTTP | `https://api.vitacare.bizys.com.br/health/ready`, com **Certificate Expiry Notification** (aviso a partir de 14 dias) | 60 s |
+| `vitacare frontend` | HTTP | `https://vitacare.bizys.com.br/healthz` | 60 s |
 | `vitacare workers` | Push | token em `UPTIME_KUMA_PUSH_URL` (passo 4) | 600 s |
 | `vitacare backup` | Push | token na linha do cron abaixo | 90000 s (25 h) |
+
+O monitor do app passa pelo domínio de propósito: confere DNS, NPM e
+certificado junto com a API. O heartbeat continua pela rede interna
+(`http://uptime-kuma:3001`), porque não depende do caminho público.
 
 **Backup diário** (RPO 24 h): banco e anexos na mesma execução, porque só se
 restauram juntos. Copiar os scripts uma vez (e a cada mudança deles):
@@ -402,7 +556,8 @@ vira no máximo um arquivo órfão; um removido nesse intervalo deixaria linha s
 arquivo após um restore (raro às 03:20).
 
 **Cópia externa (camada 3 de `vps-hostinger-backup`) ainda não existe**: sem
-ela, perder a VPS ou a conta perde os backups. Pendente com Mateus.
+ela, perder a VPS ou a conta perde os backups. Destino a decidir por Mateus
+(adiado em 2026-11-16).
 
 **Logs**: Grafana → Loki. Ver [Observabilidade](#observabilidade).
 
@@ -426,7 +581,7 @@ obrigatório antes de dados reais.
    Recusa, sem alterar nada, sem `--yes`, com `SHA256SUMS` que não confere, com
    o volume montado em algum container, com volume padrão inexistente, com o
    role do dono ausente e com conexão aberta no banco (`DROP` sem `FORCE`).
-4. **Subir a stack** (Start) e conferir: `node scripts/ops/smoke.mjs --base-url http://<IP-da-VPS>:1050`
+4. **Subir a stack** (Start) e conferir: `node scripts/ops/smoke.mjs --base-url https://api.vitacare.bizys.com.br`
    (de qualquer checkout) → `7/7 verificacoes ok (modo read)`; login de um administrador e
    download de um anexo recente.
 5. **Órfãos**: `docker exec app-vitacare node dist/cli/storage-orphans.js`
@@ -488,6 +643,13 @@ Nada de dado clínico no log: corpo de requisição não é registrado; `search`
 nome de arquivo do `Content-Disposition` saem `[Redacted]`; o heartbeat e os
 scripts não imprimem token, senha nem URL de push.
 
+`req.remoteAddress` é o IP do **cliente** pela regra `TRUST_PROXY` (o `req.ip`
+do Express, o mesmo da auditoria), e não o do NPM (OPS-01, 2026-11-16):
+
+```logql
+{stack="vitacare"} |= "request completed" | json | line_format "{{.req_remoteAddress}} {{.req_method}} {{.req_url}} {{.res_statusCode}}"
+```
+
 ## Metas (decididas por Mateus em 2026-11-10)
 
 | Meta | Valor | Medido localmente em 2026-11-10 (512 MiB, 1 CPU, 1.000 pacientes, 5.000 registros) |
@@ -514,10 +676,25 @@ Sem SLA ou SLO de disponibilidade: não declarar.
 
 ## Antes de dados reais (checklist)
 
-- [ ] HTTPS configurado (decisão de Mateus em 2026-11-13); enquanto não estiver, valem os riscos de [Acesso por IP, sem HTTPS](#acesso-por-ip-sem-https). Firewall só com as portas necessárias.
-- [ ] Termo de uso publicado: `curl -s <APP_URL>/api/v1/terms/current` responde a versão esperada e `<APP_URL>/termos` abre no navegador; o frontend linka `/termos` no rodapé e trata `403 TERMS_ACCEPTANCE_REQUIRED` ([Termo de uso](#termo-de-uso-e-aceite-be-32)).
-- [ ] `CORS_ORIGINS` só com a origem do frontend.
-- [ ] Monitores `vitacare` app, `vitacare workers` e `vitacare backup` no Kuma, UP.
+Marcar só o que foi conferido, com a data. Estado da OPS-01 em
+[`docs/ops/ops-01-dominio-https-smtp.md`](ops/ops-01-dominio-https-smtp.md).
+
+- [x] **HTTPS configurado** (verificado em 2026-11-16, OPS-01): certificado
+      Let's Encrypt nos dois nomes, `http` → `https` com `301`, HSTS presente,
+      `/health/ready` 200 e `data.version` igual ao commit da `main` pelo
+      domínio; `1050` e `1040` recusadas por IP e regras retiradas do firewall.
+- [ ] IP real do cliente conferido de uma rede externa (passo 8). De dentro da
+      VPS a auditoria mostrou o IP público da VPS, e não o do NPM — indício, não
+      prova.
+- [ ] Termo de uso publicado: na API, sim — o master aceitou a versão 1 em
+      2026-11-16 pelo domínio. Falta o frontend linkar `/termos` no rodapé e
+      tratar `403 TERMS_ACCEPTANCE_REQUIRED` ([Termo de uso](#termo-de-uso-e-aceite-be-32)).
+- [x] `CORS_ORIGINS` só com a origem do frontend (preflight de
+      `https://vitacare.bizys.com.br` com `204` em 2026-11-16).
+- [ ] SMTP ligado e testado: SPF, DKIM e DMARC conferidos, recuperação de senha
+      com link `https` recebida, e-mail de alerta `sent`, nova tentativa sem
+      duplicar com o SMTP fora.
+- [ ] Monitores `vitacare app` (pelo domínio, com aviso de certificado), `vitacare frontend`, `vitacare workers` e `vitacare backup` no Kuma, UP, com alerta por e-mail testado.
 - [ ] Cron do `backup.sh` com push; primeira pasta conferida.
 - [ ] Cópia externa criptografada dos backups (camada 3).
 - [ ] Ensaio de restauração na VPS com o tempo anotado (RTO).
@@ -542,7 +719,12 @@ Sem SLA ou SLO de disponibilidade: não declarar.
 | log: `too many connections for role` | `CONNECTION LIMIT` no role | `ALTER ROLE vitacare CONNECTION LIMIT -1;` |
 | `/health/ready` 503, redis `down` / WRONGPASS | `REDIS_PASSWORD` ≠ a da `infra` | igualar → Update |
 | erro de CORS no navegador | origem do front fora de `CORS_ORIGINS` | ajustar → Update |
-| timeout de fora, ok em `curl 127.0.0.1:1050` | firewall sem 1050 ou `APP_BIND` ausente | passos 3 e 4 |
+| `502 Bad Gateway` pelo domínio | container fora da rede `proxy` ou nome/porta errados no NPM | passo 7.2 e 7.3 |
+| "Internal Error" ao pedir o certificado | DNS ainda não propagado ou porta 80 fechada | `dig` do passo 7.1; esperar; até 5 tentativas por hora |
+| `413` ao enviar anexo | limite de corpo do NPM | `client_max_body_size 12m;` no Advanced do host da API |
+| API não sobe com `SMTP_ENABLED=true` | `SMTP_FROM` com nome (`VitaCare <...>`) ou URL de link faltando | `SMTP_FROM` só com o endereço; passo 4 |
+| `429 AUTH_TEMPORARILY_BLOCKED` no login | 5 falhas em 15 min pela conta ou pelo IP, inclusive antes do seed | esperar 15 min da primeira falha; tentativa bloqueada não soma |
+| log e auditoria com IP `172.x` | `TRUST_PROXY` vazio/`false` ou proxy fora da faixa privada | voltar ao padrão `loopback,uniquelocal` |
 
 ## Dia a dia
 
@@ -595,40 +777,40 @@ Sem SLA ou SLO de disponibilidade: não declarar.
   do termo e o tratamento do `403` **antes ou junto** deste merge; sem isso,
   ninguém consegue usar o sistema, nem em demonstração.
 
-## Acesso por IP, sem HTTPS
+## Histórico: acesso por IP (2026-11-10 a 2026-11-16)
 
-Decisão de Mateus em 2026-11-10: o sistema não terá domínio nem HTTPS; o acesso
-é sempre por IP e porta. Diverge do TCC (p. PDF 50: "requisições HTTPS").
-
-> **Revista em 2026-11-13:** Mateus decidiu que haverá HTTPS e vai
-> configurá-lo. Esta seção vale até lá; quando o HTTPS estiver no ar, ajustar
-> `APP_URL`, `CORS_ORIGINS`, `PASSWORD_RESET_URL`, `INVITATION_ACCEPT_URL`,
-> `NOTIFICATION_APP_URL` e esta página.
-
-- **Stack:** `APP_BIND=0.0.0.0` é permanente; a porta `1050` fica aberta no
-  firewall; `APP_URL=http://<IP-da-VPS>:1050` no GitHub; `CORS_ORIGINS` com
-  `http://<IP-da-VPS>:1040` (o frontend). Sem Nginx Proxy Manager na frente, a
-  conexão já é o cliente; `TRUST_PROXY=loopback,uniquelocal` continua inofensivo.
-- **Riscos aceitos:** tudo trafega sem criptografia — senha no login, o token
-  Bearer de cada requisição, dados de saúde e anexos — e pode ser lido ou
-  alterado por quem estiver no caminho (Wi-Fi público, rede da operadora).
-- **Efeito no navegador:** fora de HTTPS (exceto `localhost`) o navegador não
-  libera service worker nem Push API. O push do BE-17 e a instalação do PWA não
-  funcionam pelo `http://IP`; a caixa interna (`/notifications`) e o e-mail
-  continuam.
+De 2026-11-10 (decisão de Mateus, divergente do TCC, p. PDF 50: "requisições
+HTTPS") a 2026-11-16, o acesso era por `http://<IP-da-VPS>:1050` (API) e
+`:1040` (frontend), com `APP_BIND=0.0.0.0` e as portas abertas no firewall.
+Senha, token Bearer, dados de saúde e anexos trafegavam sem criptografia, e o
+navegador não liberava service worker nem Push API. Em 2026-11-13 Mateus
+decidiu que haveria HTTPS; em 2026-11-12 decidiu o domínio, o SMTP e o restante
+da infraestrutura (OPS-01), e o domínio com HTTPS entrou no ar em 2026-11-16
+([Passo a passo](#passo-a-passo-do-zero-ao-ar-domínio-com-https)). Não voltar a
+publicar a porta: `APP_BIND` não existe mais na stack.
 
 ## Pendências
 
-- **Na VPS (passos de Mateus, comandos acima):** variável
-  `UPTIME_KUMA_PUSH_URL` e os três monitores; cron único do `backup.sh`;
-  ensaio de restauração com tempo; medição de carga com o tamanho real.
-- **Cópia externa** dos backups (camada 3), criptografada.
-- **HTTPS** decidido em 2026-11-13 e ainda não configurado: até lá, riscos e
-  efeito no push em [Acesso por IP, sem HTTPS](#acesso-por-ip-sem-https).
+Andamento da OPS-01 item a item em
+[`docs/ops/ops-01-dominio-https-smtp.md`](ops/ops-01-dominio-https-smtp.md).
+
+- **SMTP** (Hostinger, `no-reply@vitacare.bizys.com.br`): domínio de e-mail em
+  verificação na Hostinger; caixa, DNS do remetente, variáveis e testes reais
+  pendentes. Ligá-lo ativa a recuperação de senha, os e-mails de alerta
+  (BE-17), o aviso de vencimento do plano (BE-28) e o convite por link (BE-31);
+  ver [Variáveis](#4-variáveis-envproduction-nunca-commitado).
+- **Push (VAPID)**: par de produção a gerar; o teste no navegador depende do
+  service worker do frontend, que ainda não existe.
+- **Na VPS (passos de Mateus, comandos acima):** `UPTIME_KUMA_PUSH_URL` e os
+  monitores; cron único do `backup.sh`; ensaio de restauração com tempo;
+  medição de carga com o tamanho real; IP real conferido de fora.
+- **Cópia externa** dos backups (camada 3), criptografada: destino adiado por
+  Mateus em 2026-11-16.
+- **Frontend** (repositório próprio): ainda com dados simulados em 2026-11-16 —
+  sem `/aceitar-convite`, tela do termo nem service worker. A validação nos
+  navegadores (RF019, RNF001–003) agora é possível com HTTPS.
 - **LGPD (P31)** resolvida no escopo acadêmico com o termo de uso (BE-32): ver
   o checklist.
-- **S3**: anexos usam o volume local (decisão de 2026-11-05). **SMTP**: desligado
-  até haver servidor. Ligá-lo ativa a recuperação de senha, os e-mails de alerta
-  (BE-17) e o aviso de vencimento do plano (BE-28); ver [Variáveis](#4-variáveis-envproduction-nunca-commitado).
+- **S3**: anexos usam o volume local (decisão de 2026-11-05).
 - **Dependências**: `npm audit` (à mão, fora do CI) sem `high`/`critical`; restam 3 `moderate`
   (glob/minimatch via TypeORM, correção só no TypeORM 1.x, fora do semver).

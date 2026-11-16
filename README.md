@@ -73,8 +73,11 @@ de producao, lint, build e unitarios, sem banco nem Redis) → `imagem` (build e
 push no GHCR, `:latest` e `:sha-<commit>`) → `deploy` (webhook do Portainer e
 espera `GET /api/v1` mostrar o commit em `data.version` e `/health/ready`
 responder `200`). A stack `vitacare` tem **um container**, `app-vitacare`, na
-porta `1050`; o entrypoint aplica as migrations pendentes
-(`RUN_MIGRATIONS=true`) e sobe a API.
+porta `1050` (presa em `127.0.0.1`), publicado em
+`https://api.vitacare.bizys.com.br` pelo Nginx Proxy Manager; o entrypoint
+aplica as migrations pendentes (`RUN_MIGRATIONS=true`) e sobe a API. Estado da
+operacao na VPS (dominio, SMTP, push, monitores, backup):
+`docs/ops/ops-01-dominio-https-smtp.md`.
 
 O CI e simples e leve de proposito (decisao de Mateus em 2026-11-10): os e2e
 (`npm run test:e2e` com PostgreSQL e Redis descartaveis) e a homologacao

@@ -29,7 +29,7 @@ Headers obrigatórios: nenhum. Path: nenhum parâmetro. Query: nenhuma. Corpo: n
 curl -i 'https://api.example.com/api/docs'
 ```
 
-`https://api.example.com` é a origem sintética do [manual](../README.md#endereço-e-convenções). Hoje a produção é acessada por IP e porta, sem HTTPS (decisão de Mateus em 2026-11-10; o HTTPS foi decidido em 2026-11-13 e ainda não está configurado), então a página fica em `http://<IP>:1050/api/docs`.
+`https://api.example.com` é a origem sintética do [manual](../README.md#endereço-e-convenções). Em produção, a página fica em `https://api.vitacare.bizys.com.br/api/docs` (HTTPS desde 2026-11-16, OPS-01).
 
 ## Respostas
 

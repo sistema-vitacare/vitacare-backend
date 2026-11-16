@@ -4,9 +4,12 @@ export const REDACTED = '[Redacted]';
 const SENSITIVE_QUERY_PARAMS = ['search'];
 
 interface SerializedRequest {
+  method?: string;
   url?: string;
   query?: Record<string, unknown>;
-  [key: string]: unknown;
+  remoteAddress?: string;
+  /** Requisicao original, nao enumeravel no objeto do pino. */
+  raw?: unknown;
 }
 
 /** Mascara na URL os parametros de query sensiveis. */
@@ -30,11 +33,28 @@ export const redactUrl = (url: string): string => {
 };
 
 /**
+ * IP do cliente pela regra `TRUST_PROXY` (o `req.ip` do Express), o mesmo da
+ * auditoria. Sem isto o log grava o endereco do socket, que atras do Nginx
+ * Proxy Manager e o do proxy.
+ */
+const clientIp = (raw: unknown): string | undefined => {
+  const ip = (raw as { ip?: unknown } | undefined)?.ip;
+
+  return typeof ip === 'string' && ip !== '' ? ip : undefined;
+};
+
+/**
  * Serializer de `req` do log HTTP: a busca de usuarios recebe nome ou e-mail,
- * que nao podem ir para o log nem pela URL nem pela query ja interpretada.
+ * que nao podem ir para o log nem pela URL nem pela query ja interpretada; o
+ * `remoteAddress` passa a ser o IP do cliente, e nao o do proxy.
  */
 export const redactRequestLog = <T extends SerializedRequest>(req: T): T => {
   const redacted = { ...req };
+  const ip = clientIp(req.raw);
+
+  if (ip) {
+    redacted.remoteAddress = ip;
+  }
 
   if (typeof req.url === 'string') {
     redacted.url = redactUrl(req.url);
