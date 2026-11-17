@@ -238,7 +238,7 @@ describeWithInfrastructure('homologacao funcional dos 14 casos de uso', () => {
     it('aplica todas as migrations no banco vazio, como o entrypoint de producao', () => {
       expect(t.executedMigrations).toHaveLength(migrationFiles().length);
       expect(t.executedMigrations.at(-1)).toBe(
-        'PublishTermsOfUseV11792200000001',
+        'PublishTermsOfUseV21792300000000',
       );
     });
 

@@ -1,7 +1,7 @@
 ---
 title: Termo de uso vigente
 status: atual
-updated: 2026-11-13
+updated: 2026-11-17
 method: GET
 path: /api/v1/terms/current
 source: src/modules/Terms/terms.controller.ts
@@ -36,12 +36,12 @@ curl -i 'https://api.example.com/api/v1/terms/current' -H 'Accept: application/j
 ```json
 {
   "data": {
-    "version": 1,
+    "version": 2,
     "title": "Termo de Uso e Privacidade do VitaCare",
-    "content": "# Termo de Uso e Privacidade do VitaCare\n\nVersão 1\n\nLeia com calma. ...",
-    "contentHash": "d11270af9e3bfc0817118586325d9cc26444dd4e4a1cb7937cdbc754f807c641",
+    "content": "# Termo de Uso e Privacidade do VitaCare\n\nVersão 2\n\nLeia com calma. ...",
+    "contentHash": "09c2057a90aaaa0af15aaf03c0d56db6fae99c47db942d1df6e2c79b32de3915",
     "publishedAt": "2026-11-13T12:00:00.000Z",
-    "pageUrl": "/termos?versao=1"
+    "pageUrl": "/termos?versao=2"
   },
   "meta": {
     "requestId": "b1c2d3e4-f5a6-4b7c-8d9e-0f1a2b3c4d5e",
