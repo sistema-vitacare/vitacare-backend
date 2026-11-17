@@ -363,6 +363,8 @@ Profissional sem vínculo não é notificado, mas lê os alertas da organizaçã
 
 **Conteúdo fora do sistema.** Push e e-mail aparecem na tela bloqueada e na caixa de e-mail, então levam só tipo, severidade e nome do paciente. Nunca valor, parâmetro, regra, formulário ou medicamento.
 
+**Formato dos e-mails (2026-11-17).** Todo e-mail da API (alerta, recuperação de senha, convite e aviso de vencimento do plano) sai em HTML no layout do VitaCare, com a versão em texto puro junto e o mesmo conteúdo: faixa navy com a logo (anexo inline), título, destaque colorido quando há severidade (`critical`, `warning`, `info`) ou vencimento, botão para o link (alerta e aviso de plano: "Abrir no VitaCare"/"Acessar o VitaCare", para `NOTIFICATION_APP_URL`; recuperação: "Redefinir senha"; convite: "Criar minha senha") com o mesmo link em texto logo abaixo, e rodapé "e-mail automático, não responda", com o nome da organização no convite e no aviso de plano. Sem o `NOTIFICATION_APP_URL`, alerta e aviso de plano saem sem botão. Por ora o rodapé não traz o link de `/termos` (decisão de Mateus em 2026-11-17). O conteúdo e as restrições de privacidade não mudaram.
+
 **Entrega.** A fila BullMQ `notifications` roda o scheduler `notification-delivery-sweep` a cada 10 s; o estado fica em `notification_deliveries` no PostgreSQL. Cada envio é reservado com `SKIP LOCKED` e **reconferido** antes de sair. Fica `skipped`, com o motivo, quando:
 
 - o usuário foi inativado, perdeu o vínculo ou deixou de ser admin com opt-in (`RECIPIENT_REVOKED`);

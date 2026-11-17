@@ -201,9 +201,48 @@ describe('invitationEmail', () => {
     );
   });
 
-  it('nao leva CPF, telefone nem id interno', () => {
-    expect(message.text).not.toMatch(/\d{3}\.?\d{3}\.?\d{3}-?\d{2}/);
-    expect(message.text).not.toMatch(/CPF|telefone/i);
-    expect(message.text).not.toMatch(/[0-9a-f]{8}-[0-9a-f]{4}-/);
+  it('HTML no layout padrao: botao "Criar minha senha", link em texto e organizacao no rodape', () => {
+    const url = 'https://app.example.test/aceitar-convite?token=abc';
+
+    expect(message.html).toContain('>Olá, Ana Exemplo.</p>');
+    expect(message.html).toMatch(
+      new RegExp(
+        `<a href="${url.replace('?', '\\?')}"[^>]*>Criar minha senha</a>`,
+      ),
+    );
+    expect(message.html).toContain(`>${url}</a>`);
+    expect(message.html).toContain('&quot;casa-exemplo&quot;');
+    expect(message.html).toContain('16/11/2026 às 12:00 (horário de Brasília)');
+    expect(message.html).toContain('Organização: Casa Exemplo</td>');
+    expect(message.attachments).toHaveLength(1);
+    expect(message.text).toContain(`Criar minha senha: ${url}`);
+  });
+
+  it('escapa nomes vindos de dado', () => {
+    const hostile = invitationEmail({
+      to: 'ana@example.test',
+      userName: '<img src=x onerror=alert(1)>',
+      organizationName: 'Casa & "Filhos"',
+      organizationCode: 'casa',
+      inviterName: '<b>Admin</b>',
+      profileName: 'Cuidador',
+      acceptUrl: 'https://app.example.test/aceitar-convite?token=abc',
+      expiresAt,
+    });
+
+    expect(hostile.html).not.toMatch(/<img src=x|<b>Admin/);
+    expect(hostile.html).toContain('&lt;b&gt;Admin&lt;/b&gt; convidou você');
+    expect(hostile.html).toContain(
+      'Organização: Casa &amp; &quot;Filhos&quot;',
+    );
+  });
+
+  it('nao leva CPF, telefone, id interno nem o endereco do destinatario', () => {
+    for (const body of [message.text, message.html!]) {
+      expect(body).not.toMatch(/\d{3}\.?\d{3}\.?\d{3}-?\d{2}/);
+      expect(body).not.toMatch(/CPF|telefone/i);
+      expect(body).not.toMatch(/[0-9a-f]{8}-[0-9a-f]{4}-/);
+      expect(body).not.toContain('ana@example.test');
+    }
   });
 });

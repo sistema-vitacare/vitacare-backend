@@ -2,6 +2,7 @@ import { DataSource } from 'typeorm';
 
 import { DisabledChannelSender } from '@/modules/Notification/channels/disabledChannel.sender';
 import type { DeliveryResult } from '@/modules/Notification/channels/deliveryResult.type';
+import type { EmailMessage } from '@/modules/Notification/channels/emailSender';
 import { DeliverNotificationsUseCase } from '@/modules/Notification/DeliverNotifications/deliverNotifications.useCase';
 import { insertAlertNotifications } from '@/modules/Notification/repositories/alertNotification.query';
 import { NotificationDeliveryRepository } from '@/modules/Notification/repositories/notificationDelivery.repository';
@@ -166,11 +167,20 @@ describeWithDatabase('entrega das notificacoes (e2e)', () => {
       alertId: alert,
       url: APP_URL,
     });
-    expect(email.send).toHaveBeenCalledWith({
+    expect(email.send).toHaveBeenCalledTimes(1);
+    const [sent] = email.send.mock.calls[0] as [EmailMessage];
+
+    expect(sent).toMatchObject({
       to: caregiverEmail,
       subject: 'VitaCare: Ausência de registro',
-      text: `Paciente: Paciente Sintetico · Severidade: Crítico\nAcesse o VitaCare para ver os detalhes: ${APP_URL}`,
     });
+    expect(sent.text).toContain(
+      `Severidade: Crítico\nPaciente: Paciente Sintetico\n\nAcesse o VitaCare para ver os detalhes.\n\nAbrir no VitaCare: ${APP_URL}`,
+    );
+    expect(sent.html).toContain('Paciente: Paciente Sintetico');
+    expect(sent.attachments?.map((file) => file.cid)).toEqual([
+      'logo@vitacare',
+    ]);
 
     const states = await deliveriesOf(alert);
 

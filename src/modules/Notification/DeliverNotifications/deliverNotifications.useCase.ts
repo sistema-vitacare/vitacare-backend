@@ -69,11 +69,7 @@ export class DeliverNotificationsUseCase {
 
     try {
       if (delivery.channel === 'email') {
-        return await this.email.send({
-          to: delivery.email,
-          subject: message.subject,
-          text: message.text,
-        });
+        return await this.email.send({ to: delivery.email, ...message.email });
       }
 
       const { endpoint, p256dh, auth } = delivery.subscription!;

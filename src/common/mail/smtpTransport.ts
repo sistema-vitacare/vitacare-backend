@@ -3,7 +3,8 @@ import nodemailer, { type Transporter } from 'nodemailer';
 
 /**
  * Transporte SMTP do projeto (recuperacao de senha e notificacoes). Sem acesso
- * a arquivo ou URL no corpo e sem log, que levaria destinatario e texto.
+ * a arquivo ou URL no corpo e sem log, que levaria destinatario e texto; a
+ * logo do layout (`emailLayout.ts`) vai como anexo inline em memoria.
  */
 export const createSmtpTransport = (config: ConfigService): Transporter => {
   const user = config.get<string>('mail.user');
