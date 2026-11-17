@@ -11,7 +11,10 @@ import { alertScope } from '../policies/alertScope.policy';
 import { AlertRepository } from '../repositories/alert.repository';
 import type { ListAlertsQueryDto } from './listAlerts.dto';
 
-/** Alertas de um paciente do alcance, mais recentes primeiro (UC13 passo 5). */
+/**
+ * Alertas de um paciente do alcance ou, sem `patientId`, de todos os
+ * pacientes do alcance (UC13 passo 5; Figura 42, BE-33).
+ */
 @Injectable()
 export class ListAlertsUseCase {
   constructor(private readonly alerts: AlertRepository) {}
@@ -24,6 +27,8 @@ export class ListAlertsUseCase {
       patientId: query.patientId,
       severity: query.severity,
       status: query.status,
+      source: query.source,
+      sort: query.sort,
       skip: query.skip,
       take: query.limit,
     });

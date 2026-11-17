@@ -9,14 +9,19 @@ import { findPatientInScope } from '@/modules/PatientAccess/repositories/patient
 import { PATIENT_SCOPE_WHERE } from '@/modules/Patient/repositories/patientScope.query';
 
 import { alertMessage } from '../policies/alertMessage.policy';
-import type {
-  AlertMatch,
-  AlertRow,
-  AlertScope,
-  EvaluateRecordOutcome,
-  ListAlertsFilter,
-  ListAlertsOutcome,
-  ResolveAlertOutcome,
+import { alertListOrder } from '../policies/alertOrder.policy';
+import {
+  ALERT_SEVERITIES,
+  type AlertMatch,
+  type AlertRow,
+  type AlertScope,
+  type AlertSummaryFilter,
+  type AlertSummaryOutcome,
+  type EvaluateRecordOutcome,
+  type ListAlertsFilter,
+  type ListAlertsOutcome,
+  type OpenAlertCounts,
+  type ResolveAlertOutcome,
 } from '../types/alert.types';
 
 /**
@@ -34,6 +39,9 @@ const ALERT_FROM = `
     LEFT JOIN follow_up_records r
       ON r.id = a.follow_up_record_id
      AND r.organization_id = a.organization_id
+    LEFT JOIN users author
+      ON author.id = r.author_user_id
+     AND author.organization_id = r.organization_id
     LEFT JOIN follow_up_forms f
       ON f.id = a.form_id
      AND f.organization_id = a.organization_id
@@ -53,6 +61,7 @@ const ALERT_SELECT = `
   SELECT a.id,
          p.id AS "patientId",
          p.name AS "patientName",
+         p.main_condition AS "patientMainCondition",
          a.source,
          a.severity,
          a.status,
@@ -63,6 +72,8 @@ const ALERT_SELECT = `
          r.id AS "followUpId",
          r.visited_at AS "visitedAt",
          r.status AS "followUpStatus",
+         author.id AS "authorId",
+         author.name AS "authorName",
          a.field_key AS "fieldKey",
          a.field_name AS "fieldName",
          a.field_unit AS "fieldUnit",
@@ -101,11 +112,14 @@ type RawAlertRow = Pick<
 > & {
   patientId: string;
   patientName: string;
+  patientMainCondition: string | null;
   ruleId: string | null;
   ruleName: string | null;
   followUpId: string | null;
   visitedAt: Date | null;
   followUpStatus: string | null;
+  authorId: string | null;
+  authorName: string | null;
   fieldKey: string | null;
   fieldName: string | null;
   fieldUnit: string | null;
@@ -140,7 +154,11 @@ const toRow = (raw: RawAlertRow): AlertRow => {
 
   return {
     id: raw.id,
-    patient: { id: raw.patientId, name: raw.patientName },
+    patient: {
+      id: raw.patientId,
+      name: raw.patientName,
+      mainCondition: raw.patientMainCondition,
+    },
     source: raw.source,
     severity: raw.severity,
     status: raw.status,
@@ -152,6 +170,7 @@ const toRow = (raw: RawAlertRow): AlertRow => {
           id: raw.followUpId!,
           visitedAt: raw.visitedAt!,
           status: raw.followUpStatus!,
+          author: { id: raw.authorId!, name: raw.authorName! },
         }
       : null,
     field: reading
@@ -272,6 +291,10 @@ const FAILED_RETRY_SECONDS = 3600;
 export class AlertRepository {
   constructor(private readonly dataSource: DataSource) {}
 
+  /**
+   * Com `patientId`, um paciente do alcance (fora dele = `patient_not_found`);
+   * sem, todos os pacientes do alcance da sessao (BE-33).
+   */
   async list(
     scope: AlertScope,
     filter: ListAlertsFilter,
@@ -279,26 +302,31 @@ export class AlertRepository {
     try {
       const manager = this.dataSource.manager;
 
-      if (!(await findPatientInScope(manager, scope, filter.patientId))) {
+      if (
+        filter.patientId &&
+        !(await findPatientInScope(manager, scope, filter.patientId))
+      ) {
         return { kind: 'patient_not_found' };
       }
 
       const where = `
-          AND a.patient_id = $5
+          AND ($5::uuid IS NULL OR a.patient_id = $5)
           AND ($6::varchar IS NULL OR a.severity = $6)
-          AND ($7::varchar IS NULL OR a.status = $7)`;
+          AND ($7::varchar IS NULL OR a.status = $7)
+          AND ($8::varchar IS NULL OR a.source = $8)`;
       const parameters = [
         ...scopeParameters(scope),
-        filter.patientId,
+        filter.patientId ?? null,
         filter.severity ?? null,
         filter.status ?? null,
+        filter.source ?? null,
       ];
 
       const [rows, [{ total }]] = await Promise.all([
         manager.query<RawAlertRow[]>(
           `${ALERT_SELECT} ${where}
-            ORDER BY a.generated_at DESC, a.id
-            LIMIT $8 OFFSET $9`,
+            ORDER BY ${alertListOrder(filter.sort ?? 'recent')}
+            LIMIT $9 OFFSET $10`,
           [...parameters, filter.take, filter.skip],
         ),
         manager.query<Array<{ total: number }>>(
@@ -308,6 +336,54 @@ export class AlertRepository {
       ]);
 
       return { kind: 'ok', items: rows.map(toRow), total };
+    } catch (error) {
+      throw translatePgError(error, 'alerts');
+    }
+  }
+
+  /**
+   * Abertos por severidade numa unica consulta, no mesmo alcance e com os
+   * mesmos filtros de `list` (menos severidade e status): cada numero e o
+   * `total` de `list` com `status = open` e aquela severidade (BE-33).
+   */
+  async summary(
+    scope: AlertScope,
+    filter: AlertSummaryFilter,
+  ): Promise<AlertSummaryOutcome> {
+    try {
+      const manager = this.dataSource.manager;
+
+      if (
+        filter.patientId &&
+        !(await findPatientInScope(manager, scope, filter.patientId))
+      ) {
+        return { kind: 'patient_not_found' };
+      }
+
+      const [open] = await manager.query<OpenAlertCounts[]>(
+        `SELECT count(*)::int AS total,
+                ${ALERT_SEVERITIES.map(
+                  (severity) =>
+                    `count(*) FILTER (WHERE a.severity = '${severity}')::int AS "${severity}"`,
+                ).join(',\n                ')}
+           FROM alerts a
+           JOIN patients p
+             ON p.id = a.patient_id
+            AND p.organization_id = a.organization_id
+         ${PATIENT_SCOPE_WHERE}
+            AND a.status = 'open'
+            AND ($4::uuid IS NULL OR a.patient_id = $4)
+            AND ($5::varchar IS NULL OR a.source = $5)`,
+        [
+          scope.organizationId,
+          scope.viewerUserId,
+          scope.viewerLinkRoles,
+          filter.patientId ?? null,
+          filter.source ?? null,
+        ],
+      );
+
+      return { kind: 'ok', open };
     } catch (error) {
       throw translatePgError(error, 'alerts');
     }

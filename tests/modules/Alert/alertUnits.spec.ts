@@ -6,12 +6,17 @@ import {
   toAlertRulePatch,
   toAlertRuleResponse,
 } from '@/modules/Alert/parsers/alertRule.parser';
+import { toAlertSummaryResponse } from '@/modules/Alert/parsers/alertSummary.parser';
 import { alertMessage } from '@/modules/Alert/policies/alertMessage.policy';
+import {
+  ALERT_SEVERITY_RANK,
+  alertListOrder,
+} from '@/modules/Alert/policies/alertOrder.policy';
 import type { AlertRepository } from '@/modules/Alert/repositories/alert.repository';
 import type { AlertMatch } from '@/modules/Alert/types/alert.types';
 
 import { sessionOf } from '../Patient/patient.fixtures';
-import { alertRow, ruleRow } from './alert.fixtures';
+import { alertRow, FOLLOW_UP_AUTHOR_ID, ruleRow } from './alert.fixtures';
 
 const match = (overrides: Partial<AlertMatch> = {}): AlertMatch => ({
   ruleId: 'r',
@@ -87,6 +92,7 @@ describe('parsers de regra e alerta', () => {
             id: 'f',
             visitedAt: new Date('2026-11-05T11:00:00.000Z'),
             status: 'annulled',
+            author: { id: FOLLOW_UP_AUTHOR_ID, name: 'Cuidador Sintetico' },
           },
         }),
         ctx,
@@ -95,7 +101,12 @@ describe('parsers de regra e alerta', () => {
       value: '250',
       operator: 'gt',
       referenceValue: 180,
-      followUp: { status: 'annulled', visitedAt: '2026-11-05T11:00:00.000Z' },
+      patient: { name: 'Paciente Sintetico', mainCondition: 'Diabetes tipo 2' },
+      followUp: {
+        status: 'annulled',
+        visitedAt: '2026-11-05T11:00:00.000Z',
+        author: { id: FOLLOW_UP_AUTHOR_ID, name: 'Cuidador Sintetico' },
+      },
       generatedAt: '2026-11-05T12:01:00.000Z',
       absence: null,
       medicationReminder: null,
@@ -167,6 +178,37 @@ describe('parsers de regra e alerta', () => {
         scheduledAt: '2026-11-05T11:00:00.000Z',
       },
     });
+  });
+  it('paciente sem condicao principal sai com mainCondition null', () => {
+    expect(
+      toAlertResponse(
+        alertRow({
+          patient: { id: 'p', name: 'Paciente', mainCondition: null },
+        }),
+        ctx,
+      ).patient,
+    ).toEqual({ id: 'p', name: 'Paciente', mainCondition: null });
+  });
+
+  it('contadores saem so com total e as tres severidades', () => {
+    expect(
+      toAlertSummaryResponse({ total: 7, critical: 2, warning: 3, info: 2 }),
+    ).toEqual({ open: { total: 7, critical: 2, warning: 3, info: 2 } });
+  });
+});
+
+describe('alertListOrder', () => {
+  it('recent: mais recentes primeiro, id desempata', () => {
+    expect(alertListOrder('recent')).toBe('a.generated_at DESC, a.id');
+  });
+
+  it('priority: critical, warning, info e depois os mais recentes (Figura 42)', () => {
+    expect(alertListOrder('priority')).toBe(
+      `${ALERT_SEVERITY_RANK}, a.generated_at DESC, a.id`,
+    );
+    expect(ALERT_SEVERITY_RANK).toBe(
+      "CASE a.severity WHEN 'critical' THEN 0 WHEN 'warning' THEN 1 ELSE 2 END",
+    );
   });
 });
 

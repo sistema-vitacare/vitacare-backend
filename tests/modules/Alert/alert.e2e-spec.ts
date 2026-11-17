@@ -95,7 +95,7 @@ describe('Alert HTTP (e2e)', () => {
     deactivate: jest.fn(),
     reactivate: jest.fn(),
   };
-  const alerts = { list: jest.fn(), findById: jest.fn() };
+  const alerts = { list: jest.fn(), findById: jest.fn(), summary: jest.fn() };
 
   const server = (): App => app.getHttpServer() as App;
 
@@ -320,14 +320,94 @@ describe('Alert HTTP (e2e)', () => {
     expect(rules.update).not.toHaveBeenCalled();
   });
 
-  it('listagem de alertas exige patientId', async () => {
-    const response = await call('get', '/alerts');
+  it('sem patientId lista o alcance inteiro, com filtros e ordem', async () => {
+    alerts.list.mockResolvedValue({
+      kind: 'ok',
+      items: [alertRow()],
+      total: 1,
+    });
 
-    expect(response.status).toBe(422);
-    expect(alerts.list).not.toHaveBeenCalled();
+    const plain = await call('get', '/alerts', 'caregiver');
+
+    expect(plain.status).toBe(200);
+    expect(plain.body as object).toMatchObject({
+      data: [
+        {
+          id: ALERT_ID,
+          patient: { mainCondition: 'Diabetes tipo 2' },
+          followUp: { author: { name: 'Cuidador Sintetico' } },
+        },
+      ],
+      meta: { pagination: { total: 1 } },
+    });
+    expect(alerts.list).toHaveBeenLastCalledWith(
+      expect.objectContaining({ viewerLinkRoles: ['caregiver'] }),
+      {
+        patientId: undefined,
+        severity: undefined,
+        status: undefined,
+        source: undefined,
+        sort: 'recent',
+        skip: 0,
+        take: 20,
+      },
+    );
+
+    await call(
+      'get',
+      '/alerts?severity=critical&status=open&source=absence&sort=priority',
+    );
+
+    expect(alerts.list).toHaveBeenLastCalledWith(
+      expect.objectContaining({ viewerUserId: null }),
+      expect.objectContaining({
+        patientId: undefined,
+        severity: 'critical',
+        status: 'open',
+        source: 'absence',
+        sort: 'priority',
+      }),
+    );
+
+    for (const query of ['source=manual', 'sort=severity']) {
+      expect((await call('get', `/alerts?${query}`)).status).toBe(422);
+    }
   });
 
-  it('publica as nove rotas no OpenAPI com bearer, envelope e erros', async () => {
+  it('contadores: rota propria antes de /alerts/:alertId, mesmo alcance', async () => {
+    alerts.summary.mockResolvedValue({
+      kind: 'ok',
+      open: { total: 7, critical: 2, warning: 3, info: 2 },
+    });
+
+    const response = await call(
+      'get',
+      '/alerts/summary?source=reading',
+      'family',
+    );
+
+    expect(response.status).toBe(200);
+    expect(response.body as object).toMatchObject({
+      data: { open: { total: 7, critical: 2, warning: 3, info: 2 } },
+    });
+    expect(alerts.findById).not.toHaveBeenCalled();
+    expect(alerts.summary).toHaveBeenCalledWith(
+      expect.objectContaining({ viewerLinkRoles: ['family'] }),
+      { patientId: undefined, source: 'reading' },
+    );
+
+    alerts.summary.mockResolvedValue({ kind: 'patient_not_found' });
+
+    const outside = await call(
+      'get',
+      `/alerts/summary?patientId=${PATIENT_ID}`,
+    );
+
+    expect(outside.status).toBe(404);
+    expect((await call('get', '/alerts/summary?status=open')).status).toBe(422);
+  });
+
+  it('publica as dez rotas no OpenAPI com bearer, envelope e erros', async () => {
     const document = (await request(server()).get('/api/docs-json'))
       .body as OpenApiDocument;
 
@@ -375,6 +455,13 @@ describe('Alert HTTP (e2e)', () => {
         '200',
         ['401', '403', '404', '422'],
         'AlertDto',
+      ],
+      [
+        '/api/v1/alerts/summary',
+        'get',
+        '200',
+        ['401', '403', '404', '422'],
+        'AlertSummaryDto',
       ],
       [
         '/api/v1/alerts/{alertId}',
@@ -472,6 +559,30 @@ describe('Alert HTTP (e2e)', () => {
       'reminderId',
       'scheduledAt',
     ]);
+    expect(schemas.AlertPatientDto.properties?.mainCondition.nullable).toBe(
+      true,
+    );
+    expect(schemas.AlertFollowUpRefDto.required).toContain('author');
+    expect(schemas.OpenAlertCountsDto.required?.sort()).toEqual([
+      'critical',
+      'info',
+      'total',
+      'warning',
+    ]);
+
+    const listParameters = (
+      document.paths['/api/v1/alerts'].get as unknown as {
+        parameters: Array<{ name: string; required: boolean }>;
+      }
+    ).parameters;
+
+    expect(
+      listParameters.find((parameter) => parameter.name === 'patientId')
+        ?.required,
+    ).toBe(false);
+    expect(listParameters.map((parameter) => parameter.name)).toEqual(
+      expect.arrayContaining(['source', 'sort']),
+    );
     expect(schemas.AlertRuleDto.properties?.status.enum).toEqual([
       'active',
       'inactive',

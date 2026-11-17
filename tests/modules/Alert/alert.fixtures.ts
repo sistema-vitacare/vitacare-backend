@@ -7,6 +7,7 @@ export const ALERT_ID = '7777777a-0000-4000-8000-000000000002';
 export const RULE_FORM_ID = '7777777a-0000-4000-8000-000000000003';
 export const RULE_FIELD_KEY = '7777777a-0000-4000-8000-000000000004';
 export const RULE_FOLLOW_UP_ID = '7777777a-0000-4000-8000-000000000005';
+export const FOLLOW_UP_AUTHOR_ID = '7777777a-0000-4000-8000-000000000006';
 
 export const ruleRow = (
   overrides: Partial<AlertRuleRow> = {},
@@ -35,7 +36,11 @@ export const ruleRow = (
 
 export const alertRow = (overrides: Partial<AlertRow> = {}): AlertRow => ({
   id: ALERT_ID,
-  patient: { id: PATIENT_ID, name: 'Paciente Sintetico' },
+  patient: {
+    id: PATIENT_ID,
+    name: 'Paciente Sintetico',
+    mainCondition: 'Diabetes tipo 2',
+  },
   source: 'reading',
   severity: 'warning',
   status: 'open',
@@ -46,6 +51,7 @@ export const alertRow = (overrides: Partial<AlertRow> = {}): AlertRow => ({
     id: RULE_FOLLOW_UP_ID,
     visitedAt: new Date('2026-11-05T11:00:00.000Z'),
     status: 'valid',
+    author: { id: FOLLOW_UP_AUTHOR_ID, name: 'Cuidador Sintetico' },
   },
   field: { key: RULE_FIELD_KEY, name: 'Glicemia capilar', unit: 'mg/dL' },
   value: '250',
