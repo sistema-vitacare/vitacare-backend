@@ -35,6 +35,29 @@ export class AlertFollowUpRefDto {
     description: 'Registro anulado depois do alerta continua aqui como origem.',
   })
   status!: string;
+
+  @ApiProperty({
+    type: UserRefDto,
+    description:
+      'Quem fez o registro (o cuidador da Figura 42), o mesmo autor de GET /follow-ups.',
+  })
+  author!: UserRefDto;
+}
+
+export class AlertPatientDto {
+  @ApiProperty({ format: 'uuid' })
+  id!: string;
+
+  @ApiProperty({ example: 'Paciente Exemplo' })
+  name!: string;
+
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    example: 'Hipertensao arterial',
+    description: 'Condicao principal do cadastro do paciente, hoje.',
+  })
+  mainCondition!: string | null;
 }
 
 export class AlertFieldDto {
@@ -136,8 +159,8 @@ export class AlertDto {
   @ApiProperty({ format: 'uuid' })
   id!: string;
 
-  @ApiProperty({ type: UserRefDto })
-  patient!: UserRefDto;
+  @ApiProperty({ type: AlertPatientDto })
+  patient!: AlertPatientDto;
 
   @ApiProperty({
     enum: [...ALERT_SOURCES],

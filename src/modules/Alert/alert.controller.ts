@@ -26,8 +26,11 @@ import { CreateAlertRuleUseCase } from './CreateAlertRule/createAlertRule.useCas
 import { DeactivateAlertRuleUseCase } from './DeactivateAlertRule/deactivateAlertRule.useCase';
 import { AlertDto } from './dtos/alert.dto';
 import { AlertRuleDto } from './dtos/alertRule.dto';
+import { AlertSummaryDto } from './dtos/alertSummary.dto';
 import { GetAlertUseCase } from './GetAlert/getAlert.useCase';
 import { GetAlertRuleUseCase } from './GetAlertRule/getAlertRule.useCase';
+import { AlertSummaryQueryDto } from './GetAlertSummary/getAlertSummary.dto';
+import { GetAlertSummaryUseCase } from './GetAlertSummary/getAlertSummary.useCase';
 import { ListAlertRulesQueryDto } from './ListAlertRules/listAlertRules.dto';
 import { ListAlertRulesUseCase } from './ListAlertRules/listAlertRules.useCase';
 import { ListAlertsQueryDto } from './ListAlerts/listAlerts.dto';
@@ -54,6 +57,7 @@ export class AlertController {
     private readonly deactivateAlertRule: DeactivateAlertRuleUseCase,
     private readonly reactivateAlertRule: ReactivateAlertRuleUseCase,
     private readonly listAlerts: ListAlertsUseCase,
+    private readonly getAlertSummary: GetAlertSummaryUseCase,
     private readonly getAlert: GetAlertUseCase,
     private readonly resolveAlert: ResolveAlertUseCase,
   ) {}
@@ -188,7 +192,7 @@ export class AlertController {
   @RequirePermissions(Permissions.ALERTS_READ)
   @ApiOperation({
     summary:
-      'Lista os alertas de um paciente ao alcance da sessao, paginados; mais recentes primeiro.',
+      'Lista os alertas de um paciente ou, sem patientId, de todos os pacientes ao alcance da sessao, paginados; mais recentes primeiro ou, com sort=priority, mais graves primeiro.',
   })
   @ApiEnvelope(AlertDto, { isArray: true })
   @ApiErrors(
@@ -202,6 +206,27 @@ export class AlertController {
     @CurrentContext() ctx: RequestContext,
   ): Promise<EnvelopePayload<AlertDto[]>> {
     return this.listAlerts.execute(query, ctx);
+  }
+
+  // Antes de `alerts/:alertId`, senao "summary" cairia no parametro.
+  @Get('alerts/summary')
+  @RequirePermissions(Permissions.ALERTS_READ)
+  @ApiOperation({
+    summary:
+      'Conta os alertas em aberto por severidade, de um paciente ou de todos os pacientes ao alcance da sessao.',
+  })
+  @ApiEnvelope(AlertSummaryDto)
+  @ApiErrors(
+    UNAUTHENTICATED,
+    FORBIDDEN,
+    { status: 404, codes: ['PATIENT_NOT_FOUND'] },
+    VALIDATION,
+  )
+  async summary(
+    @Query() query: AlertSummaryQueryDto,
+    @CurrentContext() ctx: RequestContext,
+  ): Promise<AlertSummaryDto> {
+    return this.getAlertSummary.execute(query, ctx);
   }
 
   @Get('alerts/:alertId')

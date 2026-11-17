@@ -23,6 +23,7 @@ export const toAlertResponse = (
     id: row.followUp.id,
     visitedAt: row.followUp.visitedAt.toISOString(),
     status: row.followUp.status,
+    author: row.followUp.author,
   },
   field: row.field,
   value: row.value,

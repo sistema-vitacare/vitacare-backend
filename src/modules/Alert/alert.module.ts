@@ -14,6 +14,7 @@ import {
 import { EvaluateFollowUpAlertsUseCase } from './EvaluateFollowUpAlerts/evaluateFollowUpAlerts.useCase';
 import { GetAlertUseCase } from './GetAlert/getAlert.useCase';
 import { GetAlertRuleUseCase } from './GetAlertRule/getAlertRule.useCase';
+import { GetAlertSummaryUseCase } from './GetAlertSummary/getAlertSummary.useCase';
 import { ListAlertRulesUseCase } from './ListAlertRules/listAlertRules.useCase';
 import { ListAlertsUseCase } from './ListAlerts/listAlerts.useCase';
 import { ReactivateAlertRuleUseCase } from './ReactivateAlertRule/reactivateAlertRule.useCase';
@@ -30,6 +31,7 @@ export const ALERT_USE_CASES = [
   DeactivateAlertRuleUseCase,
   ReactivateAlertRuleUseCase,
   ListAlertsUseCase,
+  GetAlertSummaryUseCase,
   GetAlertUseCase,
   ResolveAlertUseCase,
 ];
@@ -37,7 +39,8 @@ export const ALERT_USE_CASES = [
 export const ALERT_REPOSITORIES = [AlertRuleRepository, AlertRepository];
 
 /**
- * Regras e alertas por valor registrado (BE-15); resolucao (BE-17). Exporta a avaliacao para o
+ * Regras e alertas por valor registrado (BE-15); resolucao (BE-17); lista da
+ * organizacao e contadores (BE-33). Exporta a avaliacao para o
  * envio do registro de acompanhamento chamar logo apos o commit e a listagem
  * para a visao consolidada do paciente (BE-18).
  */

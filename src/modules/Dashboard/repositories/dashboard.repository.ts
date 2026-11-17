@@ -9,6 +9,7 @@ import {
   type AlertSeverity,
   type AlertSource,
 } from '@/modules/Alert/types/alert.types';
+import { alertListOrder } from '@/modules/Alert/policies/alertOrder.policy';
 import { TENANT_PROFILE_CODES } from '@/modules/Access/access.permissions';
 import { hasPlanFeature } from '@/modules/Plan/repositories/planFeature.query';
 
@@ -31,8 +32,6 @@ const countBy = <K extends string>(
   keys
     .map((key) => `count(*) FILTER (WHERE ${filter(key)})::int AS "${key}"`)
     .join(',\n');
-
-const SEVERITY_RANK = `CASE a.severity WHEN 'critical' THEN 0 WHEN 'warning' THEN 1 ELSE 2 END`;
 
 /**
  * Agregados do painel operacional (UC05, Figura 33). Toda consulta e da
@@ -257,7 +256,7 @@ export class DashboardRepository {
           AND u.organization_id = r.organization_id
         WHERE a.organization_id = $1
           AND a.status = 'open'
-        ORDER BY ${SEVERITY_RANK}, a.generated_at DESC, a.id
+        ORDER BY ${alertListOrder('priority')}
         LIMIT $2`,
       [organizationId, limit],
     );

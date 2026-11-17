@@ -29,6 +29,14 @@ export const ALERT_STATUSES = ['open', 'resolved'] as const;
 
 export type AlertStatus = (typeof ALERT_STATUSES)[number];
 
+/**
+ * Ordem da lista (BE-33): `recent` = mais recentes primeiro; `priority` = mais
+ * grave primeiro e depois os mais recentes, como a Figura 42 e o painel.
+ */
+export const ALERT_SORTS = ['recent', 'priority'] as const;
+
+export type AlertSort = (typeof ALERT_SORTS)[number];
+
 /** Tipos de campo que aceitam regra: os numericos. */
 export const RULE_FIELD_TYPES = ['number', 'scale'] as const;
 
@@ -124,7 +132,8 @@ export type ReactivateAlertRuleOutcome =
 
 export interface AlertRow {
   id: string;
-  patient: NamedRef;
+  /** Condicao principal do cadastro (Figura 42, BE-33). */
+  patient: NamedRef & { mainCondition: string | null };
   source: AlertSource;
   severity: AlertSeverity;
   status: AlertStatus;
@@ -132,7 +141,13 @@ export interface AlertRow {
   message: string;
   /** Origem `reading`; nulos nas demais. */
   rule: NamedRef | null;
-  followUp: { id: string; visitedAt: Date; status: string } | null;
+  /** `author` = quem registrou, o "cuidador" da Figura 42 (BE-33). */
+  followUp: {
+    id: string;
+    visitedAt: Date;
+    status: string;
+    author: NamedRef;
+  } | null;
   field: { key: string; name: string; unit: string | null } | null;
   value: string | null;
   operator: AlertRuleOperator | null;
@@ -157,10 +172,14 @@ export interface AlertRow {
   notification: { id: string; readAt: Date | null } | null;
 }
 
+/** Sem `patientId`, todos os pacientes do alcance (BE-33). */
 export interface ListAlertsFilter {
-  patientId: string;
+  patientId?: string;
   severity?: AlertSeverity;
   status?: AlertStatus;
+  source?: AlertSource;
+  /** Omitido = `recent`. */
+  sort?: AlertSort;
   skip: number;
   take: number;
 }
@@ -168,6 +187,22 @@ export interface ListAlertsFilter {
 export type ListAlertsOutcome =
   | { kind: 'ok'; items: AlertRow[]; total: number }
   | { kind: 'patient_not_found' };
+
+/** Contadores dos abertos (BE-33): os demais filtros da lista, menos severidade e status. */
+export interface AlertSummaryFilter {
+  patientId?: string;
+  source?: AlertSource;
+}
+
+export interface OpenAlertCounts {
+  total: number;
+  critical: number;
+  warning: number;
+  info: number;
+}
+
+export type AlertSummaryOutcome =
+  { kind: 'ok'; open: OpenAlertCounts } | { kind: 'patient_not_found' };
 
 /** Alcance de pacientes mais o usuario da sessao (`viewerId`). */
 export interface AlertScope extends PatientScope {

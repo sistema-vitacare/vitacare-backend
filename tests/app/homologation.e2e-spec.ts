@@ -1012,6 +1012,57 @@ describeWithInfrastructure('homologacao funcional dos 14 casos de uso', () => {
       expect(await absences()).toHaveLength(1);
     });
 
+    it('a tela de alertas lista a organizacao, mais graves primeiro, com contadores e o autor do registro (Figura 42)', async () => {
+      const A = tenants.A;
+      const row = {
+        id: s.alertId,
+        severity: 'critical',
+        source: 'reading',
+        patient: { id: s.patientId },
+        followUp: { author: { id: A.users.caregiver } },
+      };
+
+      for (const role of [
+        'admin',
+        'professional',
+        'caregiver',
+        'family',
+      ] as const) {
+        const open = dataOf<Array<{ id: string; source: string }>>(
+          await http(
+            'get',
+            '/alerts?status=open&sort=priority',
+            A.tokens[role],
+          ),
+        );
+
+        expect(open.map((alert) => alert.source)).toEqual([
+          'reading',
+          'absence',
+        ]);
+        expect(open[0]).toMatchObject(row);
+        expect(
+          dataOf<{ open: object }>(
+            await http('get', '/alerts/summary', A.tokens[role]),
+          ).open,
+        ).toEqual({ total: 2, critical: 1, warning: 1, info: 0 });
+      }
+
+      expect(
+        dataOf<Array<{ id: string }>>(
+          await http('get', '/alerts?source=reading', A.tokens.professional),
+        ).map((alert) => alert.id),
+      ).toEqual([s.alertId]);
+      expect(
+        dataOf<unknown[]>(await http('get', '/alerts', A.tokens.caregiver2)),
+      ).toEqual([]);
+      expect(
+        dataOf<Array<{ id: string }>>(
+          await http('get', '/alerts', tenants.B.tokens.admin),
+        ).map((alert) => alert.id),
+      ).not.toContain(s.alertId);
+    });
+
     it('o familiar nao resolve; o cuidador vinculado resolve para todos', async () => {
       const A = tenants.A;
 
