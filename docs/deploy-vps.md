@@ -683,22 +683,22 @@ Marcar só o que foi conferido, com a data. Estado da OPS-01 em
       Let's Encrypt nos dois nomes, `http` → `https` com `301`, HSTS presente,
       `/health/ready` 200 e `data.version` igual ao commit da `main` pelo
       domínio; `1050` e `1040` recusadas por IP e regras retiradas do firewall.
-- [ ] IP real do cliente conferido de uma rede externa (passo 8). De dentro da
-      VPS a auditoria mostrou o IP público da VPS, e não o do NPM — indício, não
-      prova.
+- [x] IP real do cliente conferido de uma rede externa (passo 8), concluído por
+      Mateus em 2026-11-17.
 - [ ] Termo de uso publicado: na API, sim — o master aceitou a versão 1 em
       2026-11-16 pelo domínio. Falta o frontend linkar `/termos` no rodapé e
       tratar `403 TERMS_ACCEPTANCE_REQUIRED` ([Termo de uso](#termo-de-uso-e-aceite-be-32)).
 - [x] `CORS_ORIGINS` só com a origem do frontend (preflight de
       `https://vitacare.bizys.com.br` com `204` em 2026-11-16).
-- [ ] SMTP ligado e testado: SPF, DKIM e DMARC conferidos, recuperação de senha
-      com link `https` recebida, e-mail de alerta `sent`, nova tentativa sem
-      duplicar com o SMTP fora.
-- [ ] Monitores `vitacare app` (pelo domínio, com aviso de certificado), `vitacare frontend`, `vitacare workers` e `vitacare backup` no Kuma, UP, com alerta por e-mail testado.
-- [ ] Cron do `backup.sh` com push; primeira pasta conferida.
-- [ ] Cópia externa criptografada dos backups (camada 3).
-- [ ] Ensaio de restauração na VPS com o tempo anotado (RTO).
-- [ ] Medição de carga (`load.mjs`) contra um ambiente com o tamanho da VPS.
+- [x] SMTP ligado e testado: SPF, DKIM e DMARC `PASS` e recuperação de senha
+      com link `https` recebida (2026-11-16); notificação do Kuma pela mesma caixa;
+      e-mail de alerta `sent`, convite enviado e nova tentativa sem duplicar com a
+      porta 465 bloqueada (2026-11-17, na organização de teste `teste-ops`).
+- [x] Monitores `vitacare app` (pelo domínio, com aviso de certificado), `vitacare frontend`, `vitacare workers` e `vitacare backup` no Kuma, com alerta por e-mail testado (concluído por Mateus em 2026-11-17, declarado; o `vitacare backup` depende do cron do backup).
+- [x] Proteção contra perda de dados: o **backup completo do servidor** mantido
+      por Mateus (decisão de 2026-11-17, não conferido pelo agente). Cron do
+      `backup.sh`, cópia externa, ensaio de restauração e medição de carga ficaram
+      fora do escopo por ser projeto acadêmico; os scripts continuam disponíveis.
 - [x] **LGPD (P31), escopo acadêmico** (decisão de Mateus em 2026-11-12): o
       VitaCare é projeto acadêmico, não produto comercial em conformidade plena.
       A P31 se resolve com o termo de uso e privacidade e o registro do aceite
@@ -794,18 +794,14 @@ publicar a porta: `APP_BIND` não existe mais na stack.
 Andamento da OPS-01 item a item em
 [`docs/ops/ops-01-dominio-https-smtp.md`](ops/ops-01-dominio-https-smtp.md).
 
-- **SMTP** (Hostinger, `no-reply@vitacare.bizys.com.br`): domínio de e-mail em
-  verificação na Hostinger; caixa, DNS do remetente, variáveis e testes reais
-  pendentes. Ligá-lo ativa a recuperação de senha, os e-mails de alerta
-  (BE-17), o aviso de vencimento do plano (BE-28) e o convite por link (BE-31);
-  ver [Variáveis](#4-variáveis-envproduction-nunca-commitado).
-- **Push (VAPID)**: par de produção a gerar; o teste no navegador depende do
-  service worker do frontend, que ainda não existe.
-- **Na VPS (passos de Mateus, comandos acima):** `UPTIME_KUMA_PUSH_URL` e os
-  monitores; cron único do `backup.sh`; ensaio de restauração com tempo;
-  medição de carga com o tamanho real; IP real conferido de fora.
-- **Cópia externa** dos backups (camada 3), criptografada: destino adiado por
-  Mateus em 2026-11-16.
+- **OPS-01 concluída em 2026-11-17** (domínio com HTTPS, SMTP, push na API e
+  monitores). Backup próprio, cópia externa, ensaio de restauração e carga ficaram
+  fora por decisão de Mateus (projeto acadêmico; vale o backup completo do
+  servidor).
+- **Push no navegador**: o teste de inscrição e recebimento depende do service
+  worker do frontend, que ainda não existe.
+- **Organização de teste `teste-ops`** (criada em 2026-11-17 para os testes de
+  SMTP e push): inativar ou manter só como teste antes de dados reais.
 - **Frontend** (repositório próprio): ainda com dados simulados em 2026-11-16 —
   sem `/aceitar-convite`, tela do termo nem service worker. A validação nos
   navegadores (RF019, RNF001–003) agora é possível com HTTPS.
