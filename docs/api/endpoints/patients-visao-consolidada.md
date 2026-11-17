@@ -129,7 +129,8 @@ curl -i 'https://api.example.com/api/v1/patients/3c9e2a71-5b1d-4e8f-9a2c-7d6e5f4
         "id": "4e5f6a7b-8c9d-4e0f-9a1b-2c3d4e5f6a7b",
         "patient": {
           "id": "3c9e2a71-5b1d-4e8f-9a2c-7d6e5f4a3b21",
-          "name": "Paciente Exemplo"
+          "name": "Paciente Exemplo",
+          "mainCondition": "Diabetes tipo 2"
         },
         "source": "reading",
         "severity": "warning",
@@ -143,7 +144,8 @@ curl -i 'https://api.example.com/api/v1/patients/3c9e2a71-5b1d-4e8f-9a2c-7d6e5f4
         "followUp": {
           "id": "5d6e7f8a-9b0c-4d1e-8f2a-3b4c5d6e7f8a",
           "visitedAt": "2026-11-05T11:00:00.000Z",
-          "status": "valid"
+          "status": "valid",
+          "author": { "id": "0a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d", "name": "Cuidador Exemplo" }
         },
         "field": {
           "key": "7a5b3c1d-2e3f-4a5b-8c6d-7e8f9a0b1c2d",

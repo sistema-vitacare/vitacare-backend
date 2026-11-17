@@ -1,7 +1,7 @@
 ---
 title: Consultar alerta
 status: atual
-updated: 2026-11-06
+updated: 2026-11-17
 method: GET
 path: /api/v1/alerts/:alertId
 source: src/modules/Alert/alert.controller.ts
@@ -41,7 +41,8 @@ curl -i 'https://api.example.com/api/v1/alerts/4e5f6a7b-8c9d-4e0f-9a1b-2c3d4e5f6
       "id": "4e5f6a7b-8c9d-4e0f-9a1b-2c3d4e5f6a7b",
       "patient": {
         "id": "3c9e2a4b-1f6d-4e8a-9b7c-5d4e3f2a1b0c",
-        "name": "Paciente Exemplo"
+        "name": "Paciente Exemplo",
+        "mainCondition": "Diabetes tipo 2"
       },
       "source": "reading",
       "severity": "warning",
@@ -55,7 +56,8 @@ curl -i 'https://api.example.com/api/v1/alerts/4e5f6a7b-8c9d-4e0f-9a1b-2c3d4e5f6
       "followUp": {
         "id": "5d6e7f8a-9b0c-4d1e-8f2a-3b4c5d6e7f8a",
         "visitedAt": "2026-11-05T11:00:00.000Z",
-        "status": "valid"
+        "status": "valid",
+        "author": { "id": "0a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d", "name": "Cuidador Exemplo" }
       },
       "field": {
         "key": "9d8c7b6a-5f4e-4d3c-8b2a-1f0e9d8c7b6a",
@@ -83,7 +85,8 @@ Propriedades de `data`. Só o bloco da origem vem preenchido; os campos das outr
 | Propriedade JSON | Tipo / formato | Null | Significado |
 | --- | --- | --- | --- |
 | `id` | texto, UUID | não | Identificador do alerta. |
-| `patient` | objeto | não | Paciente do alerta (`id`, `name`). |
+| `patient` | objeto | não | Paciente do alerta (`id`, `name`, `mainCondition`). |
+| `patient.mainCondition` | texto, até 180 | sim | Condição principal do cadastro do paciente **hoje** (o "(DPOC)" da Figura 42; BE-33); `null` se não informada. O familiar também a recebe. |
 | `source` | texto, enum | não | Origem: `reading` (valor registrado em acompanhamento), `absence` (ausência de registro) ou `medication_reminder` (horário de medicamento). |
 | `severity` | texto, enum | não | `critical`, `warning` ou `info`: em `reading`, copiada da regra no disparo; `absence` é sempre `warning` e `medication_reminder` sempre `info`. |
 | `status` | texto, enum | não | `open` (em aberto) ou `resolved` (resolvido; vale para todos e não volta a `open`). |
@@ -94,6 +97,7 @@ Propriedades de `data`. Só o bloco da origem vem preenchido; os campos das outr
 | `followUp.id` | texto, UUID | não | Registro (`GET /follow-ups/{id}`). |
 | `followUp.visitedAt` | texto ISO 8601 (UTC) | não | Hora da visita informada pelo cuidador. |
 | `followUp.status` | texto, enum | não | `valid` ou `annulled`: registro anulado depois do disparo continua como origem do alerta. |
+| `followUp.author` | objeto | não | Quem fez o registro (`id`, `name`), o mesmo autor de [GET /follow-ups](follow-ups-listar.md): é o "Cuid." da Figura 42 (BE-33). Em `absence` e `medication_reminder` não há registro de origem, e `followUp` inteiro sai `null`. |
 | `field` | objeto | sim | Só em `reading`. Campo do valor, como estava na versão respondida (`key`, `name`, `unit` anulável). |
 | `value` | texto | sim | Só em `reading`. Valor registrado, texto decimal canônico (`"0"`, `"37.6"`). |
 | `operator` | texto, enum | sim | Só em `reading`. Operador no disparo (`gt`, `gte`, `lt`, `lte`). |

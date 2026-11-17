@@ -47,7 +47,7 @@ curl -i -X POST 'https://api.example.com/api/v1/alerts/4e5f6a7b-8c9d-4e0f-9a1b-2
 {
   "data": {
     "id": "4e5f6a7b-8c9d-4e0f-9a1b-2c3d4e5f6a7b",
-    "patient": { "id": "3c9e2a4b-1f6d-4e8a-9b7c-5d4e3f2a1b0c", "name": "Paciente Exemplo" },
+    "patient": { "id": "3c9e2a4b-1f6d-4e8a-9b7c-5d4e3f2a1b0c", "name": "Paciente Exemplo", "mainCondition": "Diabetes tipo 2" },
     "source": "absence",
     "severity": "warning",
     "status": "resolved",

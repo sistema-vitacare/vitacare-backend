@@ -1,23 +1,37 @@
 ---
-title: Listar alertas do paciente
+title: Listar alertas
 status: atual
-updated: 2026-11-06
+updated: 2026-11-17
 method: GET
 path: /api/v1/alerts
 source: src/modules/Alert/alert.controller.ts
 ---
 
-# GET /api/v1/alerts — lista os alertas de um paciente
+# GET /api/v1/alerts — lista os alertas de um paciente ou da organização
 
 ## Propósito e acesso
 
 UC13 (passos 4 e 5) e RF014: alertas e lembretes do paciente, com data e hora, para quem acompanha o paciente. Há três origens (`source`): valor registrado fora de uma regra (`reading`, BE-15), ausência de registro no prazo da frequência esperada (`absence`, BE-16) e horário de medicamento com lembrete ativo (`medication_reminder`, BE-16). Decisão de Mateus (2026-11-05): a consulta entra já no BE-15. Desde o BE-17 (2026-11-06) o alerta traz `status` `open|resolved`, o bloco `resolution` e a leitura do próprio usuário (`notification`), com filtro `status`.
 
+**Tela "Alertas" da Figura 42 (BE-33, decisões de Mateus em 2026-11-17).** Sem `patientId`, a lista traz os alertas de **todos os pacientes ao alcance da sessão**, numa lista só. Os contadores por severidade saem em [GET /alerts/summary](alerts-resumo.md). Para montar a tela:
+
+| Elemento da Figura 42 | Chamada |
+| --- | --- |
+| Cards Crítico, Atenção e Informativo; número ao lado do título | [GET /alerts/summary](alerts-resumo.md): `open.critical`, `open.warning`, `open.info`, `open.total` |
+| Aba Todos (N) | `GET /alerts?status=open&sort=priority`; N = `open.total` |
+| Abas Crítico, Atenção e Informativo | `GET /alerts?status=open&severity=critical\|warning\|info&sort=priority` |
+| Aba Resolvidos | `GET /alerts?status=resolved` |
+| Linha: título, paciente e condição, cuidador, tempo | `title` e `message`, `patient.name` e `patient.mainCondition`, `followUp.author.name` (só em `reading`), `generatedAt` |
+| Resolver, Ver | [POST /alerts/{id}/resolve](alerts-resolver.md), [GET /alerts/{id}](alerts-consultar.md) |
+| Marcar todos como lidos | [POST /notifications/read-all](notifications-marcar-todas-lidas.md) |
+
+"Medicamento não administrado" e "Visita agendada não confirmada" não existem como alerta (adiados no BE-26). Vale nos planos Basic e Enterprise: alertas automáticos são recurso básico, sem checagem de plano.
+
 Como nasce o alerta `reading`: logo depois do commit de `POST /api/v1/follow-ups`, os itens numéricos do registro são comparados com as regras **ativas** do formulário respondido criadas até o envio; a regra própria ativa do paciente num campo substitui as gerais desse campo. A comparação é exata (decimal, sem ponto flutuante). Cada par regra × item gera **no máximo um** alerta (`UNIQUE (rule_id, response_item_id)`); reavaliar não duplica. Falha na avaliação não desfaz o registro: ele fica pendente e uma varredura (job do BullMQ a cada 60 s) o avalia depois. Registro anulado antes da avaliação não gera alerta.
 
 Como nascem `absence` e `medication_reminder` (BE-16, decisões de Mateus em 2026-11-05): duas varreduras do BullMQ (fila `automation`, a cada 60 s) leem o estado gravado no PostgreSQL. **Ausência:** para cada paciente ativo e formulário ativo com frequência esperada que se aplica a ele, sai um alerta `warning` a cada período vencido sem envio válido do formulário, sem tolerância, contado do último envio (ou do início do monitoramento, o mais recente) no fuso de Brasília; um envio novo reinicia a contagem; inativar o paciente ou o formulário, retirar a frequência ou tirar o paciente da lista pausa o monitoramento, e voltar recomeça do zero. **Lembrete:** cada horário da agenda vigente de medicamento ativo com `remindersEnabled` gera um lembrete `info`; com o paciente inativo o horário passa sem lembrete; editar a agenda ou inativar o medicamento cancela os horários ainda não gerados. Atraso, queda do Redis ou do worker só adiam: na volta, cada prazo e horário vencido sai uma vez, com o instante esperado guardado (`absence.dueAt`, `medicationReminder.scheduledAt`) e `generatedAt` mostrando quando saiu (normalmente até cerca de 1 min depois). Chaves únicas por prazo e por horário impedem repetição. Destinatários, caixa interna, push, e-mail, leitura e resolução entram pelo BE-17 (seção "Notificações, leitura e resolução" do [manual](../README.md)).
 
-Autenticação: `Authorization: Bearer <token>` de sessão normal com `alerts:read` (rótulo "Consultar alertas") — `admin`, `professional`, `caregiver` e `family`. **Alcance:** `admin` e `professional` leem os pacientes da organização inteira; `caregiver` e `family`, só os pacientes com vínculo vigente no papel do próprio perfil (vínculo revogado deixa de valer na requisição seguinte). O familiar recebe o alerta completo (decisão de Mateus no BE-19). Paciente fora do alcance ou de outra organização responde `404`, igual a um inexistente.
+Autenticação: `Authorization: Bearer <token>` de sessão normal com `alerts:read` (rótulo "Consultar alertas") — `admin`, `professional`, `caregiver` e `family`. **Alcance:** `admin` e `professional` leem os pacientes da organização inteira; `caregiver` e `family`, só os pacientes com vínculo vigente no papel do próprio perfil (vínculo revogado deixa de valer na requisição seguinte). O familiar recebe o alerta completo (decisão de Mateus no BE-19). Sem `patientId`, o mesmo alcance vale para a lista inteira: o cuidador ou familiar sem vínculo vigente recebe `200` com `data: []`, e paciente inativo continua aparecendo. Com `patientId`, paciente fora do alcance ou de outra organização responde `404`, igual a um inexistente.
 
 ## Request
 
@@ -27,21 +41,23 @@ Query (parâmetro desconhecido → `422 VALIDATION_FAILED`):
 
 | Parâmetro | Tipo | Obrigatório | Default / limites | Significado |
 | --- | --- | --- | --- | --- |
-| `patientId` | texto, UUID | sim | — | Paciente dos alertas. |
+| `patientId` | texto, UUID | não | omitido = todos os pacientes ao alcance | Paciente dos alertas. Até o BE-33 era obrigatório. |
+| `source` | texto, enum | não | `reading`, `absence`, `medication_reminder`; omitido = todas | Filtro por origem (BE-33). |
+| `sort` | texto, enum | não | `recent` | `recent`: mais recentes primeiro. `priority`: `critical`, depois `warning`, depois `info` e, em cada severidade, os mais recentes primeiro — a ordem da Figura 42 e dos alertas prioritários do painel (BE-33). |
 | `severity` | texto, enum | não | `critical`, `warning`, `info`; omitido = todas | Filtro por severidade. |
 | `status` | texto, enum | não | `open`, `resolved`; omitido = todos | Filtro por estado (aba "Resolvidos" da Figura 42). Outro valor → `422`. |
 | `page` | inteiro | não | 1; ≥ 1 | Página. |
 | `limit` | inteiro | não | 20; 1 a 100 | Itens por página. |
 
 ```bash
-curl -i 'https://api.example.com/api/v1/alerts?patientId=3c9e2a4b-1f6d-4e8a-9b7c-5d4e3f2a1b0c&severity=warning' \
+curl -i 'https://api.example.com/api/v1/alerts?status=open&sort=priority' \
   -H 'Accept: application/json' \
   -H 'Authorization: Bearer F3dQ2p...Zc9'
 ```
 
 ## Resposta de sucesso
 
-`200 OK`. Ordem: `generatedAt` decrescente (mais recentes primeiro), depois `id`. `meta.pagination` traz `page`, `limit`, `total` (itens no filtro) e `totalPages`. Paciente sem alertas devolve `data: []`.
+`200 OK`. Ordem: com `sort=recent` (padrão), `generatedAt` decrescente (mais recentes primeiro), depois `id`; com `sort=priority`, severidade (`critical`, `warning`, `info`), depois `generatedAt` decrescente, depois `id`. O exemplo abaixo é de `sort=priority` com alertas de um único paciente. `meta.pagination` traz `page`, `limit`, `total` (itens no filtro) e `totalPages`. Paciente sem alertas devolve `data: []`.
 
 ```json
 {
@@ -50,7 +66,8 @@ curl -i 'https://api.example.com/api/v1/alerts?patientId=3c9e2a4b-1f6d-4e8a-9b7c
       "id": "4e5f6a7b-8c9d-4e0f-9a1b-2c3d4e5f6a7b",
       "patient": {
         "id": "3c9e2a4b-1f6d-4e8a-9b7c-5d4e3f2a1b0c",
-        "name": "Paciente Exemplo"
+        "name": "Paciente Exemplo",
+        "mainCondition": "Diabetes tipo 2"
       },
       "source": "reading",
       "severity": "warning",
@@ -64,7 +81,8 @@ curl -i 'https://api.example.com/api/v1/alerts?patientId=3c9e2a4b-1f6d-4e8a-9b7c
       "followUp": {
         "id": "5d6e7f8a-9b0c-4d1e-8f2a-3b4c5d6e7f8a",
         "visitedAt": "2026-11-05T11:00:00.000Z",
-        "status": "valid"
+        "status": "valid",
+        "author": { "id": "0a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d", "name": "Cuidador Exemplo" }
       },
       "field": {
         "key": "9d8c7b6a-5f4e-4d3c-8b2a-1f0e9d8c7b6a",
@@ -84,7 +102,8 @@ curl -i 'https://api.example.com/api/v1/alerts?patientId=3c9e2a4b-1f6d-4e8a-9b7c
       "id": "7b8c9d0e-1f2a-4b3c-8d4e-5f6a7b8c9d0e",
       "patient": {
         "id": "3c9e2a4b-1f6d-4e8a-9b7c-5d4e3f2a1b0c",
-        "name": "Paciente Exemplo"
+        "name": "Paciente Exemplo",
+        "mainCondition": "Diabetes tipo 2"
       },
       "source": "absence",
       "severity": "warning",
@@ -115,7 +134,8 @@ curl -i 'https://api.example.com/api/v1/alerts?patientId=3c9e2a4b-1f6d-4e8a-9b7c
       "id": "8c9d0e1f-2a3b-4c4d-9e5f-6a7b8c9d0e1f",
       "patient": {
         "id": "3c9e2a4b-1f6d-4e8a-9b7c-5d4e3f2a1b0c",
-        "name": "Paciente Exemplo"
+        "name": "Paciente Exemplo",
+        "mainCondition": "Diabetes tipo 2"
       },
       "source": "medication_reminder",
       "severity": "info",
@@ -155,7 +175,8 @@ Cada item de `data[]`. Só o bloco da origem vem preenchido; os campos das outra
 | Propriedade JSON | Tipo / formato | Null | Significado |
 | --- | --- | --- | --- |
 | `id` | texto, UUID | não | Identificador do alerta. |
-| `patient` | objeto | não | Paciente do alerta (`id`, `name`). |
+| `patient` | objeto | não | Paciente do alerta (`id`, `name`, `mainCondition`). |
+| `patient.mainCondition` | texto, até 180 | sim | Condição principal do cadastro do paciente **hoje** (o "(DPOC)" da Figura 42; BE-33); `null` se não informada. O familiar também a recebe. |
 | `source` | texto, enum | não | Origem: `reading` (valor registrado em acompanhamento), `absence` (ausência de registro) ou `medication_reminder` (horário de medicamento). |
 | `severity` | texto, enum | não | `critical`, `warning` ou `info`: em `reading`, copiada da regra no disparo; `absence` é sempre `warning` e `medication_reminder` sempre `info`. |
 | `status` | texto, enum | não | `open` (em aberto) ou `resolved` (resolvido; vale para todos e não volta a `open`). |
@@ -166,6 +187,7 @@ Cada item de `data[]`. Só o bloco da origem vem preenchido; os campos das outra
 | `followUp.id` | texto, UUID | não | Registro (`GET /follow-ups/{id}`). |
 | `followUp.visitedAt` | texto ISO 8601 (UTC) | não | Hora da visita informada pelo cuidador. |
 | `followUp.status` | texto, enum | não | `valid` ou `annulled`: registro anulado depois do disparo continua como origem do alerta. |
+| `followUp.author` | objeto | não | Quem fez o registro (`id`, `name`), o mesmo autor de [GET /follow-ups](follow-ups-listar.md): é o "Cuid." da Figura 42 (BE-33). Em `absence` e `medication_reminder` não há registro de origem, e `followUp` inteiro sai `null`. |
 | `field` | objeto | sim | Só em `reading`. Campo do valor, como estava na versão respondida (`key`, `name`, `unit` anulável). |
 | `value` | texto | sim | Só em `reading`. Valor registrado, texto decimal canônico (`"0"`, `"37.6"`). |
 | `operator` | texto, enum | sim | Só em `reading`. Operador no disparo (`gt`, `gte`, `lt`, `lte`). |
@@ -187,7 +209,7 @@ Cada item de `data[]`. Só o bloco da origem vem preenchido; os campos das outra
 | `notification.id` | texto, UUID | não | Use em [marcar como lida](notifications-marcar-lida.md). |
 | `notification.readAt` | texto ISO 8601 (UTC) | sim | Leitura deste usuário; `null` = não lida. Consultar o alerta **não** marca leitura. |
 
-Nunca saem `organization_id` nem o id do item de resposta. A ordem é por `generatedAt`; um lembrete gerado com atraso aparece pelo instante em que saiu, com o horário programado em `medicationReminder.scheduledAt`.
+Nunca saem `organization_id` nem o id do item de resposta. Na ordem `recent`, vale `generatedAt`: um lembrete gerado com atraso aparece pelo instante em que saiu, com o horário programado em `medicationReminder.scheduledAt`.
 
 ## Erros
 
@@ -195,8 +217,8 @@ Nunca saem `organization_id` nem o id do item de resposta. A ordem é por `gener
 | --- | --- | --- |
 | `401` | `AUTH_UNAUTHENTICATED` | Bearer ausente, inválido, expirado ou revogado. |
 | `403` | `AUTH_FORBIDDEN` | Sessão sem `alerts:read` (ex.: master). |
-| `404` | `PATIENT_NOT_FOUND` | Paciente inexistente, de outra organização ou sem vínculo vigente com o cuidador/familiar. |
-| `422` | `VALIDATION_FAILED` | `patientId` ausente ou não UUID; `severity`, `page` ou `limit` inválidos. |
+| `404` | `PATIENT_NOT_FOUND` | Só com `patientId`: paciente inexistente, de outra organização ou sem vínculo vigente com o cuidador/familiar. |
+| `422` | `VALIDATION_FAILED` | `patientId` não UUID; `severity`, `status`, `source`, `sort`, `page` ou `limit` inválidos; parâmetro desconhecido. |
 
 ```json
 {
@@ -218,4 +240,4 @@ Nunca saem `organization_id` nem o id do item de resposta. A ordem é por `gener
 
 ## Origem e validação
 
-Controller `src/modules/Alert/alert.controller.ts`; casos de uso `src/modules/Alert/ListAlerts/listAlerts.useCase.ts` e `src/modules/Alert/GetAlert/getAlert.useCase.ts`; DTOs `src/modules/Alert/ListAlerts/listAlerts.dto.ts` e de resposta `src/modules/Alert/dtos/alert.dto.ts`; parser `src/modules/Alert/parsers/alert.parser.ts`; repositório `src/modules/Alert/repositories/alert.repository.ts` (consulta e avaliação); mensagem `src/modules/Alert/policies/alertMessage.policy.ts`; erros `src/modules/Alert/alert.errors.ts`; migrations `src/database/migrations/1791300000000-CreateAlerts.ts` e `1791400000000-CreateScheduledAlerts.ts`; geração de ausência e lembrete em `src/modules/Automation/` (`automation.processor.ts`, `SweepAbsences/`, `DispatchMedicationReminders/`, `repositories/`, `policies/`). Testes: `tests/modules/Alert/alert.e2e-spec.ts`, `alertUnits.spec.ts`, `alertManagement.e2e-spec.ts` (PostgreSQL descartável, guards reais, duas organizações, vínculo revogado) e `alertSchema.e2e-spec.ts`; `tests/modules/Automation/` (`absenceSweep`, `medicationReminderDispatch`, `scheduledAlertsReading`, `automationSchema`, `automationPolicies`, `automationProcessor`). Conferido contra o OpenAPI gerado (`/api/docs-json`, tag `alerts`) e contra a imagem Docker com HTTP real em 2026-11-05 (as três origens, inclusive com o Redis parado e religado). Specs `docs/superpowers/specs/2026-11-05-be-15-regras-alertas-design.md` e `2026-11-05-be-16-ausencia-lembretes-design.md`. Vault: [[2026-10-29-be-15-alerts]], [[2026-11-05-regras-e-alertas-por-valor]], [[2026-10-29-be-16-automation]] e [[2026-11-05-ausencia-e-lembretes-agendados]]. Requisitos: RF014, RF016, RNF007/008; UC13 (passos 1, 2, 4 e 5), UC11 (passo 6), UC09 (passo 4), UC08. Desde o BE-17 (2026-11-06): `status` `open|resolved`, `resolution` e `notification` da sessão (`src/modules/Alert/policies/alertScope.policy.ts`, repositório com `LEFT JOIN` em `alert_notifications` e no autor da resolução, migration `1791500000000-CreateAlertNotifications.ts`); testes `tests/modules/Alert/alertResolution.e2e-spec.ts` e o contrato OpenAPI em `alert.e2e-spec.ts`; spec `docs/superpowers/specs/2026-11-06-be-17-notificacoes-design.md`; vault [[2026-10-29-be-17-notifications]].
+Controller `src/modules/Alert/alert.controller.ts`; casos de uso `src/modules/Alert/ListAlerts/listAlerts.useCase.ts` e `src/modules/Alert/GetAlert/getAlert.useCase.ts`; DTOs `src/modules/Alert/ListAlerts/listAlerts.dto.ts` e de resposta `src/modules/Alert/dtos/alert.dto.ts`; parser `src/modules/Alert/parsers/alert.parser.ts`; repositório `src/modules/Alert/repositories/alert.repository.ts` (consulta e avaliação); mensagem `src/modules/Alert/policies/alertMessage.policy.ts`; erros `src/modules/Alert/alert.errors.ts`; migrations `src/database/migrations/1791300000000-CreateAlerts.ts` e `1791400000000-CreateScheduledAlerts.ts`; geração de ausência e lembrete em `src/modules/Automation/` (`automation.processor.ts`, `SweepAbsences/`, `DispatchMedicationReminders/`, `repositories/`, `policies/`). Testes: `tests/modules/Alert/alert.e2e-spec.ts`, `alertUnits.spec.ts`, `alertManagement.e2e-spec.ts` (PostgreSQL descartável, guards reais, duas organizações, vínculo revogado) e `alertSchema.e2e-spec.ts`; `tests/modules/Automation/` (`absenceSweep`, `medicationReminderDispatch`, `scheduledAlertsReading`, `automationSchema`, `automationPolicies`, `automationProcessor`). Conferido contra o OpenAPI gerado (`/api/docs-json`, tag `alerts`) e contra a imagem Docker com HTTP real em 2026-11-05 (as três origens, inclusive com o Redis parado e religado). Specs `docs/superpowers/specs/2026-11-05-be-15-regras-alertas-design.md` e `2026-11-05-be-16-ausencia-lembretes-design.md`. Vault: [[2026-10-29-be-15-alerts]], [[2026-11-05-regras-e-alertas-por-valor]], [[2026-10-29-be-16-automation]] e [[2026-11-05-ausencia-e-lembretes-agendados]]. Requisitos: RF014, RF016, RNF007/008; UC13 (passos 1, 2, 4 e 5), UC11 (passo 6), UC09 (passo 4), UC08. Desde o BE-17 (2026-11-06): `status` `open|resolved`, `resolution` e `notification` da sessão (`src/modules/Alert/policies/alertScope.policy.ts`, repositório com `LEFT JOIN` em `alert_notifications` e no autor da resolução, migration `1791500000000-CreateAlertNotifications.ts`); testes `tests/modules/Alert/alertResolution.e2e-spec.ts` e o contrato OpenAPI em `alert.e2e-spec.ts`; spec `docs/superpowers/specs/2026-11-06-be-17-notificacoes-design.md`; vault [[2026-10-29-be-17-notifications]]. Desde o BE-33 (2026-11-17): `patientId` opcional, filtros `source` e `sort`, `patient.mainCondition` e `followUp.author` (`listAlerts.dto.ts`, ordem em `src/modules/Alert/policies/alertOrder.policy.ts`, `LEFT JOIN` no autor do registro), sem migration nem índice novo — a consulta sem paciente conta com os índices `alerts_org_generated_idx` e `alerts_org_open_idx` do BE-22 (plano não medido em volume); testes `tests/modules/Alert/organizationAlerts.e2e-spec.ts` (PostgreSQL descartável, guards reais, duas organizações, os quatro perfis, vínculo revogado, paciente inativo, contadores iguais ao `total` da lista), `listAlerts.dto.spec.ts`, `alertUnits.spec.ts`, `alert.e2e-spec.ts` (OpenAPI) e a homologação `tests/app/homologation.e2e-spec.ts`; vault [[2026-11-17-be-33-alertas-da-organizacao]] e [[2026-11-17-lista-de-alertas-da-organizacao]].
