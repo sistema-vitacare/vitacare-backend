@@ -1,7 +1,7 @@
 ---
 title: Cadastrar usuário com convite
 status: atual
-updated: 2026-11-13
+updated: 2026-11-17
 method: POST
 path: /api/v1/users
 source: src/modules/User/user.controller.ts
@@ -13,8 +13,8 @@ source: src/modules/User/user.controller.ts
 
 O administrador da organização cadastra um usuário vinculado à própria organização (RF004; UC03 passo 3, "informando nome, e-mail e perfil de acesso"). O usuário nasce `pending` e o **convite** do passo 6 sai por um de dois canais (BE-31, decisões de Mateus em 2026-11-12/13):
 
-- **`email`**, padrão com o SMTP ligado (`SMTP_ENABLED=true`): o usuário nasce **sem senha** e recebe por e-mail um **link de uso único** para a página de aceite do frontend (`INVITATION_ACCEPT_URL?token=…`), onde **ele mesmo** cadastra a senha ([consulta](auth-convite-consultar.md) e [aceite](auth-convite-aceitar.md)). O link vale `INVITATION_TTL_HOURS` (padrão **72 h**). A resposta **nunca** traz senha.
-- **`temporary_password`**, padrão com o SMTP desligado, que é o modo de produção hoje: a resposta traz uma **senha provisória** de 24 h, exibida uma única vez, que o administrador entrega fora da API (decisão de 2026-11-03, mantida como contingência). O usuário vira `active` ao concluir o [primeiro acesso](auth-primeiro-acesso.md). Com o SMTP ligado, o admin ainda pode escolher esse canal, por exemplo para quem não tem acesso ao e-mail.
+- **`email`**, padrão com o SMTP ligado (`SMTP_ENABLED=true`, produção desde 2026-11-16): o usuário nasce **sem senha** e recebe por e-mail um **link de uso único** para a página de aceite do frontend (`INVITATION_ACCEPT_URL?token=…`), onde **ele mesmo** cadastra a senha ([consulta](auth-convite-consultar.md) e [aceite](auth-convite-aceitar.md)). O link vale `INVITATION_TTL_HOURS` (padrão **72 h**). A resposta **nunca** traz senha.
+- **`temporary_password`**, padrão com o SMTP desligado: a resposta traz uma **senha provisória** de 24 h, exibida uma única vez, que o administrador entrega fora da API (decisão de 2026-11-03, mantida como contingência). O usuário vira `active` ao concluir o [primeiro acesso](auth-primeiro-acesso.md). Com o SMTP ligado, o admin ainda pode escolher esse canal, por exemplo para quem não tem acesso ao e-mail. **Enquanto o frontend não publicar a página de aceite (`/aceitar-convite`), envie `"channel": "temporary_password"`**, porque sem ela o link do convite leva a um endereço que não existe.
 
 Vencido ou perdido, o convite é reemitido por [POST /users/{userId}/invitation](users-reemitir-convite.md), que também troca o canal. O primeiro administrador criado pelo master ([POST /organizations](organizations-criar.md)) continua com senha provisória sem prazo (D4). O limite do plano conta pendentes e ativos (decisão de 2026-11-03).
 

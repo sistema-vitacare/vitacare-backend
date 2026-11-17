@@ -2,17 +2,18 @@ import { createHash } from 'node:crypto';
 
 import request from 'supertest';
 
+import { TERMS_V1_HASH } from '@/database/migrations/1792200000001-PublishTermsOfUseV1';
 import {
-  TERMS_V1_CONTENT,
-  TERMS_V1_HASH,
-  TERMS_V1_TITLE,
-} from '@/database/migrations/1792200000001-PublishTermsOfUseV1';
+  TERMS_V2_CONTENT,
+  TERMS_V2_HASH,
+  TERMS_V2_TITLE,
+} from '@/database/migrations/1792300000000-PublishTermsOfUseV2';
 
 import { bootFullApp, type FullApp } from '../../app/fullApp.fixtures';
 
 /**
- * BE-32 de ponta a ponta sobre a API inteira, com a versao 1 publicada pela
- * migration como em producao: o login sem aceite so le o termo e a propria
+ * BE-32 de ponta a ponta sobre a API inteira, com as versoes publicadas pelas
+ * migrations como em producao (a vigente e a 2 desde a DOC-03, 2026-11-17): o login sem aceite so le o termo e a propria
  * sessao, aceita e sai; o aceite grava a prova (data, IP, navegador, versao,
  * hash, perfil e requisicao) uma vez so; uma versao nova bloqueia de novo ate
  * em sessao aberta; admin ve so a propria organizacao e o master todas, com
@@ -25,6 +26,12 @@ const describeWithInfrastructure =
   databaseUrl && redisUrl ? describe : describe.skip;
 
 const PASSWORD = 'senha definitiva do termo';
+
+/** Versao vigente publicada pelas migrations e a anterior, ainda legivel. */
+const CURRENT_VERSION = 2;
+const PREVIOUS_VERSION = 1;
+/** Versao que o teste publica a mais, para simular uma troca do termo. */
+const NEXT_VERSION = 3;
 const USER_AGENT = 'vitacare-e2e/1.0';
 
 const cpfFrom = (base: string): string => {
@@ -177,15 +184,15 @@ describeWithInfrastructure(
       await t?.close();
     }, 120000);
 
-    it('publica a versao 1 do repositorio pela migration', async () => {
+    it('publica a versao vigente do repositorio pela migration', async () => {
       const current = await http('get', '/terms/current');
 
       expect(current.status).toBe(200);
       expect(dataOf(current)).toMatchObject({
-        version: 1,
-        title: TERMS_V1_TITLE,
-        content: TERMS_V1_CONTENT,
-        contentHash: TERMS_V1_HASH,
+        version: CURRENT_VERSION,
+        title: TERMS_V2_TITLE,
+        content: TERMS_V2_CONTENT,
+        contentHash: TERMS_V2_HASH,
       });
     });
 
@@ -201,7 +208,7 @@ describeWithInfrastructure(
       expect(data.session.permissions).toEqual([]);
       expect(data.session.terms).toEqual({
         required: true,
-        currentVersion: 1,
+        currentVersion: CURRENT_VERSION,
         acceptedVersion: null,
       });
     });
@@ -223,7 +230,7 @@ describeWithInfrastructure(
       expect(profile.status).toBe(200);
       expect(dataOf<LoginData['session']>(profile)).toMatchObject({
         permissions: [],
-        terms: { required: true, currentVersion: 1 },
+        terms: { required: true, currentVersion: CURRENT_VERSION },
       });
 
       const spare = dataOf<LoginData>(
@@ -235,7 +242,7 @@ describeWithInfrastructure(
     });
 
     it('aceitar versao que nao e a vigente responde 422 e nao grava nada', async () => {
-      const wrong = await accept(masterToken, 2);
+      const wrong = await accept(masterToken, PREVIOUS_VERSION);
 
       expect(wrong.status).toBe(422);
       expect(codeOf(wrong)).toBe('TERMS_VERSION_NOT_CURRENT');
@@ -244,12 +251,12 @@ describeWithInfrastructure(
 
     it('o aceite grava a prova, audita uma vez e libera a sessao aberta', async () => {
       const before = await acceptedEvents();
-      const response = await accept(masterToken, 1);
+      const response = await accept(masterToken, CURRENT_VERSION);
 
       expect(response.status).toBe(200);
       expect(dataOf(response)).toMatchObject({
-        version: 1,
-        contentHash: TERMS_V1_HASH,
+        version: CURRENT_VERSION,
+        contentHash: TERMS_V2_HASH,
         alreadyAccepted: false,
       });
 
@@ -258,8 +265,8 @@ describeWithInfrastructure(
       expect(row).toMatchObject({
         user_agent: USER_AGENT,
         profile_code: 'platform_admin',
-        content_hash: TERMS_V1_HASH,
-        terms_version: 1,
+        content_hash: TERMS_V2_HASH,
+        terms_version: CURRENT_VERSION,
         request_id: (response.body as { meta: { requestId: string } }).meta
           .requestId,
       });
@@ -276,8 +283,8 @@ describeWithInfrastructure(
 
       expect(profile.terms).toEqual({
         required: false,
-        currentVersion: 1,
-        acceptedVersion: 1,
+        currentVersion: CURRENT_VERSION,
+        acceptedVersion: CURRENT_VERSION,
       });
       expect(profile.permissions).toContain('audit_events:read');
 
@@ -290,7 +297,7 @@ describeWithInfrastructure(
 
     it('aceitar de novo a mesma versao nao duplica nem audita', async () => {
       const before = await acceptedEvents();
-      const again = await accept(masterToken, 1);
+      const again = await accept(masterToken, CURRENT_VERSION);
 
       expect(again.status).toBe(200);
       expect(dataOf(again)).toMatchObject({ alreadyAccepted: true });
@@ -354,8 +361,8 @@ describeWithInfrastructure(
 
       const before = await acceptedEvents();
       const both = await Promise.all([
-        accept(orgs.A.adminToken, 1),
-        accept(orgs.A.adminToken, 1),
+        accept(orgs.A.adminToken, CURRENT_VERSION),
+        accept(orgs.A.adminToken, CURRENT_VERSION),
       ]);
 
       expect(both.map((response) => response.status)).toEqual([200, 200]);
@@ -368,7 +375,9 @@ describeWithInfrastructure(
       expect(await acceptanceRows(orgs.A.adminToken)).toHaveLength(1);
       expect(await acceptedEvents()).toBe(before + 1);
 
-      expect((await accept(orgs.B.adminToken, 1)).status).toBe(200);
+      expect((await accept(orgs.B.adminToken, CURRENT_VERSION)).status).toBe(
+        200,
+      );
 
       const invited = await http('post', '/users', orgs.A.adminToken, {
         name: 'Cuidadora A',
@@ -387,7 +396,7 @@ describeWithInfrastructure(
 
       expect(caregiver.state).toBe('terms_acceptance_required');
       caregiverAToken = caregiver.accessToken;
-      expect((await accept(caregiverAToken, 1)).status).toBe(200);
+      expect((await accept(caregiverAToken, CURRENT_VERSION)).status).toBe(200);
     });
 
     it('o admin ve so os aceites da propria organizacao, mesmo pedindo outra', async () => {
@@ -452,40 +461,47 @@ describeWithInfrastructure(
         dataOf<Array<{ version: number }>>(
           await http('get', '/terms/acceptances/me', caregiverAToken),
         ).map((item) => item.version),
-      ).toEqual([1]);
+      ).toEqual([CURRENT_VERSION]);
     });
 
     it('uma versao nova bloqueia de novo, ate em sessao aberta, e guarda os aceites antigos', async () => {
       expect((await http('get', '/users', orgs.A.adminToken)).status).toBe(200);
 
-      const content = '# Termo de Uso v2\n\nVersão 2\n\nTexto novo.\n';
+      const content = `# Termo de Uso v${NEXT_VERSION}\n\nVersão ${NEXT_VERSION}\n\nTexto novo.\n`;
 
       await t.dataSource.query(
         `INSERT INTO terms_versions (version, title, content, content_hash, published_at)
-       VALUES (2, 'Termo de Uso v2', $1, $2, now())`,
-        [content, createHash('sha256').update(content, 'utf8').digest('hex')],
+       VALUES ($1, $2, $3, $4, now())`,
+        [
+          NEXT_VERSION,
+          `Termo de Uso v${NEXT_VERSION}`,
+          content,
+          createHash('sha256').update(content, 'utf8').digest('hex'),
+        ],
       );
 
       const blocked = await http('get', '/users', orgs.A.adminToken);
 
       expect(blocked.status).toBe(403);
       expect(codeOf(blocked)).toBe('TERMS_ACCEPTANCE_REQUIRED');
-      expect((await accept(orgs.A.adminToken, 1)).status).toBe(422);
-      expect((await accept(orgs.A.adminToken, 2)).status).toBe(200);
+      expect((await accept(orgs.A.adminToken, CURRENT_VERSION)).status).toBe(
+        422,
+      );
+      expect((await accept(orgs.A.adminToken, NEXT_VERSION)).status).toBe(200);
       expect((await http('get', '/users', orgs.A.adminToken)).status).toBe(200);
 
       expect(
         dataOf<Array<{ version: number }>>(
           await http('get', '/terms/acceptances/me', orgs.A.adminToken),
         ).map((item) => item.version),
-      ).toEqual([2, 1]);
+      ).toEqual([NEXT_VERSION, CURRENT_VERSION]);
       expect(
         (await acceptanceRows(orgs.A.adminToken)).map(
           (row) => row.terms_version,
         ),
-      ).toEqual([1, 2]);
+      ).toEqual([CURRENT_VERSION, NEXT_VERSION]);
 
-      // Quem ainda nao aceitou a 2 volta a ver o estado no login.
+      // Quem ainda nao aceitou a nova volta a ver o estado no login.
       const relogin = dataOf<LoginData>(
         await login(orgs.B.code, `admin@${orgs.B.code}.test`, PASSWORD),
       );
@@ -493,16 +509,21 @@ describeWithInfrastructure(
       expect(relogin.state).toBe('terms_acceptance_required');
       expect(relogin.session.terms).toEqual({
         required: true,
-        currentVersion: 2,
-        acceptedVersion: 1,
+        currentVersion: NEXT_VERSION,
+        acceptedVersion: CURRENT_VERSION,
       });
 
-      // A versao 1 continua legivel como prova.
+      // As versoes anteriores continuam legiveis como prova.
       const v1 = await http('get', '/terms/versions/1');
 
       expect(dataOf<{ contentHash: string }>(v1).contentHash).toBe(
         TERMS_V1_HASH,
       );
+      expect(
+        dataOf<{ contentHash: string }>(
+          await http('get', `/terms/versions/${CURRENT_VERSION}`),
+        ).contentHash,
+      ).toBe(TERMS_V2_HASH);
     });
 
     it('a pagina e o JSON abrem sem login e mostram o mesmo texto', async () => {

@@ -1,7 +1,7 @@
 ---
 title: Manual de integração da API VitaCare
 status: atual
-updated: 2026-11-13
+updated: 2026-11-17
 ---
 
 # Manual de integração da API VitaCare
@@ -167,7 +167,7 @@ Todo usuário de organização cliente tem um de quatro **perfis fixos**: `admin
 
 O administrador da organização gerencia os usuários do próprio tenant pelas rotas `/api/v1/users` (BE-06, 2026-11-03). O usuário nasce `pending` no [cadastro](endpoints/users-criar.md), e o **convite** do UC03 sai por um de dois canais (BE-31, decisões de Mateus em 2026-11-12/13). A troca entre eles é só de configuração (`SMTP_ENABLED`):
 
-- **SMTP desligado (produção hoje): senha provisória.** A senha é devolvida uma única vez ao administrador, que a entrega fora da API. O usuário entra só pela sessão restrita e vira `active` ao concluir o [primeiro acesso](endpoints/auth-primeiro-acesso.md). Vale 24 horas. A resposta é a de antes do BE-31, com o campo `channel: "temporary_password"` a mais.
+- **SMTP desligado (padrão fora da produção): senha provisória.** A senha é devolvida uma única vez ao administrador, que a entrega fora da API. O usuário entra só pela sessão restrita e vira `active` ao concluir o [primeiro acesso](endpoints/auth-primeiro-acesso.md). Vale 24 horas. A resposta é a de antes do BE-31, com o campo `channel: "temporary_password"` a mais.
 - **SMTP ligado: link por e-mail.** O usuário nasce sem senha e recebe um link de uso único para a página de aceite do frontend (`INVITATION_ACCEPT_URL?token=…`), onde **ele mesmo** cadastra a senha. O link vale `INVITATION_TTL_HOURS` (padrão 72 h). O admin **não vê senha nenhuma**: a resposta traz `channel: "email"` e `delivery.status` (`sent` ou `failed`). Se o envio falhar, o link é revogado na hora. Com o SMTP ligado, o admin ainda pode pedir `channel: "temporary_password"`.
 
 Vencido, perdido ou com o envio falho, o convite é [reemitido](endpoints/users-reemitir-convite.md), no mesmo canal ou trocando-o, e o anterior para de valer antes do envio. `invitation` em cada usuário mostra `channel`, `status` (`pending`, `expired` ou `invalidated`, este quando o link foi revogado), `expiresAt` e `sentAt`. O link também morre quando o e-mail do pendente [muda](endpoints/users-atualizar.md), quando o usuário é [inativado](endpoints/users-inativar.md) ou quando a organização é [inativada](endpoints/organizations-inativar.md). O primeiro administrador criado pelo master continua com senha provisória sem prazo.
@@ -176,7 +176,19 @@ Usuários `pending` e `active`, o primeiro administrador incluído, contam no li
 
 Rotas públicas de autenticação: login, solicitação de recuperação, redefinição por token e, desde o BE-31, [consulta](endpoints/auth-convite-consultar.md) e [aceite](endpoints/auth-convite-aceitar.md) do convite por link. Todo o resto exige Bearer, e o OpenAPI marca isso no esquema `bearer`.
 
-> **Não existe SMTP configurado em nenhum ambiente** (decisão de 2026-09-22). Por isso, em produção o convite de usuário é a senha provisória. A solicitação de recuperação responde `202` com `meta.message` orientando a procurar o administrador, mas não cria token nem envia mensagem. O canal operacional de recuperação é a [redefinição administrativa](endpoints/auth-redefinir-senha-usuario.md) (recuperação assistida, 2026-10-29): senha temporária válida por 24 horas, reemitida pelo administrador quando vence ou se perde. O envio por link passa a valer apenas quando houver servidor de e-mail.
+> **SMTP ligado em produção desde 2026-11-16 (OPS-01).** A decisão de 2026-09-22, que deixava o projeto sem SMTP, foi revista. Em produção:
+>
+> - a [recuperação de senha](endpoints/auth-solicitar-recuperacao.md) envia o link por e-mail;
+> - o convite padrão é o link por e-mail.
+>
+> A [redefinição administrativa](endpoints/auth-redefinir-senha-usuario.md) (recuperação assistida, 2026-10-29) continua disponível: é uma senha temporária válida por 24 horas, reemitida pelo administrador. Use-a quando o usuário não tem acesso ao e-mail ou quando o SMTP está desligado.
+>
+> Sem SMTP (`SMTP_ENABLED=false`, padrão fora da produção):
+>
+> - a solicitação de recuperação responde `202` com `meta.message` orientando a procurar o administrador, mas não cria token;
+> - o convite é a senha provisória.
+>
+> **Enquanto o frontend não publicar a página de aceite (`/aceitar-convite`), cadastre usuários com `"channel": "temporary_password"`.** Sem essa página, o link do convite leva a um endereço que não existe.
 
 A senha tem de 8 a 128 **caracteres**, aceita espaços e Unicode e não tem regra de composição. O armazenamento usa Argon2id.
 
@@ -372,7 +384,7 @@ Profissional sem vínculo não é notificado, mas lê os alertas da organizaçã
 - a inscrição foi revogada (`PUSH_SUBSCRIPTION_REVOKED`);
 - o alerta foi resolvido (`ALERT_RESOLVED`);
 - a organização foi inativada (`ORGANIZATION_INACTIVE`; organização inativa também não gera notificação nova);
-- o canal está desligado no servidor (`CHANNEL_DISABLED`). Hoje o SMTP está desligado e o push só liga com chaves VAPID.
+- o canal está desligado no servidor (`CHANNEL_DISABLED`). Em produção, o SMTP está ligado desde 2026-11-16 e as chaves VAPID foram configuradas em 2026-11-17 (OPS-01). O push no navegador ainda depende do service worker do frontend.
 
 Falha temporária (rede, `429`, `5xx`, SMTP `4xx`) tenta de novo após 1 min, 5 min, 30 min e 2 h, até 5 tentativas; falha definitiva fica `failed`. Inscrição expirada (`404`/`410`) é revogada. Não há promessa de exatamente uma vez: uma queda entre o envio e a gravação pode repetir um push ou e-mail.
 
@@ -652,7 +664,7 @@ Os protótipos do TCC (Figuras 31–46) mostram elementos que **não têm rota n
 | Formato XLSX | 43 | adiada | PDF gerado na hora |
 | Relatório diário às 7h | 46 | adiada | nada |
 | Aviso ao admin quando familiar acessa | 46 | aviso adiado | consulta pela auditoria: `GET /audit-events` com a ação `auth.login_succeeded` |
-| 2FA dos administradores | 46 | adiada | nada; login só com e-mail e senha |
+| 2FA dos administradores | 46 | adiada | nada; login só com código da organização, e-mail e senha |
 | Seletor "sessão máxima sem atividade" | 46 | valor fixo | informativo: 30 min sem atividade e 12 h absolutas, iguais para todos |
 | Aba Integrações; plano "Pro - Clínica", armazenamento, registros/mês | 46 | fora de escopo / catálogo Basic e Enterprise | `GET /organizations/me/plan` |
 

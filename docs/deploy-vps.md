@@ -529,6 +529,13 @@ com "Versão <commit> no ar em <APP_URL>" no fim do deploy (o job espera
 
 ### 11. Monitoramento e backup
 
+> **Estado em 2026-11-17 (OPS-01):** os monitores do Kuma foram concluídos por
+> Mateus. O backup próprio do VitaCare (cron do `backup.sh`), a cópia externa e
+> o ensaio de restauração ficaram **fora do escopo** por decisão de Mateus
+> (projeto acadêmico; vale o backup completo do servidor que ele mantém). As
+> instruções de backup abaixo ficam para uso futuro. Sem o cron, o monitor
+> `vitacare backup` cai depois de 25 h: pause-o no Kuma até o cron existir.
+
 **Uptime Kuma**, cada monitor com a notificação SMTP (a mesma caixa
 `no-reply@vitacare.bizys.com.br`, `smtp.hostinger.com:465`, Security TLS):
 
@@ -572,8 +579,9 @@ vira no máximo um arquivo órfão; um removido nesse intervalo deixaria linha s
 arquivo após um restore (raro às 03:20).
 
 **Cópia externa (camada 3 de `vps-hostinger-backup`) ainda não existe**: sem
-ela, perder a VPS ou a conta perde os backups. Destino a decidir por Mateus
-(adiado em 2026-11-16).
+ela, perder a VPS ou a conta perde os backups. Adiada em 2026-11-16 e
+deixada fora do escopo em 2026-11-17 por decisão de Mateus, junto com o cron
+do `backup.sh`.
 
 **Logs**: Grafana → Loki. Ver [Observabilidade](#observabilidade).
 
@@ -637,7 +645,9 @@ Anotar o `time` na nota da tarefa no vault: é a medição do RTO.
 - O `down` da `1792100000000-CreateUserInvitations` (BE-31) **recusa** a
   reversão enquanto houver usuário `pending` por link (sem senha), com mensagem
   que diz quantos. Reemita o convite deles com `channel: "temporary_password"`
-  ou inative-os antes de reverter. Com o SMTP desligado, não existe nenhum.
+  ou inative-os antes de reverter. Com o SMTP desligado, não existe nenhum;
+  com o SMTP ligado (produção desde 2026-11-16), pode existir, então confira
+  antes de reverter.
   O código anterior ao BE-31 roda sobre o schema novo enquanto não houver
   pendente por link.
 - Nunca automático; nunca `migration:revert` sem backup do dia.
@@ -671,7 +681,7 @@ do Express, o mesmo da auditoria), e não o do NPM (OPS-01, 2026-11-16):
 | Meta | Valor | Medido localmente em 2026-11-10 (512 MiB, 1 CPU, 1.000 pacientes, 5.000 registros) |
 | --- | --- | --- |
 | RPO | 24 h | backup diário único (banco + anexos), 14 dias |
-| RTO | 4 h | restauração 1 s e API de pé em 12–16 s com o conjunto de teste; **VPS a medir** |
+| RTO | 4 h | restauração 1 s e API de pé em 12–16 s com o conjunto de teste; ensaio na VPS fora do escopo (2026-11-17) |
 | p95 leitura | ≤ 500 ms | **591 ms sem pausa (não atingida)** · 181 ms com pausa de ~1 s |
 | p95 escrita | ≤ 1 s | 652 ms sem pausa · 273 ms com pausa |
 | p95 PDF/CSV | ≤ 5 s | 956 ms sem pausa · 352 ms com pausa |
@@ -684,9 +694,11 @@ lenta (com 5 sessões, p50 de 20–40 ms). Com pausa (`--think-ms 1000`), todas 
 metas são atingidas, mas o p99 chega a ~2,4 s quando um painel (`GET /dashboard`,
 várias consultas em paralelo no pool de 10) ou um CSV de ~10.000 eventos
 (montado de forma síncrona) coincide com a carga. Login: com 1 CPU o argon2id
-padrão faz ~3–4 hashes/s; 10 logins simultâneos levam até ~4,8 s. Saídas
-possíveis (decisão de Mateus): aceitar o modelo com pausa, `API_CPUS=2`,
-otimizar painel/CSV, ajustar o argon2.
+padrão faz ~3–4 hashes/s; 10 logins simultâneos levam até ~4,8 s. A meta de
+leitura e os parâmetros do argon2 ficam **a revisitar no uso** (decisão de
+Mateus em 2026-11-12), sem bloquear a conclusão do backend. Saídas possíveis
+quando voltar ao tema: aceitar o modelo com pausa, `API_CPUS=2`, otimizar
+painel/CSV, ajustar o argon2.
 
 Sem SLA ou SLO de disponibilidade: não declarar.
 
@@ -702,7 +714,8 @@ Marcar só o que foi conferido, com a data. Estado da OPS-01 em
 - [x] IP real do cliente conferido de uma rede externa (passo 8), concluído por
       Mateus em 2026-11-17.
 - [ ] Termo de uso publicado: na API, sim — o master aceitou a versão 1 em
-      2026-11-16 pelo domínio. Falta o frontend linkar `/termos` no rodapé e
+      2026-11-16 pelo domínio, e a versão 2 (DOC-03, 2026-11-17, sem a promessa
+      de cópia de segurança diária) sai no deploy seguinte e pede novo aceite. Falta o frontend linkar `/termos` no rodapé e
       tratar `403 TERMS_ACCEPTANCE_REQUIRED` ([Termo de uso](#termo-de-uso-e-aceite-be-32)).
 - [x] `CORS_ORIGINS` só com a origem do frontend (preflight de
       `https://vitacare.bizys.com.br` com `204` em 2026-11-16).
@@ -767,12 +780,13 @@ Marcar só o que foi conferido, com a data. Estado da OPS-01 em
 - **Texto:** `docs/termos/termo-de-uso-v<N>.md`, versionado no repositório. A
   versão publicada é identificada pelo número e pelo SHA-256 do conteúdo.
 - **Publicação:** só por migration, no deploy. A versão 1 vem da
-  `1792200000001-PublishTermsOfUseV1`, que guarda o texto e o hash como
-  constantes (um teste confere que batem com o arquivo). Para uma versão nova:
+  `1792200000001-PublishTermsOfUseV1` e a versão 2 (vigente desde a DOC-03,
+  2026-11-17) da `1792300000000-PublishTermsOfUseV2`. Cada uma guarda o texto e
+  o hash como constantes, e um teste confere que batem com o arquivo. Para uma versão nova:
   1. criar `docs/termos/termo-de-uso-v<N>.md` (Markdown simples: `#`, `##`,
      parágrafos, listas `-` e `1.`, negrito `**`; sem tabela nem link);
   2. criar a migration `PublishTermsOfUseV<N>` no mesmo molde, com teste de
-     hash igual ao da v1;
+     hash igual ao da v1 e da v2 (`tests/modules/Terms/termsContent.spec.ts`);
   3. merge na `main`: o entrypoint aplica a migration e, a partir da requisição
      seguinte, **todos** os usuários precisam aceitar de novo (inclusive quem
      está logado). Os aceites antigos continuam guardados.
@@ -781,13 +795,13 @@ Marcar só o que foi conferido, com a data. Estado da OPS-01 em
 - **Prova:** `terms_acceptances` (imutável por trigger) com data e hora do
   servidor, IP (regra `TRUST_PROXY`), navegador, versão, hash, perfil e
   requisição; consulta em `GET /api/v1/terms/acceptances` (admin da própria
-  organização, master de todas). O backup diário leva a tabela junto.
+  organização, master de todas). O backup do banco leva a tabela junto.
 - **Reverter** a publicação é recusado quando alguém já aceitou a versão: o
   aceite é prova e não pode perder o texto.
 - **Smoke e carga:** o modo `read` não faz login; `full`, `verify` e
   `load.mjs` aceitam o termo com as contas sintéticas que criam.
 - **Ordem de publicação:** o merge na `main` dispara o deploy, e o entrypoint
-  publica a versão 1 na subida. A partir da requisição seguinte, **todo**
+  publica a versão nova na subida (a 1 no BE-32, a 2 na DOC-03). A partir da requisição seguinte, **todo**
   usuário recebe `terms_acceptance_required` no login e `403
   TERMS_ACCEPTANCE_REQUIRED` nas demais rotas. Publique o frontend com a tela
   do termo e o tratamento do `403` **antes ou junto** deste merge; sem isso,

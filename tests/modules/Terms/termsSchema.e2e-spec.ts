@@ -6,6 +6,10 @@ import {
   PublishTermsOfUseV11792200000001,
   TERMS_V1_HASH,
 } from '@/database/migrations/1792200000001-PublishTermsOfUseV1';
+import {
+  PublishTermsOfUseV21792300000000,
+  TERMS_V2_HASH,
+} from '@/database/migrations/1792300000000-PublishTermsOfUseV2';
 import { provisionTenantProfiles } from '@/modules/Access/repositories/tenantProfileProvisioning.repository';
 
 import {
@@ -18,13 +22,18 @@ import {
  * BE-32: `terms_versions` (global) e `terms_acceptances` (por organizacao) sao
  * imutaveis por trigger, o hash e conferido pelo banco, aceitar a mesma versao
  * duas vezes viola a unicidade e o `down` da publicacao recusa apagar uma
- * versao ja aceita.
+ * versao ja aceita. Desde a DOC-03 (2026-11-17) a versao 2 e publicada por
+ * outra migration, no mesmo molde.
  */
 
 const databaseUrl = process.env.VITACARE_TEST_DATABASE_URL;
 const describeWithDatabase = databaseUrl ? describe : describe.skip;
 
-const MIGRATIONS = [...ALL_MIGRATIONS, PublishTermsOfUseV11792200000001];
+const MIGRATIONS = [
+  ...ALL_MIGRATIONS,
+  PublishTermsOfUseV11792200000001,
+  PublishTermsOfUseV21792300000000,
+];
 
 const sha256 = (text: string) =>
   createHash('sha256').update(text, 'utf8').digest('hex');
@@ -160,21 +169,34 @@ describeWithDatabase('terms_versions e terms_acceptances (e2e)', () => {
     await dataSource.destroy();
   }, 60000);
 
-  it('publica a versao 1 com o hash conferido pelo banco', async () => {
-    const [row] = await dataSource.query<
-      Array<{ title: string; content_hash: string; content: string }>
-    >('SELECT title, content_hash, content FROM terms_versions');
+  it('publica as versoes 1 e 2 com o hash conferido pelo banco', async () => {
+    const rows = await dataSource.query<
+      Array<{
+        version: number;
+        title: string;
+        content_hash: string;
+        content: string;
+      }>
+    >(
+      'SELECT version, title, content_hash, content FROM terms_versions ORDER BY version',
+    );
 
-    expect(row.title).toBe('Termo de Uso e Privacidade do VitaCare');
-    expect(row.content_hash).toBe(TERMS_V1_HASH);
-    expect(sha256(row.content)).toBe(TERMS_V1_HASH);
+    expect(rows.map((row) => [row.version, row.content_hash])).toEqual([
+      [1, TERMS_V1_HASH],
+      [2, TERMS_V2_HASH],
+    ]);
+
+    for (const row of rows) {
+      expect(row.title).toBe('Termo de Uso e Privacidade do VitaCare');
+      expect(sha256(row.content)).toBe(row.content_hash);
+    }
   });
 
   it('recusa versao cujo hash nao bate com o texto', async () => {
     const error = await failure(
       dataSource,
       `INSERT INTO terms_versions (version, title, content, content_hash, published_at)
-       VALUES (2, 'T', 'texto', $1, now())`,
+       VALUES (3, 'T', 'texto', $1, now())`,
       [sha256('outro texto')],
     );
 
@@ -226,16 +248,32 @@ describeWithDatabase('terms_versions e terms_acceptances (e2e)', () => {
   });
 
   it('o down da publicacao recusa apagar versao ja aceita', async () => {
+    const versionTwo = (await scalar(
+      'SELECT id AS value FROM terms_versions WHERE version = 2',
+    ))!;
+
+    await dataSource.query(
+      `INSERT INTO terms_acceptances
+         (organization_id, user_id, terms_version_id, terms_version, content_hash, profile_code)
+       VALUES ($1, $2, $3, 2, $4, 'admin')`,
+      [organizationA, userA, versionTwo, TERMS_V2_HASH],
+    );
+
     await expect(dataSource.undoLastMigration()).rejects.toThrow(
-      'terms version 1 already accepted',
+      'terms version 2 already accepted',
     );
     expect(
       await scalar('SELECT count(*)::text AS value FROM terms_versions'),
-    ).toBe('1');
+    ).toBe('2');
   });
 
   it('sem aceite, down e up da publicacao e da estrutura voltam ao estado limpo', async () => {
     await dataSource.query('TRUNCATE terms_acceptances');
+
+    await dataSource.undoLastMigration();
+    expect(
+      await scalar('SELECT count(*)::text AS value FROM terms_versions'),
+    ).toBe('1');
 
     await dataSource.undoLastMigration();
     expect(
@@ -259,9 +297,14 @@ describeWithDatabase('terms_versions e terms_acceptances (e2e)', () => {
     expect(reapplied.map((migration) => migration.name)).toEqual([
       CreateTermsOfUse1792200000000.name,
       PublishTermsOfUseV11792200000001.name,
+      PublishTermsOfUseV21792300000000.name,
     ]);
     expect(
-      await scalar('SELECT content_hash AS value FROM terms_versions'),
-    ).toBe(TERMS_V1_HASH);
+      (
+        await dataSource.query<Array<{ content_hash: string }>>(
+          'SELECT content_hash FROM terms_versions ORDER BY version',
+        )
+      ).map((row) => row.content_hash),
+    ).toEqual([TERMS_V1_HASH, TERMS_V2_HASH]);
   });
 });

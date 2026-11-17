@@ -185,9 +185,12 @@ desenvolvimento) e, para as ja existentes, pela migration
 - Escopo por paciente (BE-09): `admin` e `professional` alcancam a organizacao
   inteira; os demais perfis so pacientes com vinculo vigente em
   `user_patients` num papel que o perfil le (`LINK_ROLES_BY_PROFILE` em
-  `Patient/policies/patient.policy.ts`; o de responsavel nao conta). Ainda **nao**
-  cobertos: tipos de vinculo e revogacao (BE-10) e campos visiveis por perfil
-  (BE-19).
+  `Patient/policies/patient.policy.ts`; o de responsavel nao conta). Tipos de
+  vinculo e revogacao vieram no BE-10; a revogacao vale na requisicao
+  seguinte. Os campos visiveis por perfil (recorte do familiar) vieram no
+  BE-19, em `readsFullPatientRecord` e `readsAnnulledFollowUps`. Modulos que
+  tocam dados de paciente usam `findPatientInScope` e `listPatientRecipients`
+  (`PatientAccess/repositories/patientAccess.query.ts`).
 
 ## Outras regras
 

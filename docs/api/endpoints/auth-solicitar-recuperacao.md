@@ -1,7 +1,7 @@
 ---
 title: Solicitação de recuperação de senha
 status: atual
-updated: 2026-10-29
+updated: 2026-11-17
 method: POST
 path: /api/v1/auth/password-recovery/request
 source: src/modules/Auth/auth.controller.ts
@@ -42,7 +42,7 @@ curl -i -X POST 'https://api.example.com/api/v1/auth/password-recovery/request' 
 
 `202 Accepted`, com `data: null` e `meta.message`. O `202` é literal: a API aceitou o pedido e não afirma que houve envio.
 
-Sem SMTP — **estado real de todos os ambientes**:
+Sem SMTP (`SMTP_ENABLED=false`, padrão fora da produção):
 
 ```json
 {
@@ -68,7 +68,7 @@ O que acontece por trás, quando a conta existe, está ativa, a organização es
 
 Com `SMTP_ENABLED=false` **nenhum token é criado**. A resposta continua `202`, e o canal operacional é a [redefinição administrativa](auth-redefinir-senha-usuario.md): o usuário procura o administrador da organização, que emite uma senha temporária válida por 24 horas.
 
-> **Estado real em 2026-10-29:** por decisão de Mateus, **não existe SMTP em nenhum ambiente** do projeto. Esta rota hoje aceita a solicitação, não cria token, não envia mensagem e devolve a orientação para procurar o administrador — em todos os casos. O envio por link descrito acima passa a valer só quando um servidor for configurado; não trate o envio como funcionalidade disponível.
+> **Estado real desde 2026-11-16 (OPS-01):** o SMTP está ligado em produção, e esta rota envia o link por e-mail em HTML no layout do VitaCare (MAIL-01, 2026-11-17). A ida à caixa de entrada foi conferida com SPF, DKIM e DMARC `PASS`. A decisão de 2026-09-22, que deixava o projeto sem SMTP, foi revista; o comportamento sem SMTP acima continua valendo nos ambientes com `SMTP_ENABLED=false`.
 
 ## Erros
 
@@ -100,7 +100,7 @@ O `429` e o `503` são os únicos desvios da resposta uniforme: eles falam do pe
 
 ## Notas de integração
 
-- Exiba `meta.message` ao usuário depois do envio do formulário. Sem SMTP, a tela de recuperação pode também apontar direto para o administrador; não peça ao usuário para aguardar e-mail.
+- Exiba `meta.message` ao usuário depois do envio do formulário. Ela já diz se o usuário deve aguardar o e-mail (SMTP ligado) ou procurar o administrador (SMTP desligado).
 - Uma nova solicitação **invalida o link anterior** da mesma conta. Pedir de novo torna o e-mail antigo inútil.
 - Retenção: a tabela guarda só o token mais recente de cada conta. Nova solicitação e redefinição administrativa apagam o anterior; a redefinição concluída fica na auditoria (`auth.password_recovered`).
 - A mensagem enviada não cita organização nem nome do usuário; contém apenas o link e o prazo.

@@ -1,7 +1,7 @@
 ---
 title: Aceitar o termo de uso
 status: atual
-updated: 2026-11-13
+updated: 2026-11-17
 method: POST
 path: /api/v1/terms/acceptances
 source: src/modules/Terms/terms.controller.ts
@@ -38,7 +38,7 @@ Nenhuma outra propriedade é aceita: propriedade extra responde `422`.
 curl -i -X POST 'https://api.example.com/api/v1/terms/acceptances' \
   -H 'Authorization: Bearer <token>' \
   -H 'Content-Type: application/json' \
-  -d '{"version":1}'
+  -d '{"version":2}'
 ```
 
 ## Resposta de sucesso
@@ -49,8 +49,8 @@ curl -i -X POST 'https://api.example.com/api/v1/terms/acceptances' \
 {
   "data": {
     "id": "5a1d7c2e-3b4f-4e6a-9c8d-7e6f5a4b3c2d",
-    "version": 1,
-    "contentHash": "d11270af9e3bfc0817118586325d9cc26444dd4e4a1cb7937cdbc754f807c641",
+    "version": 2,
+    "contentHash": "09c2057a90aaaa0af15aaf03c0d56db6fae99c47db942d1df6e2c79b32de3915",
     "acceptedAt": "2026-11-13T12:05:00.000Z",
     "alreadyAccepted": false
   },

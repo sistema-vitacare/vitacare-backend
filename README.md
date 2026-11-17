@@ -159,9 +159,17 @@ trace, nunca para a resposta HTTP.
 
 O login recebe `organizationCode`, `email` e `password`; a sessão Bearer é opaca e stateful. Senhas temporárias exigem troca no primeiro acesso.
 
-> **Decisão de 2026-09-22: não existe SMTP no projeto.** Nenhum ambiente tem servidor de e-mail configurado, e `SMTP_ENABLED` fica `false`. Consequência prática: a recuperação de senha por link **não entrega nada** — a rota responde `202` e, sem SMTP, sequer cria token. Quem perdeu a senha depende da [redefinição administrativa](docs/api/endpoints/auth-redefinir-senha-usuario.md). O código do envio já existe e passa a valer no dia em que um SMTP for configurado.
+> **SMTP ligado em produção desde 2026-11-16 (OPS-01).** O envio sai pela Hostinger, de `no-reply@vitacare.bizys.com.br`. Os quatro e-mails (recuperação de senha, alerta, aviso de plano e convite) saem em HTML desde 2026-11-17 (MAIL-01). A recuperação por link funciona, e a [redefinição administrativa](docs/api/endpoints/auth-redefinir-senha-usuario.md) continua disponível para quem não tem acesso ao e-mail. A decisão de 2026-09-22, que deixava o projeto sem SMTP, foi revista na OPS-01.
 
-`SMTP_ENABLED=false` permite iniciar a API sem SMTP e solicitações de recuperação continuam genéricas, sem criar token entregável. Com SMTP habilitado, configure `SMTP_HOST`, `SMTP_FROM` e `PASSWORD_RESET_URL`; os demais valores SMTP são opcionais conforme o provedor. Veja o manual de autenticação em `docs/api/`.
+`SMTP_ENABLED=false` (padrão fora da produção) permite iniciar a API sem SMTP. Nesse modo:
+
+- as solicitações de recuperação respondem de forma genérica, sem criar token entregável;
+- o convite de usuário é a senha provisória;
+- os e-mails de alerta e de aviso de plano ficam `skipped`.
+
+Com SMTP habilitado, configure `SMTP_HOST`, `SMTP_FROM`, `PASSWORD_RESET_URL` e `INVITATION_ACCEPT_URL`. Os demais valores SMTP são opcionais conforme o provedor.
+
+Com o SMTP ligado, o convite padrão passa a ser o link por e-mail. **Enquanto o frontend não tiver a página `/aceitar-convite`, cadastre usuários com `"channel": "temporary_password"`**, como explica `docs/deploy-vps.md`. Veja o manual de autenticação em `docs/api/`.
 
 ## Organizacao de plataforma e administrador master
 

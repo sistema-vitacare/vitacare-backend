@@ -269,20 +269,23 @@ so na de plataforma, desde `1790100000000`) e referencia `usage_plans.id` com
 catalogo; o limite de usuarios e aplicado desde o BE-06 e o de pacientes
 desde o BE-09.
 `users.cpf` e obrigatorio, armazena 11 digitos e e unico por organizacao;
-o banco verifica o formato, nao os digitos verificadores. E-mail de usuario
+o banco verifica o formato, e os digitos verificadores sao validados nos DTOs
+(`@IsCpf`, `src/common/validation/cpf.ts`). E-mail de usuario
 tambem e unico por organizacao. `organizations.legal_name` e a razao social
 opcional. `organizations.document` continua opcional e tem unicidade global
 apos converter letras para maiusculas e remover caracteres nao alfanumericos,
 inclusive para linhas com `deleted_at` preenchido. Essas escolhas foram
-confirmadas por Mateus em 2026-09-18; descoberta do tenant no login e validacao
-completa do CPF pertencem aos casos de uso futuros. Esta fatia nao inclui
-campos de formulario. P17 bloqueia a futura modelagem de formularios, nao
-estas sete tabelas. Ver
+confirmadas por Mateus em 2026-09-18. A descoberta do tenant no login (codigo
+da organizacao) veio na tarefa 2 e a validacao completa do CPF nos cadastros;
+os formularios (P17) foram modelados no BE-11, em
+`1790900000000-CreateFollowUpForms`. Ver
 `09-sistemas/vitacare/dados/vitacare-comparacao-der-mer.md` e
 `vitacare-integridade-dados.md` no vault.
 
 **Auditoria:** `before_values` e `after_values` aceitam apenas objetos JSON;
 isso nao mascara dados automaticamente. O caso de uso de gravacao deve usar
 lista de campos permitidos e excluir senhas, tokens e dados clinicos
-desnecessarios antes de inserir o evento. A tabela existe, mas a gravacao e a
-consulta de auditoria ainda dependem dos respectivos modulos.
+desnecessarios antes de inserir o evento. A gravacao passa sempre por
+`insertAuditEvent` (`src/modules/Audit/repositories/auditEvent.repository.ts`),
+e a consulta e a exportacao vieram no BE-23 (`1791700000000-AuditEventQuery`,
+que torna a tabela imutavel por trigger).

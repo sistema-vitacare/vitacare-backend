@@ -82,7 +82,7 @@ Pendências fora da tarefa:
 | B8 | SMTP no Kuma | ✅ concluído | notificação SMTP (`smtp.hostinger.com`, 465, TLS, caixa `no-reply@`) testada no Kuma. Concluído por Mateus em 2026-11-17 (declarado, sem saída anexada) |
 | B9 | Alerta por e-mail, convite e nova tentativa | ✅ concluído | 2026-11-17, na `teste-ops`: alerta (glicemia 250, regra `gt 180`) com as duas entregas `email` (cuidador vinculado e admin responsável) `sent` na 1ª tentativa, 7 s após o registro; convite com `channel: email` → `delivery.status = sent`, convite `pending` até 2026-11-20, sem senha na resposta; com a 465 de saída bloqueada (`DOCKER-USER`), novo alerta (260) ficou `pending`, `attempts = 1`, `SMTP_UNAVAILABLE`, e, liberada a porta, passou a `sent` com `attempts = 2` na tentativa de 1 min, uma entrega por destinatário, sem duplicar. Antes, foi marcado por declaração e revertido, porque a produção não tinha organização cliente |
 | C | Push (VAPID) | ✅ concluído na API | 2026-11-17: par gerado uma vez na imagem (`web-push`), guardado no cofre; `WEB_PUSH_*` na stack com `WEB_PUSH_SUBJECT` `mailto:`; API subiu sem erro de validação; `GET /notifications/push/config` com o admin da `teste-ops` respondeu `enabled: true` e a chave pública (`BPGADyGp…`). O teste no Chrome e no Firefox (inscrição, push recebido, revogação) continua pendente do service worker do frontend |
-| — | Organização de teste `teste-ops` | ✅ criada | 2026-11-17, pelo master: plano Basic, admin `mateusmenavila+admin@gmail.com` com primeiro acesso e termo v1 aceito. Antes de dados reais, inativar ou manter só como organização de teste |
+| — | Organização de teste `teste-ops` | ✅ criada | 2026-11-17, pelo master: plano Basic, admin com e-mail pessoal de Mateus (mascarado: `m***+admin@g***.com`) com primeiro acesso e termo v1 aceito. Antes de dados reais, inativar ou manter só como organização de teste |
 | D | Monitores do Kuma | ✅ concluído | `vitacare app` (domínio, aviso de certificado), `vitacare frontend`, `vitacare workers` (heartbeat) e `vitacare backup` com a notificação SMTP, e teste de queda. Concluído por Mateus em 2026-11-17 (declarado, sem saída anexada). O `vitacare backup` só recebe push depois do cron do E1 |
 | E | Backup, cron, restauração | ➖ fora do escopo (decisão de Mateus em 2026-11-17: projeto acadêmico, só o prometido no TCC) | backup completo do servidor mantido por Mateus, não conferido pelo agente; cópia externa e ensaio de restauração fora |
 | F | Carga no hardware real | ➖ fora do escopo (decisão de Mateus em 2026-11-17: projeto acadêmico, só o prometido no TCC) | o TCC não define metas numéricas; a medição local do BE-25 (2026-11-10) continua como referência |
@@ -107,7 +107,13 @@ Achados de 2026-11-16, já corrigidos na documentação:
   termo nem service worker. Os testes de SMTP e push vão direto na API; usuários
   são cadastrados com `"channel": "temporary_password"` até a integração.
 
-## Próximos passos (comandos)
+## Comandos usados (referência)
+
+> **Revisto em 2026-11-17 (DOC-03):** a OPS-01 está encerrada. Os passos A a D
+> estão concluídos e E a G ficaram fora do escopo (ver [Estado](#estado)). Os
+> comandos ficam como registro do que foi feito e como roteiro para repetir
+> (por exemplo, numa VPS nova ou para religar o backup próprio). Não são
+> pendências.
 
 ### A — pendências do domínio
 
