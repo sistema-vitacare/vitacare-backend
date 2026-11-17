@@ -1,7 +1,7 @@
 ---
 title: Redefinição administrativa de senha
 status: atual
-updated: 2026-11-03
+updated: 2026-11-17
 method: POST
 path: /api/v1/auth/users/{userId}/temporary-password
 source: src/modules/Auth/auth.controller.ts
@@ -11,7 +11,7 @@ source: src/modules/Auth/auth.controller.ts
 
 ## Propósito e acesso
 
-Gera uma senha provisória para outro usuário **da mesma organização** (RF001/RF002/RF004, UC01–UC03). Sem SMTP no projeto, é o **canal operacional de recuperação de acesso** (recuperação assistida, decidida em 2026-10-29): quem perdeu a senha procura o administrador da organização, que emite a senha provisória e a entrega por um meio fora da API.
+Gera uma senha provisória para outro usuário **da mesma organização** (RF001/RF002/RF004, UC01–UC03). É a **recuperação assistida** (decidida em 2026-10-29): quem perdeu a senha procura o administrador da organização, que emite a senha provisória e a entrega por um meio fora da API. Desde 2026-11-16 (OPS-01) o SMTP está ligado em produção, e a [recuperação por link](auth-solicitar-recuperacao.md) é o caminho normal. Esta rota continua sendo o canal de quem não tem acesso ao e-mail e o único canal em ambiente com o SMTP desligado.
 
 Autenticação: `Authorization: Bearer <token>` de sessão **normal**, com a permissão `users:reset_password`. A organização vem da sessão do administrador, nunca do caminho ou do corpo: um alvo de outro tenant responde `404`, igual a um usuário inexistente.
 

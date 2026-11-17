@@ -1,7 +1,7 @@
 ---
 title: Consultar o plano da própria organização
 status: atual
-updated: 2026-11-12
+updated: 2026-11-17
 method: GET
 path: /api/v1/organizations/me/plan
 source: src/modules/Plan/plan.controller.ts
@@ -15,7 +15,7 @@ UC04 passos 1–3 (RF018): o administrador vê o plano contratado, os recursos, 
 
 - **Limite efetivo** = limite expandido do termo corrente, se o master definiu; senão, o do catálogo. Pelo Quadro 2 do TCC só o Enterprise (`plan.expandable = true`) é expandido, e só para cima (decisão de Mateus em 2026-11-04).
 - **Vigência:** `term.endsAt = null` não vence. Com `endsAt` no passado, `term.status = "expired"`: a organização continua lendo e registrando tudo, mas **novos cadastros e reativações de usuário** são bloqueados (`409 USER_PLAN_EXPIRED`) até o master renovar. Política de vencimento decidida pelo agente em 2026-11-03, aceita por Mateus na implementação.
-- **Aviso de vencimento (BE-28, decisão de Mateus em 2026-11-12):** `term.expiryWarning` mostra na tela o mesmo aviso que os administradores ativos recebem por e-mail às 08:00 de Brasília: `within_7_days` desde as 08:00 do sétimo dia antes da data de fim, `within_1_day` desde as 08:00 do dia anterior à data de fim, e `expired` desde o fim (igual a `status = expired`). Com aviso, `meta.message` explica a data de fim, o efeito do vencimento e como pedir a renovação. Assim o UC04 ("sistema notifica o administrador") fica cumprido também enquanto o SMTP está desligado. O e-mail sai de um job, sem rota; a geração fica na auditoria (`plan_expiry_notice.generated`).
+- **Aviso de vencimento (BE-28, decisão de Mateus em 2026-11-12):** `term.expiryWarning` mostra na tela o mesmo aviso que os administradores ativos recebem por e-mail às 08:00 de Brasília: `within_7_days` desde as 08:00 do sétimo dia antes da data de fim, `within_1_day` desde as 08:00 do dia anterior à data de fim, e `expired` desde o fim (igual a `status = expired`). Com aviso, `meta.message` explica a data de fim, o efeito do vencimento e como pedir a renovação. Assim o UC04 ("sistema notifica o administrador") fica cumprido também em ambiente com o SMTP desligado. O e-mail sai de um job, sem rota; a geração fica na auditoria (`plan_expiry_notice.generated`).
 - **Uso:** `usage.users` conta `pending` + `active` com a mesma consulta que decide o limite no cadastro e na reativação (`checkPlanSeat`, BE-08), então o número exibido é o aplicado. Uso acima do limite — depois de um rebaixamento de plano — é possível e aparece como está: ninguém é inativado, só novos cadastros e reativações ficam bloqueados. `usage.patients` conta os pacientes `active` com a mesma consulta que decide o limite no [cadastro](patients-criar.md) e na [reativação](patients-reativar.md) de pacientes (BE-09, 2026-11-04); paciente inativo não conta.
 
 Autenticação: `Authorization: Bearer <token>` de sessão **normal** com `plan:read` (só o perfil `admin`). Demais perfis e o administrador master (a organização de plataforma não tem plano) → `403 AUTH_FORBIDDEN`. A organização vem **sempre** da sessão.
