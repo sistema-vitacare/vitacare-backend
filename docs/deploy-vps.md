@@ -310,6 +310,22 @@ Para testar sem servidor real, suba um Mailpit (`axllent/mailpit`, SMTP na porta
 1025 e interface web na 8025), aponte `SMTP_HOST`/`SMTP_PORT` para ele e confira
 as mensagens na interface.
 
+**Visual dos e-mails (desde 2026-11-17).** Os quatro e-mails saem em HTML no
+layout do VitaCare (faixa navy com a logo, botão teal, destaque de severidade ou
+de vencimento e rodapé padrão), sempre com a versão em texto puro junto. A logo
+vai como anexo inline (CID), embutida na API: não depende do frontend no ar nem
+de imagem remota. Não há variável nova. Para ver os quatro com dados sintéticos,
+rode localmente `npm run build` e
+`node scripts/mail/preview-emails.mjs [--out <dir>] [--smtp 127.0.0.1:1025]`:
+o script grava um `.html` e um `.txt` por e-mail e, com `--smtp`, envia ao
+Mailpit. Para ver na caixa real, envie pela Hostinger só para o seu endereço
+(`--smtp smtp.hostinger.com:465 --secure --from no-reply@vitacare.bizys.com.br
+--to <seu-endereco> --app-url https://vitacare.bizys.com.br --only <nome>`, com
+`SMTP_USER` e `SMTP_PASSWORD` no ambiente, nunca na linha de comando). Use o
+endereço real em `--app-url`: com o padrão `app.example.test`, o filtro de saída
+da Hostinger (MailChannels) devolveu os 7 e-mails com `550 5.7.1 [CS] Message
+blocked` em 2026-11-17. Mande um por vez (`--only`).
+
 ### 5. Stack no Portainer
 
 Stacks → Add stack → **Repository**:
