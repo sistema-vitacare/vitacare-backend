@@ -1,26 +1,12 @@
 import PDFDocument from 'pdfkit';
 
+import { BRAND_COLORS } from '@/common/brand/brandColors';
 import { toPdfText } from '@/modules/Report/policies/reportText.policy';
 
 type Document = PDFKit.PDFDocument;
 
-/** Paleta do frontend (`src/styles/theme.js`): navy, teal e tons de estado. */
-export const COLORS = {
-  navy: '#183058',
-  teal: '#0D7D77',
-  accent: '#00B69B',
-  muted: '#5B6B82',
-  surface: '#F3F5F7',
-  divider: '#E6E9EE',
-  critical: '#B42318',
-  criticalTint: '#FEF3F2',
-  warning: '#B54708',
-  warningTint: '#FFFAEB',
-  info: '#175CD3',
-  infoTint: '#EFF8FF',
-  success: '#067647',
-  successTint: '#ECFDF3',
-} as const;
+/** Paleta unica do sistema, a mesma dos e-mails. */
+export const COLORS = BRAND_COLORS;
 
 export const MARGIN = 48;
 const FOOTER_HEIGHT = 28;

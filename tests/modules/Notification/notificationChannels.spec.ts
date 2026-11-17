@@ -30,6 +30,28 @@ describe('SmtpNotificationMailer', () => {
     });
   });
 
+  it('envia HTML, texto e a logo inline juntos', async () => {
+    sendMail.mockResolvedValue({});
+    const rendered = {
+      ...message,
+      html: '<p>Paciente: Maria</p>',
+      attachments: [
+        {
+          filename: 'vitacare.png',
+          content: Buffer.from('png'),
+          contentType: 'image/png',
+          cid: 'logo@vitacare',
+        },
+      ],
+    };
+
+    expect(await mailer.send(rendered)).toEqual({ kind: 'sent' });
+    expect(sendMail).toHaveBeenCalledWith({
+      from: 'no-reply@example.com',
+      ...rendered,
+    });
+  });
+
   it.each([
     [{ responseCode: 550 }, { kind: 'failed', code: 'SMTP_REJECTED' }],
     [{ code: 'EENVELOPE' }, { kind: 'failed', code: 'SMTP_REJECTED' }],

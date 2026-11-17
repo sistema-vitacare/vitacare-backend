@@ -213,16 +213,62 @@ const decodeQuotedPrintable = (value: string): string =>
     'latin1',
   ).toString('utf8');
 
-/** Assunto (RFC 2047) e corpo (quoted-printable ou base64) legiveis. */
+interface MimePart {
+  headers: string;
+  body: string;
+}
+
+const splitPart = (raw: string): MimePart => {
+  const split = raw.indexOf('\n\n');
+
+  return {
+    headers: raw.slice(0, split).replace(/\n[ \t]+/g, ' '),
+    body: raw.slice(split + 2),
+  };
+};
+
+const headerOf = (headers: string, name: string): string =>
+  new RegExp(`^${name}: (.*)$`, 'im').exec(headers)?.[1] ?? '';
+
+const decodeBody = ({ headers, body }: MimePart): string => {
+  const encoding = headerOf(headers, 'Content-Transfer-Encoding').toLowerCase();
+
+  return encoding === 'base64'
+    ? Buffer.from(body.replace(/\s/g, ''), 'base64').toString('utf8')
+    : encoding === 'quoted-printable'
+      ? decodeQuotedPrintable(body)
+      : body;
+};
+
+/** Folhas do MIME (o layout manda text + html + logo inline aninhados). */
+const leaves = (part: MimePart): MimePart[] => {
+  const type = headerOf(part.headers, 'Content-Type');
+  const boundary = /boundary="?([^";]+)"?/i.exec(type)?.[1];
+
+  if (!/^multipart\//i.test(type) || !boundary) return [part];
+
+  return part.body
+    .split(`--${boundary}`)
+    .slice(1, -1)
+    .map((chunk) => splitPart(chunk.replace(/^\n/, '')))
+    .flatMap(leaves);
+};
+
+/**
+ * Assunto (RFC 2047), texto puro e HTML (quoted-printable ou base64) legiveis
+ * e os Content-ID das imagens inline.
+ */
 export const readMessage = (
   raw: string,
-): { to: string; subject: string; text: string } => {
-  const split = raw.indexOf('\n\n');
-  const headers = raw.slice(0, split).replace(/\n[ \t]+/g, ' ');
-  const body = raw.slice(split + 2);
-  const header = (name: string) =>
-    new RegExp(`^${name}: (.*)$`, 'im').exec(headers)?.[1] ?? '';
-  const subject = header('Subject')
+): {
+  to: string;
+  subject: string;
+  text: string;
+  html: string;
+  inlineIds: string[];
+} => {
+  const root = splitPart(raw.replace(/\r/g, ''));
+  const subject = headerOf(root.headers, 'Subject')
     .replace(/\?=\s+=\?/g, '?==?')
     .replace(
       /=\?UTF-8\?([QB])\?(.*?)\?=/gi,
@@ -231,13 +277,21 @@ export const readMessage = (
           ? Buffer.from(text, 'base64').toString('utf8')
           : decodeQuotedPrintable(text.replace(/_/g, ' ')),
     );
-  const encoding = header('Content-Transfer-Encoding').toLowerCase();
-  const text =
-    encoding === 'base64'
-      ? Buffer.from(body.replace(/\s/g, ''), 'base64').toString('utf8')
-      : encoding === 'quoted-printable'
-        ? decodeQuotedPrintable(body)
-        : body;
+  const parts = leaves(root);
+  const ofType = (type: string) =>
+    parts.find((part) =>
+      headerOf(part.headers, 'Content-Type').toLowerCase().startsWith(type),
+    );
+  const text = ofType('text/plain');
+  const html = ofType('text/html');
 
-  return { to: header('To'), subject, text: text.replace(/\r/g, '') };
+  return {
+    to: headerOf(root.headers, 'To'),
+    subject,
+    text: text ? decodeBody(text) : '',
+    html: html ? decodeBody(html) : '',
+    inlineIds: parts
+      .map((part) => headerOf(part.headers, 'Content-ID'))
+      .filter(Boolean),
+  };
 };

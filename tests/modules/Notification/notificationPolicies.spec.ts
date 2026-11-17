@@ -8,43 +8,58 @@ import { isAllowedPushEndpoint } from '@/modules/Notification/policies/pushEndpo
 
 describe('notificationMessage', () => {
   it.each([
-    ['critical', 'Alerta crítico', 'Crítico'],
-    ['warning', 'Alerta de atenção', 'Atenção'],
-    ['info', 'Alerta informativo', 'Informativo'],
+    ['critical', 'Alerta crítico', 'Crítico', '#B42318'],
+    ['warning', 'Alerta de atenção', 'Atenção', '#B54708'],
+    ['info', 'Alerta informativo', 'Informativo', '#175CD3'],
   ] as const)(
     'valor registrado %s: tipo e severidade, sem valor clinico',
-    (severity, title, label) => {
-      expect(
-        notificationMessage({
-          source: 'reading',
-          severity,
-          patientName: 'Maria Sintetica',
-          appUrl: 'https://app.example.com',
-        }),
-      ).toEqual({
+    (severity, title, label, color) => {
+      const message = notificationMessage({
+        source: 'reading',
+        severity,
+        patientName: 'Maria Sintetica',
+        appUrl: 'https://app.example.com',
+      });
+
+      expect(message).toMatchObject({
         title,
         body: `Paciente: Maria Sintetica · Severidade: ${label}`,
-        subject: `VitaCare: ${title}`,
-        text: `Paciente: Maria Sintetica · Severidade: ${label}\nAcesse o VitaCare para ver os detalhes: https://app.example.com`,
         url: 'https://app.example.com',
       });
+      expect(message.email.subject).toBe(`VitaCare: ${title}`);
+      expect(message.email.text).toBe(
+        [
+          title,
+          `Severidade: ${label}\nPaciente: Maria Sintetica`,
+          'Acesse o VitaCare para ver os detalhes.',
+          'Abrir no VitaCare: https://app.example.com',
+          '--\nE-mail automático do VitaCare. Não responda esta mensagem.',
+        ].join('\n\n'),
+      );
+      expect(message.email.html).toContain(`color:${color};">${label}</p>`);
+      expect(message.email.html).toContain('>Abrir no VitaCare</a>');
+      expect(message.email.html).toContain('href="https://app.example.com"');
     },
   );
 
-  it('ausencia e lembrete tem titulo proprio; sem link o texto termina em ponto', () => {
-    expect(
-      notificationMessage({
-        source: 'absence',
-        severity: 'warning',
-        patientName: 'Jose Sintetico',
-      }),
-    ).toEqual({
+  it('ausencia e lembrete tem titulo proprio; sem link nao ha botao', () => {
+    const message = notificationMessage({
+      source: 'absence',
+      severity: 'warning',
+      patientName: 'Jose Sintetico',
+    });
+
+    expect(message).toMatchObject({
       title: 'Ausência de registro',
       body: 'Paciente: Jose Sintetico · Severidade: Atenção',
-      subject: 'VitaCare: Ausência de registro',
-      text: 'Paciente: Jose Sintetico · Severidade: Atenção\nAcesse o VitaCare para ver os detalhes.',
       url: null,
     });
+    expect(message.email.subject).toBe('VitaCare: Ausência de registro');
+    expect(message.email.text).toContain(
+      'Severidade: Atenção\nPaciente: Jose Sintetico\n\nAcesse o VitaCare para ver os detalhes.',
+    );
+    expect(message.email.text).not.toContain('http');
+    expect(message.email.html).not.toContain('<a ');
     expect(
       notificationMessage({
         source: 'medication_reminder',
@@ -52,6 +67,24 @@ describe('notificationMessage', () => {
         patientName: 'Jose Sintetico',
       }).title,
     ).toBe('Lembrete de medicamento');
+  });
+
+  it('o e-mail leva so tipo, severidade e paciente, escapado no HTML', () => {
+    const { email } = notificationMessage({
+      source: 'reading',
+      severity: 'critical',
+      patientName: '<b>Ana</b> & "Filhos"',
+      appUrl: 'https://app.example.com',
+    });
+
+    expect(email.html).toContain(
+      'Paciente: &lt;b&gt;Ana&lt;/b&gt; &amp; &quot;Filhos&quot;',
+    );
+    expect(email.html).not.toContain('<b>Ana</b>');
+    expect(email.text).toContain('Paciente: <b>Ana</b> & "Filhos"');
+    expect(`${email.html}\n${email.text}`).not.toMatch(
+      /mmHg|bpm|mg\/dL|valor|regra|formulário|medicamento|CPF/i,
+    );
   });
 });
 

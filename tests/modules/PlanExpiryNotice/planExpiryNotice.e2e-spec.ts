@@ -568,6 +568,15 @@ describeWithDatabase('aviso de vencimento do plano (e2e)', () => {
         expect(message.text).toContain('solicitação de mudança de plano');
         expect(message.text).toContain(APP_URL);
         expect(message.text.toLowerCase()).not.toContain('paciente ');
+        // Layout HTML junto do texto, com a logo inline pelo CID.
+        expect(message.html).toContain('<html lang="pt-BR"');
+        expect(message.html).toContain(
+          `O plano Basic da organização ${org.code} venceu em`,
+        );
+        expect(message.html).toMatch(/>Acessar o VitaCare<\/a>/);
+        expect(message.html).toContain('src="cid:logo@vitacare"');
+        expect(message.inlineIds).toEqual(['<logo@vitacare>']);
+        expect(message.html).not.toContain(admins[0].email);
         expect(
           (await deliveriesOf(org)).every(
             (row) => row.status === 'sent' && row.sentAt !== null,

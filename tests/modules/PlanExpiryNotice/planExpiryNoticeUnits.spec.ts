@@ -44,7 +44,18 @@ describe('planExpiryEmail (BE-28)', () => {
     );
     expect(email.text).toContain('continuam funcionando');
     expect(email.text).toContain('solicitação de mudança de plano');
-    expect(email.text).toContain('https://app.example.com');
+    expect(email.text).toContain('Acessar o VitaCare: https://app.example.com');
+    expect(email.html).toMatch(
+      /<a href="https:\/\/app\.example\.com"[^>]*>Acessar o VitaCare<\/a>/,
+    );
+    expect(email.html).toContain(
+      'background-color:#FFFAEB;border-left:4px solid #B54708;',
+    );
+    expect(email.html).toContain('20/11/2026 às 23:59 (horário de Brasília)');
+    expect(email.html).toContain(
+      'Aviso automático enviado aos administradores da organização. Não responda este e-mail.<br>Organização: Clinica Exemplo</td>',
+    );
+    expect(email.html.toLowerCase()).not.toContain('paciente ');
   });
 
   it('1 dia: vence amanha; enviado na data de fim, vence hoje', () => {
@@ -76,6 +87,12 @@ describe('planExpiryEmail (BE-28)', () => {
     expect(email.text).toContain(
       'Até a renovação, a organização não consegue cadastrar nem reativar usuários e pacientes.',
     );
+    expect(email.text).toContain(
+      'Venceu em: 20/11/2026 às 23:59 (horário de Brasília)\nPlano Basic',
+    );
+    expect(email.html).toContain(
+      'background-color:#FEF3F2;border-left:4px solid #B42318;',
+    );
   });
 
   it('sem endereco da aplicacao, sem link', () => {
@@ -87,5 +104,6 @@ describe('planExpiryEmail (BE-28)', () => {
     });
 
     expect(email.text).not.toContain('http');
+    expect(email.html).not.toContain('<a ');
   });
 });

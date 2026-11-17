@@ -4,6 +4,8 @@ import type { Transporter } from 'nodemailer';
 
 import { createSmtpTransport } from '@/common/mail/smtpTransport';
 
+import { passwordRecoveryEmail } from '../policies/passwordRecoveryEmail.policy';
+
 import type {
   PasswordRecoveryMailer,
   PasswordRecoveryMessage,
@@ -21,13 +23,12 @@ export class SmtpPasswordRecoveryMailer implements PasswordRecoveryMailer {
     this.transport = createSmtpTransport(config);
   }
 
-  /** A mensagem nao diz quem e o usuario nem qual organizacao. */
+  /** HTML e texto do layout padrao; a mensagem nao identifica o usuario. */
   async send(message: PasswordRecoveryMessage): Promise<void> {
     await this.transport.sendMail({
       from: this.from,
       to: message.to,
-      subject: 'Redefinição de senha VitaCare',
-      text: `Use o link para redefinir a senha. Ele expira em ${message.expiresInMinutes} minutos: ${message.resetUrl}`,
+      ...passwordRecoveryEmail(message),
     });
   }
 }

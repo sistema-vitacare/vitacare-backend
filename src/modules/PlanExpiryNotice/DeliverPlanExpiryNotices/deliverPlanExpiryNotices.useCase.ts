@@ -82,11 +82,7 @@ export class DeliverPlanExpiryNoticesUseCase {
     });
 
     try {
-      return await this.email.send({
-        to: delivery.email,
-        subject: message.subject,
-        text: message.text,
-      });
+      return await this.email.send({ to: delivery.email, ...message });
     } catch (error) {
       this.logger.error(
         `Erro inesperado no aviso de vencimento ${delivery.id}.`,
